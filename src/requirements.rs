@@ -1,19 +1,11 @@
-use crate::BoolOrExpression;
-use crate::IntegerOrExpression;
-use crate::NumberOrExpression;
-use crate::deserialize::FromShortHand;
-use crate::deserialize::deserialize_map_list_envname;
-use crate::deserialize::deserialize_map_list_package;
-use crate::deserialize::make_shorthand_impl;
+use crate::deserialize::{
+    deserialize_map_list_envname, deserialize_map_list_package, make_shorthand_impl,
+};
+use crate::io::{Dirent, FileOrDirectory, LoadListingEnum};
+use crate::{
+    BoolOrExpression, IntegerOrExpression, NumberOrExpression, deserialize::FromShortHand,
+};
 use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
-#[serde(rename = "snake_case")]
-pub enum LoadListingEnum {
-    NoListing,
-    ShallowListing,
-    DeepListing,
-}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "class")]
@@ -35,26 +27,26 @@ pub enum ToolRequirements {
 impl FromShortHand for ToolRequirements {}
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct InlineJavascriptRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub expression_lib: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct SchemaDefRequirement {
-    //TODO
+    types: serde_yaml::Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct LoadListingRequirement {
     pub load_listing: LoadListingEnum,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct DockerRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub docker_pull: Option<String>,
@@ -71,14 +63,14 @@ pub struct DockerRequirement {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct SoftwareRequirement {
     #[serde(deserialize_with = "deserialize_map_list_package")]
     pub packages: Vec<SoftwarePackage>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct SoftwarePackage {
     pub package: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,62 +82,86 @@ pub struct SoftwarePackage {
 impl FromShortHand for SoftwarePackage {}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
-pub struct InitialWorkDirRequirement {
-    //TODO
+#[serde(untagged)]
+pub enum ListingItems {
+    Expression(String),
+    Dirent(Dirent),
+    FileOrDirectory(FileOrDirectory),
+    Vec(Vec<FileOrDirectory>),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(untagged)]
+pub enum WorkDirItems {
+    Expression(String),
+    ListingItems(Box<ListingItems>),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InitialWorkDirRequirement {
+    listing: WorkDirItems,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct EnvVarRequirement {
     #[serde(deserialize_with = "deserialize_map_list_envname", rename = "envDef")]
     pub env_def: Vec<EnvironmentDef>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct EnvironmentDef {
     pub env_name: String,
     pub env_value: String,
 }
-make_shorthand_impl!(EnvironmentDef, "env_name", "env_value");
+make_shorthand_impl!(EnvironmentDef, "envName", "envValue");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 pub struct ShellCommandRequirement;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ResourceRequirement {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cores_min: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub cores_max: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ram_min: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub ram_max: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tmpdir_min: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tmpdir_max: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub outdir_min: Option<NumberOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub outdir_max: Option<NumberOrExpression>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct WorkReuse {
     pub enable_reuse: BoolOrExpression,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct NetworkAccess {
     pub network_access: BoolOrExpression,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct InplaceUpdateRequirement {
     pub inplace_update: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ToolTimeLimit {
     pub timelimit: IntegerOrExpression,
 }
@@ -175,6 +191,14 @@ mod tests {
           InlineJavascriptRequirement: {}
         "#;
         let res = serde_yaml::from_str::<RequirementsBag>(bare_by_map);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_iwdr() {
+        let contents = include_str!("../testdata/iwdr.yaml");
+        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        dbg!(&res);
         assert!(res.is_ok());
     }
 

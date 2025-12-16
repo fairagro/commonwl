@@ -47,7 +47,7 @@ where
                 };
                 result.push(normalized);
             }
-            Ok(serde_yaml::from_value(serde_yaml::Value::Sequence(result)).unwrap())
+            Ok(serde_yaml::from_value(serde_yaml::Value::Sequence(result)).map_err(serde::de::Error::custom)?)
         }
     }
 }

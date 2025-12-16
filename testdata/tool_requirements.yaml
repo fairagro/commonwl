@@ -9,10 +9,6 @@ requirements:
     timelimit: 0
   WorkReuse:
     enableReuse: false
-  InitialWorkDirRequirement:
-    listing:
-      - entry: $(inputs.testdir)
-        writable: false
   ResourceRequirement:
     coresMin: .5
   SchemaDefRequirement:
