@@ -1,0 +1,38 @@
+requirements:
+  - class: DockerRequirement
+    dockerPull: docker.io/debian:stable-slim
+  - class: InlineJavascriptRequirement
+    expressionLib:
+      - "function foo() { return 2; }"
+  - class: ShellCommandRequirement
+  - class: ToolTimeLimit
+    timelimit: 0
+  - class: WorkReuse
+    enableReuse: false
+  - class: InitialWorkDirRequirement
+    listing:
+      - entry: $(inputs.testdir)
+        writable: false
+  - class: ResourceRequirement
+    coresMin: .5
+  - class: SchemaDefRequirement
+    types:
+      - name: name
+        type: record
+        fields:
+          - name: first
+            type: string
+          - name: last
+            type: string
+      - name: person
+        type: record
+        fields:
+          - name: name
+            type: name
+          - name: age
+            type: int
+  - class: EnvVarRequirement
+    envDef:
+      TEST_ENV: $(inputs.in)
+  - class: NetworkAccess
+    networkAccess: true
