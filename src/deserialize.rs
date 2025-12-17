@@ -69,11 +69,7 @@ macro_rules! make_deserialize_map_list_option {
             T: DeserializeOwned + FromShortHand + Clone,
         {
             if let Ok(result) = deserialize_map_list::<D, T>(deserializer, $tag) {
-                if result.is_empty() {
-                    Ok(None)
-                } else {
-                    Ok(Some(result))
-                }
+                Ok(Some(result))
             } else {
                 Ok(None)
             }
