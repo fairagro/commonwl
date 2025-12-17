@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-
 use crate::Integer;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
@@ -18,36 +17,53 @@ pub enum FileOrDirectory {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub struct File {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub basename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub dirname: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nameroot: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub nameext: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub checksum: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<Integer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub secondary_files: Option<Vec<FileOrDirectory>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub contents: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub struct Directory {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub location: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub basename: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub listing: Option<Vec<FileOrDirectory>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub struct Dirent {
     pub entry: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub entry_name: Option<String>,
-    pub writable: Option<bool>
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub writable: Option<bool>,
 }
 
 #[cfg(test)]

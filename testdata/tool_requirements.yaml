@@ -3,7 +3,7 @@ requirements:
     dockerPull: docker.io/debian:stable-slim
   InlineJavascriptRequirement:
     expressionLib:
-          - "function foo() { return 2; }"
+      - "function foo() { return 2; }"
   ShellCommandRequirement: {}
   ToolTimeLimit:
     timelimit: 0
@@ -11,6 +11,10 @@ requirements:
     enableReuse: false
   ResourceRequirement:
     coresMin: .5
+  InitialWorkDirRequirement:
+    listing:
+      - entry: $(inputs.testdir)
+        writable: false
   SchemaDefRequirement:
     types:
       - name: name

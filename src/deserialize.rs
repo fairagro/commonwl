@@ -3,7 +3,7 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 
 pub trait FromShortHand {
-    fn from_shorthand(_key: &str, _value: &str) -> Option<Value> {
+    fn from_shorthand(_key: &str, _value: Value) -> Option<Value> {
         None
     }
 }
@@ -33,21 +33,18 @@ where
                         );
                         Value::Mapping(m.clone())
                     }
-                    Value::String(s) => {
-                        //"id: type" thingy which is used for inputs
-                        if let Some(sh) = T::from_shorthand(key, s) {
+                    _ => {
+                        if let Some(sh) = T::from_shorthand(key, value.to_owned()) {
                             sh
                         } else {
                             Err(serde::de::Error::custom("From Shorthand returned None"))?
                         }
                     }
-                    _ => Err(serde::de::Error::custom(
-                        "Value is neither String nor Mapping",
-                    ))?,
                 };
                 result.push(normalized);
             }
-            Ok(serde_yaml::from_value(serde_yaml::Value::Sequence(result)).map_err(serde::de::Error::custom)?)
+            Ok(serde_yaml::from_value(serde_yaml::Value::Sequence(result))
+                .map_err(serde::de::Error::custom)?)
         }
     }
 }
@@ -64,18 +61,36 @@ macro_rules! make_deserialize_map_list {
     };
 }
 
+macro_rules! make_deserialize_map_list_option {
+    ($func_name:ident, $tag:expr) => {
+        pub fn $func_name<'de, D, T>(deserializer: D) -> Result<Option<Vec<T>>, D::Error>
+        where
+            D: Deserializer<'de>,
+            T: DeserializeOwned + FromShortHand + Clone,
+        {
+            let result = deserialize_map_list::<D, T>(deserializer, $tag)?;
+            if result.is_empty() {
+                Ok(None)
+            } else {
+                Ok(Some(result))
+            }
+        }
+    };
+}
+
 make_deserialize_map_list!(deserialize_map_list_class, "class");
 make_deserialize_map_list!(deserialize_map_list_id, "id");
 make_deserialize_map_list!(deserialize_map_list_package, "package");
 make_deserialize_map_list!(deserialize_map_list_envname, "envName");
+make_deserialize_map_list_option!(deserialize_map_list_option_name, "name");
 
 macro_rules! make_shorthand_impl {
     ($class:ident, $id:expr, $type:expr) => {
         impl FromShortHand for $class {
-            fn from_shorthand(key: &str, value: &str) -> Option<serde_yaml::Value> {
+            fn from_shorthand(key: &str, value: serde_yaml::Value) -> Option<serde_yaml::Value> {
                 let mut map = serde_yaml::Mapping::new();
                 map.insert($id.into(), serde_yaml::Value::String(key.to_owned()));
-                map.insert($type.into(), serde_yaml::Value::String(value.to_owned()));
+                map.insert($type.into(), value);
                 Some(serde_yaml::Value::Mapping(map))
             }
         }

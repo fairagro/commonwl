@@ -1,7 +1,8 @@
+use crate::OneOrMany;
 use crate::deserialize::{
     deserialize_map_list_envname, deserialize_map_list_package, make_shorthand_impl,
 };
-use crate::io::{Dirent, FileOrDirectory, LoadListingEnum};
+use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
 use crate::{
     BoolOrExpression, IntegerOrExpression, NumberOrExpression, deserialize::FromShortHand,
 };
@@ -94,7 +95,7 @@ pub enum ListingItems {
 #[serde(untagged)]
 pub enum WorkDirItems {
     Expression(String),
-    ListingItems(Box<ListingItems>),
+    ListingItems(Box<OneOrMany<ListingItems>>),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]

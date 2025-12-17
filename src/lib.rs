@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+pub mod types;
 pub mod deserialize;
-pub mod io;
+pub mod files;
 pub mod requirements;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -33,4 +34,11 @@ pub enum BoolOrExpression {
 pub enum Integer {
     Int(i32),
     Long(i64),
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
+#[serde(untagged)]
+pub enum OneOrMany<T> {
+    One(T),
+    Many(Vec<T>),
 }
