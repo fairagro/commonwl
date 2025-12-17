@@ -28,12 +28,42 @@ pub enum ToolRequirements {
 impl FromShortHand for ToolRequirements {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "class")]
+pub enum WorkflowRequirements {
+    InlineJavascriptRequirement(InlineJavascriptRequirement),
+    SchemaDefRequirement(SchemaDefRequirement),
+    LoadListingRequirement(LoadListingRequirement),
+    DockerRequirement(DockerRequirement),
+    SoftwareRequirement(SoftwareRequirement),
+    InitialWorkDirRequirement(InitialWorkDirRequirement),
+    EnvVarRequirement(EnvVarRequirement),
+    ShellCommandRequirement(ShellCommandRequirement),
+    ResourceRequirement(ResourceRequirement),
+    NetworkAccess(NetworkAccess),
+    InplaceUpdateRequirement(InplaceUpdateRequirement),
+    ToolTimeLimit(ToolTimeLimit),
+    SubworkflowFeatureRequirement(SubworkflowFeatureRequirement),
+    ScatterFeatureRequirement(ScatterFeatureRequirement),
+    MultipleInputFeatureRequirement(MultipleInputFeatureRequirement),
+    StepInputExpressionRequirement(StepInputExpressionRequirement),
+}
+impl FromShortHand for WorkflowRequirements {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "untagged")]
 pub enum ToolHints {
     Requirement(ToolRequirements),
     Any(serde_yaml::Value),
 }
 impl FromShortHand for ToolHints {}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "untagged")]
+pub enum WorkflowHints {
+    Requirement(WorkflowRequirements),
+    Any(serde_yaml::Value),
+}
+impl FromShortHand for WorkflowHints {}
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -174,6 +204,18 @@ pub struct InplaceUpdateRequirement {
 pub struct ToolTimeLimit {
     pub timelimit: IntegerOrExpression,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+pub struct SubworkflowFeatureRequirement;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+pub struct ScatterFeatureRequirement;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+pub struct MultipleInputFeatureRequirement;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+pub struct StepInputExpressionRequirement;
 
 #[cfg(test)]
 mod tests {
