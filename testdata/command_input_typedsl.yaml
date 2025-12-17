@@ -16,3 +16,9 @@ inputs:
         required: false
       - pattern: .dat2
         required: $(inputs.require_dat)
+  outdir_alt:
+    type: string[]?
+    doc: |
+      Output directory, defaults to the current directory
+    inputBinding:
+      prefix: "--outdir"

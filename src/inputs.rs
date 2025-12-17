@@ -195,7 +195,7 @@ mod tests {
         let res = serde_yaml::from_str::<InputHolder>(contents);
         dbg!(&res);
         assert!(res.is_ok());
-        assert_eq!(res.unwrap().inputs.len(), 2);
+        assert_eq!(res.unwrap().inputs.len(), 3);
     }
 
     #[test]
