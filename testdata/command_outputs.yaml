@@ -1,0 +1,50 @@
+outputs:
+  outlist:
+    type: File
+    outputBinding:
+      glob: output.txt
+  result:
+    type: File
+    outputBinding:
+      glob: input.txt
+  output:
+    type: int
+    outputBinding:
+      glob: output.txt
+      loadContents: true
+      outputEval: |
+        ${
+          var s = self[0].contents.split(/\r?\n/);
+          return parseInt(s[s.length-2]);
+        }
+  echo_out:
+    type: string
+    outputBinding:
+      glob: "step1_out"
+      loadContents: true
+      outputEval: $(self[0].contents)
+  head:
+    type: File
+    outputBinding:
+      glob: head.txt
+  log: stderr
+  output_object_document:
+    type: stdout
+  output_object_documenterr:
+    type: stderr
+  dir: Directory
+  directories:
+    type:
+      type: array
+      items: Directory
+    outputBinding: { glob: "[a,b,c]_dir" }
+  runtime:
+    type:
+      type: record
+      fields:
+        cores: long
+        outdir: string
+        outdirSize: long
+        ram: long
+        tmpdir: string
+        tmpdirSize: long

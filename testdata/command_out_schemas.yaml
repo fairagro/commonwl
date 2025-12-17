@@ -1,0 +1,43 @@
+bag:
+  - id: item-1
+    type:
+      type: record
+      fields:
+        b:
+          type: int
+        c:
+          type: int
+  - id: d
+    type:
+      type: record
+      fields:
+        - name: e
+          type: int
+        - name: f
+          type: int
+    inputBinding:
+      position: 6
+      prefix: -d
+  - id: item-16
+    type: File
+  - id: item-12
+    type: SomeBogusType
+  - id: letters
+    type:
+      type: array
+      items:
+        type: array
+        items: string
+  - id: first
+    type:
+      type: record
+      fields:
+        species:
+            - "null"
+            - type: enum
+              symbols: [homo_sapiens, mus_musculus]
+  - id: second
+    type:
+      - "null"
+      - type: enum
+        symbols: [homo_sapiens, mus_musculus]
