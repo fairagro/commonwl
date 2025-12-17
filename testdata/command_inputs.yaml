@@ -1,0 +1,103 @@
+inputs:
+  outdir:
+    type: string
+    doc: |
+      Output directory, defaults to the current directory
+    inputBinding:
+      prefix: "--outdir"
+
+  quiet:
+    type: boolean
+    doc: no diagnostic output
+    inputBinding:
+      prefix: "--quiet"
+
+  version:
+    type: boolean
+    doc: report the name & version, then quit without further processing
+    inputBinding:
+      prefix: "--version"
+
+  processfile:
+    type: File
+    format:
+      [
+        iana:application/cwl,
+        iana:application/cwl+json,
+        iana:application/cwl+yaml,
+      ]
+    doc: |
+      The CommandLineTool, ExpressionTool, or Workflow description to run.
+      Optional if the jobfile has a `cwl:tool` field to indicate which process
+      description to run.
+    inputBinding:
+      position: 1
+
+  jobfile:
+    type: File
+    doc: The input job document.
+    inputBinding:
+      position: 2
+
+  input_file: File
+  outdir_name: string
+
+  inp1:
+    type: File
+    secondaryFiles:
+      - pattern: ".2"
+        required: true
+
+  a_string:
+    type: string
+    default: z
+
+  i1:
+    type: Any
+    default: "the-default"
+
+  script:
+    type: File
+    default: { class: File, location: mkfilelist.py }
+
+  fasta_path:
+    type:
+      type: array
+      items: string
+    secondaryFiles:
+      - pattern: .fai
+        required: true
+      - pattern: .crai
+        required: false
+      - pattern: .bai
+        required: false
+      - pattern: .dat2
+        required: $(inputs.require_dat)
+
+  array_input:
+    type:
+      - type: array
+        items: File
+    inputBinding:
+      valueFrom: replacementValue
+
+  a_record:
+    type:
+      - "null"
+      - type: record
+        fields:
+          first: string
+          second: int
+          third: float
+          fourth: long
+          fifth: double
+          sixth: File
+    default:
+      first: y
+      second: 23
+      third: 2.3
+      fourth: 4242424242
+      fifth: 4200000000000000000000000000000000000000000
+      sixth:
+        class: File
+        path: whale.txt

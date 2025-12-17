@@ -4,6 +4,7 @@ pub mod types;
 pub mod deserialize;
 pub mod files;
 pub mod requirements;
+pub mod inputs;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
