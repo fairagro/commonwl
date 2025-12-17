@@ -1,0 +1,18 @@
+inputs:
+  outdir:
+    type: string?
+    doc: |
+      Output directory, defaults to the current directory
+    inputBinding:
+      prefix: "--outdir"
+  fasta_path:
+    type: string[]
+    secondaryFiles:
+      - pattern: .fai
+        required: true
+      - pattern: .crai
+        required: false
+      - pattern: .bai
+        required: false
+      - pattern: .dat2
+        required: $(inputs.require_dat)

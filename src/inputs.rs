@@ -1,5 +1,7 @@
 use crate::IntegerOrExpression;
-use crate::deserialize::{FromShortHand, deserialize_map_list_option_name, make_shorthand_impl};
+use crate::deserialize::{
+    FromShortHand, deserialize_map_list_option_name, deserialize_with_type_dsl, make_shorthand_impl,
+};
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{
     OneOrMany,
@@ -26,6 +28,7 @@ pub enum DefautltValue {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
+    #[serde(deserialize_with = "deserialize_with_type_dsl")]
     pub r#type: CommandInputParameterType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
@@ -89,6 +92,7 @@ pub struct CommandInputRecordSchema {
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputRecordField {
     pub name: String,
+    #[serde(deserialize_with = "deserialize_with_type_dsl")]
     pub r#type: OneOrMany<CommandInputType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
@@ -176,6 +180,22 @@ mod tests {
         dbg!(&res);
         assert!(res.is_ok());
         assert_eq!(res.unwrap().inputs.len(), 14);
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn test_command_input_type_dsl() {
+        #[derive(Deserialize, Debug)]
+        struct InputHolder {
+            #[serde(deserialize_with = "deserialize_map_list_id")]
+            inputs: Vec<CommandInputParameter>,
+        }
+
+        let contents = include_str!("../testdata/command_input_typedsl.yaml");
+        let res = serde_yaml::from_str::<InputHolder>(contents);
+        dbg!(&res);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().inputs.len(), 2);
     }
 
     #[test]

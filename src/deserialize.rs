@@ -1,3 +1,5 @@
+use crate::types::type_dsl;
+use serde::de::Error;
 use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use serde_yaml::Value;
 use std::collections::HashMap;
@@ -97,6 +99,16 @@ macro_rules! make_shorthand_impl {
     };
 }
 pub(crate) use make_shorthand_impl;
+
+pub fn deserialize_with_type_dsl<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let value = serde_yaml::Value::deserialize(deserializer)?;
+    let normalized = type_dsl(value);
+    T::deserialize(normalized).map_err(D::Error::custom)
+}
 
 #[cfg(test)]
 mod tests {
