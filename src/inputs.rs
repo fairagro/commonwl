@@ -3,6 +3,7 @@ use crate::deserialize::{
     FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
     deserialize_with_type_dsl, make_shorthand_impl,
 };
+use crate::outputs::{LinkMergeMethod, PickValueMethod};
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{
     OneOrMany,
@@ -308,6 +309,31 @@ pub struct CommandLineBinding {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shell_quote: Option<bool>,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowStepInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_merge: Option<LinkMergeMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pick_value: Option<PickValueMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_listing: Option<LoadListingEnum>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<DefautltValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_from: Option<String>,
+}
+
+make_shorthand_impl!(WorkflowStepInput, "id", "source");
 
 #[cfg(test)]
 mod tests {

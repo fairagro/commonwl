@@ -311,6 +311,20 @@ pub struct CommandOutputBinding {
     pub output_eval: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(untagged)]
+pub enum StringOrWorkflowStepOutput {
+    String(String),
+    WorkflowStepOutput(WorkflowStepOutput),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowStepOutput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    id: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
