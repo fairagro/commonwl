@@ -68,11 +68,14 @@ macro_rules! make_deserialize_map_list_option {
             D: Deserializer<'de>,
             T: DeserializeOwned + FromShortHand + Clone,
         {
-            let result = deserialize_map_list::<D, T>(deserializer, $tag)?;
-            if result.is_empty() {
-                Ok(None)
+            if let Ok(result) = deserialize_map_list::<D, T>(deserializer, $tag) {
+                if result.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(result))
+                }
             } else {
-                Ok(Some(result))
+                Ok(None)
             }
         }
     };
@@ -83,6 +86,7 @@ make_deserialize_map_list!(deserialize_map_list_id, "id");
 make_deserialize_map_list!(deserialize_map_list_package, "package");
 make_deserialize_map_list!(deserialize_map_list_envname, "envName");
 make_deserialize_map_list_option!(deserialize_map_list_option_name, "name");
+make_deserialize_map_list_option!(deserialize_map_list_option_class, "class");
 
 macro_rules! make_shorthand_impl {
     ($class:ident, $id:expr, $type:expr) => {

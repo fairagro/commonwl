@@ -27,6 +27,14 @@ pub enum ToolRequirements {
 }
 impl FromShortHand for ToolRequirements {}
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "untagged")]
+pub enum ToolHints {
+    Requirement(ToolRequirements),
+    Any(serde_yaml::Value),
+}
+impl FromShortHand for ToolHints {}
+
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct InlineJavascriptRequirement {

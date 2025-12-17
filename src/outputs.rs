@@ -67,6 +67,7 @@ pub enum CommandOutputType {
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputRecordSchema {
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
+    #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<CommandOutputRecordField>>,
     #[serde(skip_serializing_if = "Option::is_none")]

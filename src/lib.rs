@@ -5,6 +5,7 @@ pub mod deserialize;
 pub mod files;
 pub mod requirements;
 pub mod inputs;
+pub mod documents;
 pub mod outputs;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

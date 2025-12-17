@@ -73,6 +73,7 @@ pub enum CommandInputType {
 pub struct CommandInputRecordSchema {
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub fields: Option<Vec<CommandInputRecordField>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
