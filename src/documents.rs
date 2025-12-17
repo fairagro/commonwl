@@ -212,6 +212,7 @@ mod tests {
     fn test_command_line_tools() {
         let cwl_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
             .join("testdata")
+            .join("smoke")
             .join("commandlinetools");
         let mut count = 0;
         for entry in cwl_path.read_dir().unwrap() {
@@ -235,6 +236,7 @@ mod tests {
     fn test_expression_tools() {
         let cwl_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
             .join("testdata")
+            .join("smoke")
             .join("expressiontools");
         let mut count = 0;
         for entry in cwl_path.read_dir().unwrap() {
@@ -248,6 +250,27 @@ mod tests {
                     result_doc.unwrap(),
                     CWLDocument::ExpressionTool(_)
                 ));
+                count += 1;
+            }
+        }
+        assert_eq!(count, 3)
+    }
+
+    #[test]
+    fn test_workflows() {
+        let cwl_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
+            .join("testdata")
+            .join("smoke")
+            .join("workflows");
+        let mut count = 0;
+        for entry in cwl_path.read_dir().unwrap() {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_file() && entry.path().extension().unwrap() == "cwl" {
+                let contents = fs::read_to_string(entry.path()).unwrap();
+                let result_doc = serde_yaml::from_str::<CWLDocument>(&contents);
+                dbg!(&result_doc);
+                assert!(result_doc.is_ok());
+                assert!(matches!(result_doc.unwrap(), CWLDocument::Workflow(_)));
                 count += 1;
             }
         }
