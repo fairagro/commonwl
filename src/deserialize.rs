@@ -1,4 +1,4 @@
-use crate::types::type_dsl;
+use crate::types::{secondary_files_dsl, type_dsl};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use serde_yaml::Value;
@@ -107,6 +107,16 @@ where
 {
     let value = serde_yaml::Value::deserialize(deserializer)?;
     let normalized = type_dsl(value);
+    T::deserialize(normalized).map_err(D::Error::custom)
+}
+
+pub fn deserialize_with_secondary_files_dsl<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    let value = serde_yaml::Value::deserialize(deserializer)?;
+    let normalized = secondary_files_dsl(value);
     T::deserialize(normalized).map_err(D::Error::custom)
 }
 

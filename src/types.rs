@@ -64,12 +64,41 @@ fn type_dsl_impl(value: &serde_yaml::Value) -> Option<serde_yaml::Value> {
     }
 }
 
+pub fn secondary_files_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
+    match value {
+        serde_yaml::Value::String(value) => {
+            if value.ends_with("?") {
+                return serde_yaml::Value::Mapping(Mapping::from_iter([
+                    (
+                        serde_yaml::Value::String("pattern".into()),
+                        serde_yaml::Value::String(value[..value.len() - 1].to_string()),
+                    ),
+                    (
+                        serde_yaml::Value::String("required".into()),
+                        serde_yaml::Value::Bool(false),
+                    ),
+                ]));
+            }
+            serde_yaml::Value::Mapping(Mapping::from_iter([(
+                serde_yaml::Value::String("pattern".into()),
+                serde_yaml::Value::String(value),
+            )]))
+        }
+        serde_yaml::Value::Sequence(seq) => {
+            serde_yaml::Value::Sequence(seq.into_iter().map(secondary_files_dsl).collect())
+        }
+        _ => value,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::OneOrMany;
+    use crate::deserialize::deserialize_with_secondary_files_dsl;
 
     #[test]
-    fn test_type_dsl_impl() {
+    fn test_type_dsl() {
         let optional = "string?";
         let result = type_dsl(serde_yaml::Value::String(optional.to_owned()));
         assert_eq!(
@@ -136,5 +165,51 @@ mod tests {
                 ),
             ])),
         );
+    }
+
+    #[test]
+    fn test_secondary_files_dsl() {
+        assert_eq!(
+            secondary_files_dsl(serde_yaml::Value::String("wamborambo".to_string())),
+            serde_yaml::Value::Mapping(Mapping::from_iter([(
+                serde_yaml::Value::String("pattern".into()),
+                serde_yaml::Value::String("wamborambo".into()),
+            )]))
+        );
+
+        assert_eq!(
+            secondary_files_dsl(serde_yaml::Value::String("wamborambo?".to_string())),
+            serde_yaml::Value::Mapping(Mapping::from_iter([
+                (
+                    serde_yaml::Value::String("pattern".into()),
+                    serde_yaml::Value::String("wamborambo".into()),
+                ),
+                (
+                    serde_yaml::Value::String("required".into()),
+                    serde_yaml::Value::Bool(false),
+                )
+            ]))
+        );
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn test_secondary_files_dsl_deserialization() {
+        #[derive(Deserialize, Debug)]
+        struct SecondaryBag {
+            #[serde(rename = "secondaryFiles")]
+            #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
+            secondary_files: OneOrMany<SecondaryFileSchema>,
+        }
+
+        let contents = r#"
+        secondaryFiles:
+            - bai
+            - rampawampa?
+            - wamborambo
+            - alerta"#;
+        let sec_files = serde_yaml::from_str::<SecondaryBag>(contents);
+        dbg!(&sec_files);
+        assert!(sec_files.is_ok())
     }
 }

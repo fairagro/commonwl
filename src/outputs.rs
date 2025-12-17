@@ -1,5 +1,6 @@
 use crate::deserialize::{
-    FromShortHand, deserialize_map_list_option_name, deserialize_with_type_dsl, make_shorthand_impl,
+    FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
+    deserialize_with_type_dsl, make_shorthand_impl,
 };
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{
@@ -34,6 +35,8 @@ pub struct CommandOutputParameter {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streamable: Option<bool>,
@@ -91,6 +94,8 @@ pub struct CommandOutputRecordField {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streamable: Option<bool>,

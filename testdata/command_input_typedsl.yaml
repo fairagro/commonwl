@@ -6,14 +6,17 @@ inputs:
     inputBinding:
       prefix: "--outdir"
   fasta_path:
-    type: string[]
+    type:
+      type: array
+      items: File
     secondaryFiles:
       - pattern: .fai
         required: true
       - pattern: .crai
         required: false
-      - pattern: .bai
-        required: false
+      - .bai?
+      - "${ if (inputs.require_dat) {return '.dat'} else {return null} }"
+      - "${ return null; }"
       - pattern: .dat2
         required: $(inputs.require_dat)
   outdir_alt:
