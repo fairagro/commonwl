@@ -17,6 +17,7 @@ jobs:
       - name: Run CWL conformance examples
         run: |
           set -e
+          shopt -s globstar nullglob
 
           for file in cwl-v1.2/tests/**/*.cwl; do
             echo "Running on $file"
