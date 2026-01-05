@@ -1,0 +1,15 @@
+[package]
+name = "cwl_core"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow = "1.0.100"
+derive_builder = "0.20.2"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
+
+[lib]
+path ="lib.rs"

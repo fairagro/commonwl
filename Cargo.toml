@@ -1,12 +1,13 @@
-[package]
-name = "commonwl"
-version = "0.1.0"
+[workspace]
+members = ["crates/commonwl", "crates/core", "crates/execution"]
+
+resolver = "3"
+
+[workspace.package]
+version = "1.1.0"
 edition = "2024"
+repository = "https://github.com/fairagro/commonwl"
+license = "MIT OR Apache-2.0"
 
-[dependencies]
-anyhow = "1.0.100"
-derive_builder = "0.20.2"
-serde = { version = "1.0.228", features = ["derive"] }
-serde_yaml = "0.9.34"
-
-[dev-dependencies]
+[workspace.dependencies]
+cwl_core = { path = "crates/core" }

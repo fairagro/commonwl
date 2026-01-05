@@ -1,0 +1,12 @@
+[package]
+name = "cwl_execution"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[lib]
+path ="lib.rs"
+
+[dependencies]
+cwl_core.workspace = true

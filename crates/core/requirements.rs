@@ -250,7 +250,7 @@ mod tests {
 
     #[test]
     fn test_iwdr() {
-        let contents = include_str!("../testdata/iwdr.yaml");
+        let contents = include_str!("../../testdata/iwdr.yaml");
         let res = serde_yaml::from_str::<RequirementsBag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
@@ -258,11 +258,11 @@ mod tests {
 
     #[test]
     fn test_mapping_requirements() {
-        let contents = include_str!("../testdata/tool_requirements.yaml");
+        let contents = include_str!("../../testdata/tool_requirements.yaml");
         let res = serde_yaml::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
 
-        let contents = include_str!("../testdata/tool_requirements_list.yaml");
+        let contents = include_str!("../../testdata/tool_requirements_list.yaml");
         let res = serde_yaml::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
     }

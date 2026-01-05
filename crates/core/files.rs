@@ -81,7 +81,7 @@ mod tests {
         struct ListingBag {
             listing: Vec<FileOrDirectory>,
         }
-        let contents = include_str!("../testdata/listing.yaml");
+        let contents = include_str!("../../testdata/listing.yaml");
         let res = serde_yaml::from_str::<ListingBag>(contents);
         assert!(res.is_ok());
     }

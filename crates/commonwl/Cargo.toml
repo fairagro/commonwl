@@ -1,0 +1,17 @@
+[package]
+name = "commonwl"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+cwl_core = { path = "../core" }
+cwl_execution = { path = "../execution", optional = true }
+
+[features]
+default = []
+execution = ["cwl_execution"]
+
+[lib]
+path = "lib.rs"

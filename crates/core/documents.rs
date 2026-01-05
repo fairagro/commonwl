@@ -216,6 +216,8 @@ mod tests {
     #[test]
     fn test_command_line_tools() {
         let cwl_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
+            .join("..")
+            .join("..")
             .join("testdata")
             .join("smoke")
             .join("commandlinetools");
@@ -240,6 +242,8 @@ mod tests {
     #[test]
     fn test_expression_tools() {
         let cwl_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
+            .join("..")
+            .join("..")
             .join("testdata")
             .join("smoke")
             .join("expressiontools");
@@ -264,6 +268,8 @@ mod tests {
     #[test]
     fn test_workflows() {
         let cwl_path = Path::new(&env::var("CARGO_MANIFEST_DIR").unwrap_or(".".to_string()))
+            .join("..")
+            .join("..")
             .join("testdata")
             .join("smoke")
             .join("workflows");

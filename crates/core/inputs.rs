@@ -1,7 +1,9 @@
+use crate::IntegerOrExpression;
 use crate::deserialize::{
     FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
     deserialize_with_type_dsl, make_shorthand_impl,
 };
+use crate::outputs::{LinkMergeMethod, PickValueMethod};
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{
     OneOrMany,
@@ -13,17 +15,15 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
-pub enum CommandOutputParameterType {
-    #[serde(rename = "stdout")]
-    Stdout,
-    #[serde(rename = "stderr")]
-    Stderr,
-    CommandOutputType(OneOrMany<CommandOutputType>),
+pub enum CommandInputParameterType {
+    #[serde(rename = "stdin")]
+    Stdin,
+    CommandInputType(OneOrMany<CommandInputType>),
 }
 
-impl Default for CommandOutputParameterType {
+impl Default for CommandInputParameterType {
     fn default() -> Self {
-        CommandOutputParameterType::CommandOutputType(OneOrMany::One(CommandOutputType::default()))
+        CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::default()))
     }
 }
 
@@ -37,9 +37,9 @@ pub enum DefautltValue {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
-pub struct CommandOutputParameter {
+pub struct CommandInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
-    pub r#type: CommandOutputParameterType,
+    pub r#type: CommandInputParameterType,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,307 +54,308 @@ pub struct CommandOutputParameter {
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_binding: Option<CommandOutputBinding>,
-}
-
-make_shorthand_impl!(CommandOutputParameter, "id", "type");
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
-#[serde(rename_all = "camelCase")]
-pub struct WorkflowOutputParameter {
-    #[serde(deserialize_with = "deserialize_with_type_dsl")]
-    pub r#type: CommandOutputParameterType,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
-    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub streamable: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_source: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub link_merge: Option<LinkMergeMethod>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub pick_value: Option<PickValueMethod>,
-}
-
-make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
-#[serde(rename_all = "camelCase")]
-pub struct OperationOutputParameter {
-    #[serde(deserialize_with = "deserialize_with_type_dsl")]
-    pub r#type: OneOrMany<OutputType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
-    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub streamable: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<OneOrMany<String>>,
-}
-
-make_shorthand_impl!(OperationOutputParameter, "id", "type");
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
-#[serde(rename_all = "camelCase")]
-pub struct ExpressionToolOutputParameter {
-    #[serde(deserialize_with = "deserialize_with_type_dsl")]
-    pub r#type: OneOrMany<OutputType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
-    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub streamable: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<OneOrMany<String>>,
-}
-
-make_shorthand_impl!(ExpressionToolOutputParameter, "id", "type");
-
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum LinkMergeMethod {
-    MergeNested,
-    MergeFlattened,
-}
-
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
-#[serde(rename_all = "snake_case")]
-pub enum PickValueMethod {
-    FirstNonNull,
-    TheOnlyNonNull,
-    AllNonNull,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-pub enum CommandOutputSchema {
-    Record(CommandOutputRecordSchema),
-    Enum(CommandOutputEnumSchema),
-    Array(CommandOutputArraySchema),
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(tag = "type")]
-#[serde(rename_all = "snake_case")]
-pub enum OutputSchema {
-    Record(OutputRecordSchema),
-    Enum(OutputEnumSchema),
-    Array(OutputArraySchema),
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(untagged)]
-pub enum CommandOutputType {
-    CWLType(CWLType),
-    CommandOutputSchema(Box<CommandOutputSchema>),
-    String(String),
-}
-
-impl Default for CommandOutputType {
-    fn default() -> Self {
-        CommandOutputType::CWLType(CWLType::Null)
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(untagged)]
-pub enum OutputType {
-    CWLType(CWLType),
-    OutputSchema(Box<OutputSchema>),
-    String(String),
-}
-
-impl Default for OutputType {
-    fn default() -> Self {
-        OutputType::CWLType(CWLType::Null)
-    }
-}
-
-impl Default for OneOrMany<OutputType> {
-    fn default() -> Self {
-        OneOrMany::One(OutputType::default())
-    }
-}
-
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandOutputRecordSchema {
-    #[serde(deserialize_with = "deserialize_map_list_option_name")]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fields: Option<Vec<CommandOutputRecordField>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OutputRecordSchema {
-    #[serde(deserialize_with = "deserialize_map_list_option_name")]
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub fields: Option<Vec<OutputRecordField>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandOutputRecordField {
-    pub name: String,
-    pub r#type: OneOrMany<CommandOutputType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
-    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub streamable: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_binding: Option<CommandOutputBinding>,
-}
-
-make_shorthand_impl!(CommandOutputRecordField, "name", "type");
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OutputRecordField {
-    pub name: String,
-    pub r#type: OneOrMany<OutputType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
-    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub streamable: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<OneOrMany<String>>,
-}
-
-make_shorthand_impl!(OutputRecordField, "name", "type");
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandOutputEnumSchema {
-    pub symbols: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OutputEnumSchema {
-    pub symbols: Vec<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CommandOutputArraySchema {
-    pub items: OneOrMany<CommandOutputType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct OutputArraySchema {
-    pub items: OneOrMany<OutputType>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub doc: Option<OneOrMany<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
-#[serde(rename_all = "camelCase")]
-pub struct CommandOutputBinding {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_contents: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub glob: Option<OneOrMany<String>>,
+    pub default: Option<DefautltValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub output_eval: Option<String>,
+    pub input_binding: Option<CommandLineBinding>,
+}
+
+make_shorthand_impl!(CommandInputParameter, "id", "type");
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowInputParameter {
+    #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    pub r#type: InputType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
+    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub streamable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_listing: Option<LoadListingEnum>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<DefautltValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[deprecated(since = "1.2.0", note = "Will be removed in CWL 2.0")]
+    pub input_binding: Option<CommandLineBinding>,
+}
+
+make_shorthand_impl!(WorkflowInputParameter, "id", "type");
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
+#[serde(rename_all = "camelCase")]
+pub struct OperationInputParameter {
+    #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    pub r#type: InputType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
+    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub streamable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_listing: Option<LoadListingEnum>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<DefautltValue>,
+}
+
+make_shorthand_impl!(OperationInputParameter, "id", "type");
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+pub enum CommandInputSchema {
+    Record(CommandInputRecordSchema),
+    Enum(CommandInputEnumSchema),
+    Array(CommandInputArraySchema),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "snake_case")]
+pub enum InputSchema {
+    Record(InputRecordSchema),
+    Enum(InputEnumSchema),
+    Array(InputArraySchema),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
-pub enum StringOrWorkflowStepOutput {
+pub enum CommandInputType {
+    CWLType(CWLType),
+    CommandInputSchema(Box<CommandInputSchema>),
     String(String),
-    WorkflowStepOutput(WorkflowStepOutput),
+}
+
+impl Default for CommandInputType {
+    fn default() -> Self {
+        CommandInputType::CWLType(CWLType::Null)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(untagged)]
+pub enum InputType {
+    CWLType(CWLType),
+    InputSchema(Box<InputSchema>),
+    String(String),
+}
+
+impl Default for InputType {
+    fn default() -> Self {
+        InputType::CWLType(CWLType::Null)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct WorkflowStepOutput {
+pub struct CommandInputRecordSchema {
+    #[serde(deserialize_with = "deserialize_map_list_option_name")]
     #[serde(skip_serializing_if = "Option::is_none")]
-    id: Option<String>,
+    #[serde(default)]
+    pub fields: Option<Vec<CommandInputRecordField>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_binding: Option<CommandLineBinding>,
 }
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InputRecordSchema {
+    #[serde(deserialize_with = "deserialize_map_list_option_name")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub fields: Option<Vec<InputRecordField>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandInputRecordField {
+    pub name: String,
+    #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    pub r#type: OneOrMany<CommandInputType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
+    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub streamable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_listing: Option<LoadListingEnum>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_binding: Option<CommandLineBinding>,
+}
+
+make_shorthand_impl!(CommandInputRecordField, "name", "type");
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InputRecordField {
+    pub name: String,
+    #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    pub r#type: OneOrMany<InputType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
+    pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub streamable: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub format: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_listing: Option<LoadListingEnum>,
+}
+
+make_shorthand_impl!(InputRecordField, "name", "type");
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandInputEnumSchema {
+    pub symbols: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_binding: Option<CommandLineBinding>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InputEnumSchema {
+    pub symbols: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandInputArraySchema {
+    pub items: OneOrMany<CommandInputType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_binding: Option<CommandLineBinding>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct InputArraySchema {
+    pub items: OneOrMany<CommandInputType>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub doc: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandLineBinding {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<IntegerOrExpression>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub separate: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_separator: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_from: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shell_quote: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowStepInput {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<OneOrMany<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub link_merge: Option<LinkMergeMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pick_value: Option<PickValueMethod>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_contents: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub load_listing: Option<LoadListingEnum>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<DefautltValue>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value_from: Option<String>,
+}
+
+make_shorthand_impl!(WorkflowStepInput, "id", "source");
 
 #[cfg(test)]
 mod tests {
@@ -363,18 +364,34 @@ mod tests {
 
     #[test]
     #[allow(unused)]
-    fn test_command_output_params() {
+    fn test_command_input_params() {
         #[derive(Deserialize, Debug)]
-        struct OutputHolder {
+        struct InputHolder {
             #[serde(deserialize_with = "deserialize_map_list_id")]
-            outputs: Vec<CommandOutputParameter>,
+            inputs: Vec<CommandInputParameter>,
         }
 
-        let contents = include_str!("../testdata/command_outputs.yaml");
-        let res = serde_yaml::from_str::<OutputHolder>(contents);
+        let contents = include_str!("../../testdata/command_inputs.yaml");
+        let res = serde_yaml::from_str::<InputHolder>(contents);
         dbg!(&res);
         assert!(res.is_ok());
-        assert_eq!(res.unwrap().outputs.len(), 11);
+        assert_eq!(res.unwrap().inputs.len(), 14);
+    }
+
+    #[test]
+    #[allow(unused)]
+    fn test_command_input_type_dsl() {
+        #[derive(Deserialize, Debug)]
+        struct InputHolder {
+            #[serde(deserialize_with = "deserialize_map_list_id")]
+            inputs: Vec<CommandInputParameter>,
+        }
+
+        let contents = include_str!("../../testdata/command_input_typedsl.yaml");
+        let res = serde_yaml::from_str::<InputHolder>(contents);
+        dbg!(&res);
+        assert!(res.is_ok());
+        assert_eq!(res.unwrap().inputs.len(), 3);
     }
 
     #[test]
@@ -387,10 +404,10 @@ mod tests {
         #[derive(Deserialize, Debug)]
         struct BagHolder {
             id: String,
-            r#type: OneOrMany<CommandOutputType>,
+            r#type: OneOrMany<CommandInputType>,
         }
 
-        let contents = include_str!("../testdata/command_out_schemas.yaml");
+        let contents = include_str!("../../testdata/command_schemas.yaml");
         let res = serde_yaml::from_str::<Bag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
