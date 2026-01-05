@@ -20,5 +20,5 @@ jobs:
 
           for file in cwl-v1.2/conformance/*.cwl; do
             echo "Running on $file"
-            cargo run --release --example cwl_load -- "$file"
+            cargo run --example cwl_load "$file"
           done
