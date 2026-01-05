@@ -1,0 +1,25 @@
+name: 🦆 CWL Conformance Tests
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  cwl-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - run: cargo build --release
+      - run: git clone https://github.com/common-workflow-language/cwl-v1.2
+
+      - name: Run CWL conformance examples
+        run: |
+          set -e
+
+          for file in cwl-v1.2/conformance/*.cwl; do
+            echo "Running on $file"
+            cargo run --release --example cwl_load -- "$file"
+          done
