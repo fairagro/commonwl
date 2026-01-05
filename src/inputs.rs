@@ -10,6 +10,7 @@ use crate::{
     files::{FileOrDirectory, LoadListingEnum},
 };
 
+use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -20,6 +21,12 @@ pub enum CommandInputParameterType {
     CommandInputType(OneOrMany<CommandInputType>),
 }
 
+impl Default for CommandInputParameterType {
+    fn default() -> Self {
+        CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::default()))
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum DefautltValue {
@@ -27,7 +34,8 @@ pub enum DefautltValue {
     Any(serde_yaml::Value),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -58,7 +66,8 @@ pub struct CommandInputParameter {
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -90,7 +99,8 @@ pub struct WorkflowInputParameter {
 
 make_shorthand_impl!(WorkflowInputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -145,12 +155,24 @@ pub enum CommandInputType {
     String(String),
 }
 
+impl Default for CommandInputType {
+    fn default() -> Self {
+        CommandInputType::CWLType(CWLType::Null)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum InputType {
     CWLType(CWLType),
     InputSchema(Box<InputSchema>),
     String(String),
+}
+
+impl Default for InputType {
+    fn default() -> Self {
+        InputType::CWLType(CWLType::Null)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]

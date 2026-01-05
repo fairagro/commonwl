@@ -8,6 +8,7 @@ use crate::{
     files::{FileOrDirectory, LoadListingEnum},
 };
 
+use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -17,7 +18,13 @@ pub enum CommandOutputParameterType {
     Stdout,
     #[serde(rename = "stderr")]
     Stderr,
-    CommandInputType(OneOrMany<CommandOutputType>),
+    CommandOutputType(OneOrMany<CommandOutputType>),
+}
+
+impl Default for CommandOutputParameterType {
+    fn default() -> Self {
+        CommandOutputParameterType::CommandOutputType(OneOrMany::One(CommandOutputType::default()))
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -27,7 +34,8 @@ pub enum DefautltValue {
     Any(serde_yaml::Value),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -52,7 +60,8 @@ pub struct CommandOutputParameter {
 
 make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -81,7 +90,8 @@ pub struct WorkflowOutputParameter {
 
 make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -104,7 +114,8 @@ pub struct OperationOutputParameter {
 
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionToolOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -168,6 +179,12 @@ pub enum CommandOutputType {
     String(String),
 }
 
+impl Default for CommandOutputType {
+    fn default() -> Self {
+        CommandOutputType::CWLType(CWLType::Null)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum OutputType {
@@ -175,6 +192,19 @@ pub enum OutputType {
     OutputSchema(Box<OutputSchema>),
     String(String),
 }
+
+impl Default for OutputType {
+    fn default() -> Self {
+        OutputType::CWLType(CWLType::Null)
+    }
+}
+
+impl Default for OneOrMany<OutputType> {
+    fn default() -> Self {
+        OneOrMany::One(OutputType::default())
+    }
+}
+
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -298,7 +328,8 @@ pub struct OutputArraySchema {
     pub name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputBinding {
     #[serde(skip_serializing_if = "Option::is_none")]

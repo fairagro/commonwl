@@ -6,6 +6,7 @@ use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
 use crate::{
     BoolOrExpression, IntegerOrExpression, NumberOrExpression, deserialize::FromShortHand,
 };
+use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -84,7 +85,8 @@ pub struct LoadListingRequirement {
     pub load_listing: LoadListingEnum,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct DockerRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -160,7 +162,8 @@ make_shorthand_impl!(EnvironmentDef, "envName", "envValue");
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 pub struct ShellCommandRequirement;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]

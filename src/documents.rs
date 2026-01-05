@@ -13,6 +13,7 @@ use crate::{
     deserialize::deserialize_map_list_id, deserialize::deserialize_map_list_option_class,
     outputs::CommandOutputParameter,
 };
+use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -38,7 +39,8 @@ pub enum Argument {
     Binding(CommandLineBinding),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -81,7 +83,8 @@ pub struct CommandLineTool {
     pub permanent_fail_codes: Option<Vec<i32>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -109,7 +112,8 @@ pub struct ExpressionTool {
     pub intent: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -136,7 +140,8 @@ pub struct Operation {
     pub intent: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -275,5 +280,14 @@ mod tests {
             }
         }
         assert_eq!(count, 3)
+    }
+
+    #[test]
+    fn test_doc_builder() {
+        let tool = CommandLineToolBuilder::default()
+            .with_id("example_tool".to_string())
+            .build()
+            .unwrap();
+        assert_eq!(tool.id.unwrap(), "example_tool");
     }
 }

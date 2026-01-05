@@ -1,3 +1,4 @@
+use derive_builder::Builder;
 use serde::{Deserialize, Serialize};
 use crate::Integer;
 
@@ -16,7 +17,8 @@ pub enum FileOrDirectory {
     Directory(Directory),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct File {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -43,7 +45,8 @@ pub struct File {
     pub contents: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct Directory {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -56,7 +59,8 @@ pub struct Directory {
     pub listing: Option<Vec<FileOrDirectory>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct Dirent {
     pub entry: String,
