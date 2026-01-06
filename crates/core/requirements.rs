@@ -131,14 +131,14 @@ pub struct DockerRequirement {
     pub docker_output_directory: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct SoftwareRequirement {
     #[serde(deserialize_with = "deserialize_map_list_package")]
     pub packages: Vec<SoftwarePackage>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct SoftwarePackage {
     pub package: String,
@@ -166,23 +166,25 @@ pub enum WorkDirItems {
     ListingItems(Box<OneOrMany<ListingItems>>),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct InitialWorkDirRequirement {
     listing: WorkDirItems,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvVarRequirement {
     #[serde(deserialize_with = "deserialize_map_list_envname", rename = "envDef")]
     pub env_def: Vec<EnvironmentDef>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct EnvironmentDef {
+    #[builder(into)]
     pub env_name: String,
+    #[builder(into)]
     pub env_value: String,
 }
 make_shorthand_impl!(EnvironmentDef, "envName", "envValue");
@@ -219,25 +221,25 @@ pub struct ResourceRequirement {
     pub outdir_max: Option<NumberOrExpression>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkReuse {
     pub enable_reuse: BoolOrExpression,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkAccess {
     pub network_access: BoolOrExpression,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct InplaceUpdateRequirement {
     pub inplace_update: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolTimeLimit {
     pub timelimit: IntegerOrExpression,

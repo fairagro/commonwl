@@ -22,12 +22,42 @@ pub enum NumberOrExpression {
     Expression(String),
 }
 
+impl From<i32> for NumberOrExpression {
+    fn from(value: i32) -> Self {
+        NumberOrExpression::Int(value)
+    }
+}
+
+impl From<i64> for NumberOrExpression {
+    fn from(value: i64) -> Self {
+        NumberOrExpression::Long(value)
+    }
+}
+
+impl From<f32> for NumberOrExpression {
+    fn from(value: f32) -> Self {
+        NumberOrExpression::Float(value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum IntegerOrExpression {
     Int(i32),
     Long(i64),
     Expression(String),
+}
+
+impl From<i32> for IntegerOrExpression {
+    fn from(value: i32) -> Self {
+        IntegerOrExpression::Int(value)
+    }
+}
+
+impl From<i64> for IntegerOrExpression {
+    fn from(value: i64) -> Self {
+        IntegerOrExpression::Long(value)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
@@ -37,6 +67,12 @@ pub enum BoolOrExpression {
     Expression(String),
 }
 
+impl From<bool> for BoolOrExpression {
+    fn from(value: bool) -> Self {
+        BoolOrExpression::Bool(value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, Copy, PartialEq)]
 #[serde(untagged)]
 pub enum Integer {
@@ -44,11 +80,41 @@ pub enum Integer {
     Long(i64),
 }
 
+impl From<i32> for Integer {
+    fn from(value: i32) -> Self {
+        Integer::Int(value)
+    }
+}
+
+impl From<i64> for Integer {
+    fn from(value: i64) -> Self {
+        Integer::Long(value)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
     One(T),
     Many(Vec<T>),
+}
+
+impl<T> From<T> for OneOrMany<T> {
+    fn from(value: T) -> Self {
+        OneOrMany::One(value)
+    }
+}
+
+impl<T> From<Vec<T>> for OneOrMany<T> {
+    fn from(value: Vec<T>) -> Self {
+        OneOrMany::Many(value)
+    }
+}
+
+impl<'a> From<&'a str> for OneOrMany<String> {
+    fn from(value: &'a str) -> Self {
+        OneOrMany::One(value.into())
+    }
 }
 
 pub fn load_cwl_file<P: AsRef<Path>>(path: P, preprocess: bool) -> anyhow::Result<CWLDocument> {
