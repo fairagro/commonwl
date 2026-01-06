@@ -117,6 +117,21 @@ impl<'a> From<&'a str> for OneOrMany<String> {
     }
 }
 
+impl<'a> From<&'a [&'a str]> for OneOrMany<String> {
+    fn from(value: &[&str]) -> Self {
+        if value.len() == 1 {
+            return OneOrMany::One(value[0].to_string());
+        }
+        OneOrMany::Many(value.iter().map(|s| s.to_string()).collect())
+    }
+}
+
+impl<'a, const N: usize> From<&'a [&'a str; N]> for OneOrMany<String> {
+    fn from(value: &'a [&'a str; N]) -> Self {
+        value.as_ref().into()
+    }
+}
+
 pub fn load_cwl_file<P: AsRef<Path>>(path: P, preprocess: bool) -> anyhow::Result<CWLDocument> {
     let contents = if preprocess {
         preprocess_cwl_file(&path)?

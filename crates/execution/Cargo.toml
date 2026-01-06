@@ -9,6 +9,7 @@ license.workspace = true
 path = "lib.rs"
 
 [dependencies]
+serde_yaml.workspace = true
 anyhow = "1.0.100"
 crankshaft = { version = "0.7.0", features = ["docker"] }
 cwl_core.workspace = true

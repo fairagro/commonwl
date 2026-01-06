@@ -380,6 +380,7 @@ dependencies = [
  "crankshaft",
  "cwl_core",
  "nonempty",
+ "serde_yaml",
  "tempfile",
  "tokio",
  "tokio-util",

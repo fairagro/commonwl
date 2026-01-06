@@ -8,7 +8,7 @@ use tracing_subscriber::filter::LevelFilter;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let tool = CommandLineTool::builder()
-        .base_command("python")
+        .base_command(&["echo", "hello world"])
         .requirements(vec![DockerRequirement::builder().build().into()])
         .build();
 

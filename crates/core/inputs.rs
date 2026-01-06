@@ -341,7 +341,7 @@ pub struct InputArraySchema {
     pub name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineBinding {
     #[serde(skip_serializing_if = "Option::is_none")]

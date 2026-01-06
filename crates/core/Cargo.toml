@@ -9,7 +9,7 @@ license.workspace = true
 anyhow = "1.0.100"
 bon = "3.8.1"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_yaml = "0.9.34"
+serde_yaml.workspace = true
 
 [lib]
 path ="lib.rs"

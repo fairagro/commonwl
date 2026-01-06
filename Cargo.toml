@@ -11,3 +11,4 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 cwl_core = { path = "crates/core" }
+serde_yaml = "0.9.34"
