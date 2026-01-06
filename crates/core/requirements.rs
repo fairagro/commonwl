@@ -6,8 +6,18 @@ use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
 use crate::{
     BoolOrExpression, IntegerOrExpression, NumberOrExpression, deserialize::FromShortHand,
 };
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
+
+macro_rules! impl_from {
+    ($enum:ident, $variant:ident) => {
+        impl From<$variant> for $enum {
+            fn from(value: $variant) -> Self {
+                $enum::$variant(value)
+            }
+        }
+    };
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "class")]
@@ -27,6 +37,19 @@ pub enum ToolRequirements {
     ToolTimeLimit(ToolTimeLimit),
 }
 impl FromShortHand for ToolRequirements {}
+impl_from!(ToolRequirements, InlineJavascriptRequirement);
+impl_from!(ToolRequirements, LoadListingRequirement);
+impl_from!(ToolRequirements, SchemaDefRequirement);
+impl_from!(ToolRequirements, DockerRequirement);
+impl_from!(ToolRequirements, SoftwareRequirement);
+impl_from!(ToolRequirements, InitialWorkDirRequirement);
+impl_from!(ToolRequirements, EnvVarRequirement);
+impl_from!(ToolRequirements, ShellCommandRequirement);
+impl_from!(ToolRequirements, ResourceRequirement);
+impl_from!(ToolRequirements, WorkReuse);
+impl_from!(ToolRequirements, NetworkAccess);
+impl_from!(ToolRequirements, InplaceUpdateRequirement);
+impl_from!(ToolRequirements, ToolTimeLimit);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "class")]
@@ -86,20 +109,25 @@ pub struct LoadListingRequirement {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct DockerRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub docker_pull: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub docker_load: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub docker_file: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub docker_import: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub docker_image_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub docker_output_directory: Option<String>,
 }
 
@@ -163,24 +191,31 @@ make_shorthand_impl!(EnvironmentDef, "envName", "envValue");
 pub struct ShellCommandRequirement;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cores_min: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cores_max: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ram_min: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub ram_max: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tmpdir_min: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub tmpdir_max: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub outdir_min: Option<NumberOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub outdir_max: Option<NumberOrExpression>,
 }
 

@@ -9,8 +9,7 @@ use crate::{
     OneOrMany,
     files::{FileOrDirectory, LoadListingEnum},
 };
-
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -35,64 +34,84 @@ pub enum DefautltValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: CommandInputParameterType,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_contents: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub default: Option<DefautltValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
 }
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: InputType,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_contents: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub default: Option<DefautltValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[deprecated(since = "1.2.0", note = "Will be removed in CWL 2.0")]
     pub input_binding: Option<CommandLineBinding>,
 }
@@ -100,30 +119,39 @@ pub struct WorkflowInputParameter {
 make_shorthand_impl!(WorkflowInputParameter, "id", "type");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: InputType,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_contents: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub default: Option<DefautltValue>,
 }
 

@@ -13,7 +13,7 @@ use crate::{
     deserialize::deserialize_map_list_id, deserialize::deserialize_map_list_option_class,
     outputs::CommandOutputParameter,
 };
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -39,134 +39,176 @@ pub enum Argument {
     Binding(CommandLineBinding),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
-#[builder(default, setter(strip_option, prefix = "with"))]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub inputs: Vec<CommandInputParameter>,
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub outputs: Vec<CommandOutputParameter>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<ToolRequirements>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<ToolHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub intent: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub base_command: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub arguments: Option<Vec<Argument>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub stdin: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub stderr: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub stdout: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub success_codes: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub temporary_fail_codes: Option<Vec<i32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub permanent_fail_codes: Option<Vec<i32>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub inputs: Vec<WorkflowInputParameter>,
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub outputs: Vec<ExpressionToolOutputParameter>,
+    #[builder(into)]
     pub expression: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub intent: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub inputs: Vec<OperationInputParameter>,
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub outputs: Vec<OperationOutputParameter>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub intent: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub inputs: Vec<WorkflowInputParameter>,
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(default, into)]
     pub outputs: Vec<WorkflowOutputParameter>,
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[builder(into)]
     pub steps: Vec<WorkflowStep>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub intent: Option<String>,
 }
 
@@ -290,10 +332,9 @@ mod tests {
 
     #[test]
     fn test_doc_builder() {
-        let tool = CommandLineToolBuilder::default()
-            .with_id("example_tool".to_string())
-            .build()
-            .unwrap();
+        let tool = CommandLineTool::builder()
+            .id("example_tool".to_string())
+            .build();
         assert_eq!(tool.id.unwrap(), "example_tool");
     }
 }

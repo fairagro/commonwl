@@ -7,8 +7,7 @@ use crate::{
     OneOrMany,
     files::{FileOrDirectory, LoadListingEnum},
 };
-
-use derive_builder::Builder;
+use bon::Builder;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -35,104 +34,132 @@ pub enum DefautltValue {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: CommandOutputParameterType,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub output_binding: Option<CommandOutputBinding>,
 }
 
 make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: CommandOutputParameterType,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub output_source: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub link_merge: Option<LinkMergeMethod>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub pick_value: Option<PickValueMethod>,
 }
 
 make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct OperationOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: OneOrMany<OutputType>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
 }
 
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionToolOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
+    #[builder(into)]
     pub r#type: OneOrMany<OutputType>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub format: Option<OneOrMany<String>>,
 }
 
@@ -204,7 +231,6 @@ impl Default for OneOrMany<OutputType> {
         OneOrMany::One(OutputType::default())
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -329,7 +355,6 @@ pub struct OutputArraySchema {
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
-#[builder(default, setter(strip_option, prefix = "with"))]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputBinding {
     #[serde(skip_serializing_if = "Option::is_none")]
