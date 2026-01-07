@@ -17,6 +17,15 @@ pub enum FileOrDirectory {
     Directory(Directory),
 }
 
+impl FileOrDirectory {
+    pub fn path(&self) -> Option<&String> {
+        match self {
+            FileOrDirectory::File(f) => f.path.as_ref(),
+            FileOrDirectory::Directory(d) => d.path.as_ref(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct File {

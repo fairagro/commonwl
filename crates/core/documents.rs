@@ -1,3 +1,4 @@
+use crate::ExtractFromEnum;
 use crate::OneOrMany;
 use crate::deserialize::FromShortHand;
 use crate::inputs::{
@@ -38,6 +39,60 @@ pub enum Argument {
     String(String),
     Binding(CommandLineBinding),
 }
+
+macro_rules! impl_document_defaults {
+    ($class:ident, $req_enum:ident, $hint_enum:ident) => {
+        impl $class {
+            pub fn get_requirement<T>(&self) -> Option<&T>
+            where
+                T: ExtractFromEnum<$req_enum>,
+            {
+                self.requirements
+                    .as_ref()
+                    .and_then(|reqs| reqs.iter().find_map(|req| T::get(req)))
+            }
+
+            pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
+            where
+                T: ExtractFromEnum<$req_enum>,
+            {
+                let maybe_req = self
+                    .requirements
+                    .as_ref()
+                    .and_then(|reqs| reqs.iter().find_map(|req| T::get(req)));
+                let maybe_hint = self.hints.as_ref().and_then(|hints| {
+                    hints.iter().find_map(|hint| {
+                        if let $hint_enum::Requirement(inner) = hint {
+                            T::get(inner)
+                        } else {
+                            None
+                        }
+                    })
+                });
+                maybe_req.or(maybe_hint)
+            }
+
+            pub fn has_requirement<T>(&self) -> bool
+            where
+                T: ExtractFromEnum<$req_enum>,
+            {
+                self.get_requirement::<T>().is_some()
+            }
+
+            pub fn has_requirement_or_hint<T>(&self) -> bool
+            where
+                T: ExtractFromEnum<$req_enum>,
+            {
+                self.get_requirement_or_hint::<T>().is_some()
+            }
+        }
+    };
+}
+
+impl_document_defaults!(CommandLineTool, ToolRequirements, ToolHints);
+impl_document_defaults!(ExpressionTool, WorkflowRequirements, WorkflowHints);
+impl_document_defaults!(Operation, WorkflowRequirements, WorkflowHints);
+impl_document_defaults!(Workflow, WorkflowRequirements, WorkflowHints);
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]

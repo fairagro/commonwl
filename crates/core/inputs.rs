@@ -11,6 +11,8 @@ use crate::{
 };
 use bon::Builder;
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
+use std::fmt::{self, Display};
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
@@ -28,9 +30,26 @@ impl Default for CommandInputParameterType {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
-pub enum DefautltValue {
+pub enum DefaultValue {
     FileOrDirectory(FileOrDirectory),
     Any(serde_yaml::Value),
+}
+
+impl Display for DefaultValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DefaultValue::FileOrDirectory(fd) => match fd.path() {
+                Some(path) => write!(f, "{path}"),
+                None => Err(fmt::Error),
+            },
+            DefaultValue::Any(value) => match value {
+                Value::String(s) => write!(f, "{s}"),
+                Value::Number(n) => write!(f, "{n}"),
+                Value::Bool(b) => write!(f, "{b}"),
+                _ => Err(fmt::Error),
+            },
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
@@ -67,7 +86,7 @@ pub struct CommandInputParameter {
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    pub default: Option<DefautltValue>,
+    pub default: Option<DefaultValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
@@ -109,7 +128,7 @@ pub struct WorkflowInputParameter {
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    pub default: Option<DefautltValue>,
+    pub default: Option<DefaultValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[deprecated(since = "1.2.0", note = "Will be removed in CWL 2.0")]
@@ -152,7 +171,7 @@ pub struct OperationInputParameter {
     pub load_listing: Option<LoadListingEnum>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    pub default: Option<DefautltValue>,
+    pub default: Option<DefaultValue>,
 }
 
 make_shorthand_impl!(OperationInputParameter, "id", "type");
@@ -378,7 +397,7 @@ pub struct WorkflowStepInput {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub default: Option<DefautltValue>,
+    pub default: Option<DefaultValue>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_from: Option<String>,
 }

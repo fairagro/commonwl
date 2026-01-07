@@ -381,6 +381,7 @@ dependencies = [
  "cwl_core",
  "nonempty",
  "serde_yaml",
+ "shlex",
  "tempfile",
  "tokio",
  "tokio-util",

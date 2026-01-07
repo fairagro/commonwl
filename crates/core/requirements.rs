@@ -1,4 +1,3 @@
-use crate::OneOrMany;
 use crate::deserialize::{
     deserialize_map_list_envname, deserialize_map_list_package, make_shorthand_impl,
 };
@@ -6,14 +5,25 @@ use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
 use crate::{
     BoolOrExpression, IntegerOrExpression, NumberOrExpression, deserialize::FromShortHand,
 };
+use crate::{ExtractFromEnum, OneOrMany};
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 
-macro_rules! impl_from {
+macro_rules! impl_conversion_methods {
     ($enum:ident, $variant:ident) => {
         impl From<$variant> for $enum {
             fn from(value: $variant) -> Self {
                 $enum::$variant(value)
+            }
+        }
+
+        impl ExtractFromEnum<$enum> for $variant {
+            fn get(e: &$enum) -> Option<&Self> {
+                if let $enum::$variant(v) = e {
+                    Some(v)
+                } else {
+                    None
+                }
             }
         }
     };
@@ -36,20 +46,21 @@ pub enum ToolRequirements {
     InplaceUpdateRequirement(InplaceUpdateRequirement),
     ToolTimeLimit(ToolTimeLimit),
 }
+
 impl FromShortHand for ToolRequirements {}
-impl_from!(ToolRequirements, InlineJavascriptRequirement);
-impl_from!(ToolRequirements, LoadListingRequirement);
-impl_from!(ToolRequirements, SchemaDefRequirement);
-impl_from!(ToolRequirements, DockerRequirement);
-impl_from!(ToolRequirements, SoftwareRequirement);
-impl_from!(ToolRequirements, InitialWorkDirRequirement);
-impl_from!(ToolRequirements, EnvVarRequirement);
-impl_from!(ToolRequirements, ShellCommandRequirement);
-impl_from!(ToolRequirements, ResourceRequirement);
-impl_from!(ToolRequirements, WorkReuse);
-impl_from!(ToolRequirements, NetworkAccess);
-impl_from!(ToolRequirements, InplaceUpdateRequirement);
-impl_from!(ToolRequirements, ToolTimeLimit);
+impl_conversion_methods!(ToolRequirements, InlineJavascriptRequirement);
+impl_conversion_methods!(ToolRequirements, LoadListingRequirement);
+impl_conversion_methods!(ToolRequirements, SchemaDefRequirement);
+impl_conversion_methods!(ToolRequirements, DockerRequirement);
+impl_conversion_methods!(ToolRequirements, SoftwareRequirement);
+impl_conversion_methods!(ToolRequirements, InitialWorkDirRequirement);
+impl_conversion_methods!(ToolRequirements, EnvVarRequirement);
+impl_conversion_methods!(ToolRequirements, ShellCommandRequirement);
+impl_conversion_methods!(ToolRequirements, ResourceRequirement);
+impl_conversion_methods!(ToolRequirements, WorkReuse);
+impl_conversion_methods!(ToolRequirements, NetworkAccess);
+impl_conversion_methods!(ToolRequirements, InplaceUpdateRequirement);
+impl_conversion_methods!(ToolRequirements, ToolTimeLimit);
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "class")]
@@ -71,6 +82,7 @@ pub enum WorkflowRequirements {
     MultipleInputFeatureRequirement(MultipleInputFeatureRequirement),
     StepInputExpressionRequirement(StepInputExpressionRequirement),
 }
+
 impl FromShortHand for WorkflowRequirements {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

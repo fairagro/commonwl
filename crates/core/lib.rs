@@ -1,9 +1,4 @@
-use std::{fs, path::Path};
-
 use serde::{Deserialize, Serialize};
-use serde_yaml::Value;
-
-use crate::documents::CWLDocument;
 
 pub mod deserialize;
 pub mod documents;
@@ -12,6 +7,11 @@ pub mod inputs;
 pub mod outputs;
 pub mod requirements;
 pub mod types;
+
+mod load;
+pub use load::load_cwl_file;
+pub use load::preprocess_cwl_file;
+use serde_yaml::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
@@ -132,47 +132,17 @@ impl<'a, const N: usize> From<&'a [&'a str; N]> for OneOrMany<String> {
     }
 }
 
-pub fn load_cwl_file<P: AsRef<Path>>(path: P, preprocess: bool) -> anyhow::Result<CWLDocument> {
-    let contents = if preprocess {
-        preprocess_cwl_file(&path)?
-    } else {
-        fs::read_to_string(&path)?
-    };
-    serde_yaml::from_str::<CWLDocument>(&contents).map_err(|e| e.into())
+pub trait ExtractFromEnum<E> {
+    fn get(e: &E) -> Option<&Self>
+    where
+        Self: Sized;
 }
 
-pub fn preprocess_cwl_file<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
-    let contents = fs::read_to_string(&path)?;
-    let mut yaml: Value = serde_yaml::from_str(&contents)?;
-    let path = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
-
-    resolve_imports(&mut yaml, path)?;
-    Ok(serde_yaml::to_string(&yaml)?)
-}
-
-fn resolve_imports(value: &mut Value, base_path: &Path) -> anyhow::Result<()> {
+pub fn value_as_string(value: &Value) -> anyhow::Result<String> {
     match value {
-        Value::Mapping(map) => {
-            if map.len() == 1
-                && let Some(Value::String(file)) = map.get(Value::String("$import".to_string()))
-            {
-                let path = base_path.join(file);
-                let contents = fs::read_to_string(&path)?;
-                let mut imported_value: Value = serde_yaml::from_str(&contents)?;
-                resolve_imports(&mut imported_value, path.parent().unwrap_or(base_path))?;
-                *value = imported_value;
-                return Ok(());
-            }
-            for val in map.values_mut() {
-                resolve_imports(val, base_path)?;
-            }
-        }
-        Value::Sequence(seq) => {
-            for val in seq.iter_mut() {
-                resolve_imports(val, base_path)?;
-            }
-        }
-        _ => {}
+        Value::String(s) => Ok(s.to_string()),
+        Value::Number(n) => Ok(n.to_string()),
+        Value::Bool(b) => Ok(b.to_string()),
+        _ => anyhow::bail!("Value is not a string, number, or bool"),
     }
-    Ok(())
 }
