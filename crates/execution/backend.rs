@@ -3,7 +3,7 @@ use cwl_core::documents::{CommandLineTool, ExpressionTool, WorkflowStep};
 use nonempty::nonempty;
 use std::collections::HashMap;
 
-pub mod command;
+use crate::command;
 
 pub(crate) enum TaskKind<'a> {
     WorkflowStep(&'a WorkflowStep),

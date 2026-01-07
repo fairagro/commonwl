@@ -9,6 +9,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 mod backend;
+pub mod command;
 
 pub async fn run_command(tool: &CommandLineTool) {
     let config = crankshaft::config::backend::Config::builder()
