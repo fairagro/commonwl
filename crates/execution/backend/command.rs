@@ -22,7 +22,7 @@ enum SortKey {
 
 pub(super) fn build_command(
     tool: &CommandLineTool,
-    inputs: HashMap<String, serde_yaml::Value>,
+    inputs: &HashMap<String, serde_yaml::Value>,
 ) -> anyhow::Result<Vec<String>> {
     let mut args: Vec<String> = vec![];
 
@@ -282,7 +282,7 @@ stdout: output.txt";
 }"#;
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, input_values).unwrap();
+        let cmd = build_command(tool, &input_values).unwrap();
         let cmdline = cmd.join(" ");
         assert_eq!(cmdline, "cat hello.txt");
     }
@@ -298,7 +298,7 @@ baseCommand: [cat]
 stdin: hello.txt";
         let tool = &serde_yaml::from_str(yaml).unwrap();
 
-        let cmd = build_command(tool, HashMap::new()).unwrap();
+        let cmd = build_command(tool, &HashMap::new()).unwrap();
         let cmdline = cmd.join(" ");
         assert_eq!(cmdline, "cat hello.txt");
     }
@@ -328,7 +328,7 @@ stdout: output.txt"#;
         let tool = &serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, input_values).unwrap();
+        let cmd = build_command(tool, &input_values).unwrap();
 
         let shell_cmd = get_shell_command();
 

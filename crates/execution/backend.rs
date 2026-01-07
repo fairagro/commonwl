@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crankshaft::engine::{Task, task::Execution};
 use cwl_core::documents::{CommandLineTool, ExpressionTool, WorkflowStep};
 use nonempty::nonempty;
+use std::collections::HashMap;
 
 pub mod command;
 
@@ -45,7 +44,8 @@ fn convert_command_line_tool(
     tool: &CommandLineTool,
     inputs: HashMap<String, serde_yaml::Value>,
 ) -> anyhow::Result<Task> {
-    let args = command::build_command(tool, inputs)?;
+    let args = command::build_command(tool, &inputs)?;
+
     let task = Task::builder()
         .maybe_name(tool.label.clone())
         .executions(nonempty![
@@ -55,6 +55,7 @@ fn convert_command_line_tool(
                 .image("python:3.12") //todo get real imnage
                 .build()
         ]);
+
     Ok(task.build())
 }
 
