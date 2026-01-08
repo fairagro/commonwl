@@ -1,10 +1,10 @@
-use crate::IntegerOrExpression;
 use crate::deserialize::{
     FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
     deserialize_with_type_dsl, make_shorthand_impl,
 };
 use crate::outputs::{LinkMergeMethod, PickValueMethod};
 use crate::types::{CWLType, SecondaryFileSchema};
+use crate::{IntegerOrExpression, files};
 use crate::{
     OneOrMany,
     files::{FileOrDirectory, LoadListingEnum},
@@ -22,6 +22,22 @@ pub enum CommandInputParameterType {
     CommandInputType(OneOrMany<CommandInputType>),
 }
 
+impl From<CWLType> for CommandInputParameterType {
+    fn from(value: CWLType) -> Self {
+        CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::CWLType(
+            value,
+        )))
+    }
+}
+
+impl From<CommandInputSchema> for CommandInputParameterType {
+    fn from(value: CommandInputSchema) -> Self {
+        CommandInputParameterType::CommandInputType(OneOrMany::One(
+            CommandInputType::CommandInputSchema(Box::new(value)),
+        ))
+    }
+}
+
 impl Default for CommandInputParameterType {
     fn default() -> Self {
         CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::default()))
@@ -33,6 +49,18 @@ impl Default for CommandInputParameterType {
 pub enum DefaultValue {
     FileOrDirectory(FileOrDirectory),
     Any(serde_yaml::Value),
+}
+
+impl From<files::File> for DefaultValue {
+    fn from(value: files::File) -> Self {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(value))
+    }
+}
+
+impl From<files::Directory> for DefaultValue {
+    fn from(value: files::Directory) -> Self {
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(value))
+    }
 }
 
 impl Display for DefaultValue {
@@ -360,22 +388,29 @@ pub struct InputArraySchema {
     pub name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineBinding {
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub load_contents: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub position: Option<IntegerOrExpression>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub prefix: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub separate: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub item_separator: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub value_from: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub shell_quote: Option<bool>,
 }
 
