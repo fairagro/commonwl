@@ -8,6 +8,8 @@ use cwl_core::{
 use serde_yaml::Value;
 use std::{borrow::Cow, collections::HashMap, vec};
 
+use crate::inputs::get_input_value;
+
 #[derive(Debug, Clone)]
 struct BoundBinding {
     sort_key: Vec<SortKey>,
@@ -95,17 +97,8 @@ pub(super) fn build_command(
             ];
 
             //TODO: Handle Value from
-            let value = inputs.get(&input.id.clone().unwrap_or_default());
             // we got an actual input value
-            let binding_value = if let Some(value) = value
-                && !value.is_null()
-            {
-                serde_yaml::from_value::<DefaultValue>(value.clone())?
-            } else if let Some(default) = &input.default {
-                default.clone()
-            } else {
-                DefaultValue::Any(Value::Null)
-            };
+            let binding_value = get_input_value(input, inputs)?;
             values.insert(input.id.clone().unwrap_or_default(), binding_value.clone());
 
             bindings.push(BoundBinding { sort_key, binding });

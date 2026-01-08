@@ -1,6 +1,7 @@
 use crate::ExtractFromEnum;
 use crate::OneOrMany;
 use crate::deserialize::FromShortHand;
+use crate::inputs::InputDataProvider;
 use crate::inputs::{
     CommandInputParameter, CommandLineBinding, OperationInputParameter, WorkflowInputParameter,
     WorkflowStepInput,
@@ -24,6 +25,51 @@ pub enum CWLDocument {
     ExpressionTool(ExpressionTool),
     Operation(Operation),
     Workflow(Workflow),
+}
+
+impl CWLDocument {
+    pub fn get_input_data_providers(&self) -> Vec<&dyn InputDataProvider> {
+        match self {
+            Self::CommandLineTool(clt) => clt
+                .inputs
+                .iter()
+                .map(|i| i as &dyn InputDataProvider)
+                .collect(),
+            Self::ExpressionTool(et) => et
+                .inputs
+                .iter()
+                .map(|i| i as &dyn InputDataProvider)
+                .collect(),
+            Self::Operation(o) => o
+                .inputs
+                .iter()
+                .map(|i| i as &dyn InputDataProvider)
+                .collect(),
+            Self::Workflow(wf) => wf
+                .inputs
+                .iter()
+                .map(|i| i as &dyn InputDataProvider)
+                .collect(),
+        }
+    }
+}
+
+impl From<CommandLineTool> for CWLDocument {
+    fn from(value: CommandLineTool) -> Self {
+        CWLDocument::CommandLineTool(value)
+    }
+}
+
+impl From<ExpressionTool> for CWLDocument {
+    fn from(value: ExpressionTool) -> Self {
+        CWLDocument::ExpressionTool(value)
+    }
+}
+
+impl From<Workflow> for CWLDocument {
+    fn from(value: Workflow) -> Self {
+        CWLDocument::Workflow(value)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

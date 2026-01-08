@@ -3,10 +3,7 @@ use crate::deserialize::{
     deserialize_with_type_dsl, make_shorthand_impl,
 };
 use crate::types::{CWLType, SecondaryFileSchema};
-use crate::{
-    OneOrMany,
-    files::{FileOrDirectory, LoadListingEnum},
-};
+use crate::{OneOrMany, files::LoadListingEnum};
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -24,13 +21,6 @@ impl Default for CommandOutputParameterType {
     fn default() -> Self {
         CommandOutputParameterType::CommandOutputType(OneOrMany::One(CommandOutputType::default()))
     }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
-#[serde(untagged)]
-pub enum DefautltValue {
-    FileOrDirectory(FileOrDirectory),
-    Any(serde_yaml::Value),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]

@@ -1,9 +1,21 @@
-use crankshaft::engine::{Task, task::Execution};
-use cwl_core::documents::{CommandLineTool, ExpressionTool, WorkflowStep};
+use crate::{command, inputs::collect_inputs};
+use crankshaft::engine::{
+    Task,
+    task::{
+        Execution, Input, Output,
+        input::{self, Contents},
+        output,
+    },
+};
+use cwl_core::{
+    documents::{CommandLineTool, ExpressionTool, WorkflowStep},
+    files::FileOrDirectory,
+    inputs::{DefaultValue, InputDataProvider},
+};
 use nonempty::nonempty;
-use std::collections::HashMap;
-
-use crate::command;
+use std::{collections::HashMap, fs, path::Path};
+use tracing::info;
+use url::Url;
 
 pub(crate) enum TaskKind<'a> {
     WorkflowStep(&'a WorkflowStep),
@@ -45,18 +57,72 @@ fn convert_command_line_tool(
     inputs: HashMap<String, serde_yaml::Value>,
 ) -> anyhow::Result<Task> {
     let args = command::build_command(tool, &inputs)?;
+    info!("scheduling execution: {}", args.join(" "));
 
-    let task = Task::builder()
+    let mut task = Task::builder()
         .maybe_name(tool.label.clone())
         .executions(nonempty![
             Execution::builder()
                 .program(&args[0])
+                .work_dir("/workdir")
                 .args(&args[1..])
-                .image("python:3.12") //todo get real imnage
+                .image("alpine") //todo get real imnage
+                .stdout("/stdout")
+                .stderr("/stderr")
                 .build()
-        ]);
+        ])
+        .build();
+    let input_values = collect_inputs(&tool.clone().into(), &inputs)?;
+    for input in tool.inputs.clone() {
+        let value = input_values.get(&input.id().clone().unwrap()).unwrap();
+        //we stage here, so we want to only get file or dir
+        if let DefaultValue::FileOrDirectory(fod) = value {
+            let str = value.to_string();
+            let ty = if matches!(fod, FileOrDirectory::File(_)) {
+                input::Type::File
+            } else {
+                input::Type::Directory
+            };
+            task.add_input(
+                Input::builder()
+                    .name(input.id.unwrap())
+                    .contents(Contents::Path(
+                        Path::new(&str).canonicalize()?.to_path_buf(),
+                    ))
+                    .path(format!("/workdir/{str}"))
+                    .ty(ty)
+                    .build(),
+            );
+        }
+    }
 
-    Ok(task.build())
+    fs::File::create("./stdout")?;
+    let stdout = Path::new("./stdout").canonicalize()?;
+    task.add_output(
+        Output::builder()
+            .path("/stdout")
+            .url(
+                Url::from_file_path(&stdout)
+                    .map_err(|_| anyhow::anyhow!("failed to get stdout URL"))?,
+            )
+            .ty(output::Type::File)
+            .build(),
+    );
+
+    fs::File::create("./stderr")?;
+    let stderr = Path::new("./stderr").canonicalize()?;
+    task.add_output(
+        Output::builder()
+            .path("/stderr")
+            .url(
+                Url::from_file_path(&stderr)
+                    .map_err(|_| anyhow::anyhow!("failed to get stderr URL"))?,
+            )
+            .ty(output::Type::File)
+            .build(),
+    );
+
+    Ok(task)
 }
 
 fn convert_expression_tool(_tool: &ExpressionTool) -> anyhow::Result<Task> {

@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use cwl_core::{
     documents::CommandLineTool,
-    requirements::DockerRequirement,
+    files::{File, FileOrDirectory},
+    inputs::{CommandInputParameter, CommandLineBinding},
+    types::CWLType,
 };
 use cwl_execution::run_command;
 use tracing_subscriber::filter::LevelFilter;
@@ -8,8 +12,20 @@ use tracing_subscriber::filter::LevelFilter;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let tool = CommandLineTool::builder()
-        .base_command(&["echo", "hello world"])
-        .requirements(vec![DockerRequirement::builder().build().into()])
+        .base_command("ls")
+        .inputs(vec![
+            CommandInputParameter::builder()
+                .id("my-input")
+                .r#type(CWLType::File)
+                .default(File::builder().path(".gitignore").build())
+                .input_binding(
+                    CommandLineBinding::builder()
+                        .prefix("-la")
+                        .position(0)
+                        .build(),
+                )
+                .build(),
+        ])
         .build();
 
     let subscriber = tracing_subscriber::fmt()
@@ -17,7 +33,10 @@ async fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    run_command(&tool).await;
+    let file = FileOrDirectory::File(File::builder().path("Cargo.lock").build());
+    let inputs = HashMap::from([("my-input".to_string(), serde_yaml::to_value(file)?)]);
+
+    run_command(&tool, inputs).await;
 
     Ok(())
 }

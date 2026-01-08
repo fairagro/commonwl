@@ -80,6 +80,12 @@ impl Display for DefaultValue {
     }
 }
 
+//trait to easily retrieve default data for all input types
+pub trait InputDataProvider{
+    fn id(&self) -> &Option<String>;
+    fn default(&self) -> &Option<DefaultValue>;
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
@@ -121,6 +127,15 @@ pub struct CommandInputParameter {
 }
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
+impl InputDataProvider for CommandInputParameter {
+    fn id(&self) -> &Option<String> {
+        &self.id
+    }
+
+    fn default(&self) -> &Option<DefaultValue> {
+        &self.default
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
@@ -165,6 +180,17 @@ pub struct WorkflowInputParameter {
 
 make_shorthand_impl!(WorkflowInputParameter, "id", "type");
 
+impl InputDataProvider for WorkflowInputParameter{
+    fn id(&self) -> &Option<String> {
+        &self.id
+    }
+
+    fn default(&self) -> &Option<DefaultValue> {
+        &self.default
+    }
+}
+
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
@@ -203,6 +229,16 @@ pub struct OperationInputParameter {
 }
 
 make_shorthand_impl!(OperationInputParameter, "id", "type");
+
+impl InputDataProvider for OperationInputParameter{
+    fn id(&self) -> &Option<String> {
+        &self.id
+    }
+
+    fn default(&self) -> &Option<DefaultValue> {
+        &self.default
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(tag = "type")]
