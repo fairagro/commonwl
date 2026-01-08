@@ -72,8 +72,10 @@ fn convert_command_line_tool(
                 .build()
         ])
         .build();
+
+    //collect inputs and use staging mechanisms for file in dir
     let input_values = collect_inputs(&tool.clone().into(), &inputs)?;
-    for input in tool.inputs.clone() {
+    for input in &tool.inputs {
         let value = input_values.get(&input.id().clone().unwrap()).unwrap();
         //we stage here, so we want to only get file or dir
         if let DefaultValue::FileOrDirectory(fod) = value {
@@ -85,7 +87,7 @@ fn convert_command_line_tool(
             };
             task.add_input(
                 Input::builder()
-                    .name(input.id.unwrap())
+                    .name(input.id().clone().unwrap())
                     .contents(Contents::Path(
                         Path::new(&str).canonicalize()?.to_path_buf(),
                     ))
