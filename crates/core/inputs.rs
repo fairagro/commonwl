@@ -63,6 +63,12 @@ impl From<files::Directory> for DefaultValue {
     }
 }
 
+impl From<&str> for DefaultValue {
+    fn from(value: &str) -> Self {
+        DefaultValue::Any(serde_yaml::Value::String(value.to_string()))
+    }
+}
+
 impl Display for DefaultValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -81,7 +87,7 @@ impl Display for DefaultValue {
 }
 
 //trait to easily retrieve default data for all input types
-pub trait InputDataProvider{
+pub trait InputDataProvider {
     fn id(&self) -> &Option<String>;
     fn default(&self) -> &Option<DefaultValue>;
 }
@@ -180,7 +186,7 @@ pub struct WorkflowInputParameter {
 
 make_shorthand_impl!(WorkflowInputParameter, "id", "type");
 
-impl InputDataProvider for WorkflowInputParameter{
+impl InputDataProvider for WorkflowInputParameter {
     fn id(&self) -> &Option<String> {
         &self.id
     }
@@ -189,7 +195,6 @@ impl InputDataProvider for WorkflowInputParameter{
         &self.default
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
@@ -230,7 +235,7 @@ pub struct OperationInputParameter {
 
 make_shorthand_impl!(OperationInputParameter, "id", "type");
 
-impl InputDataProvider for OperationInputParameter{
+impl InputDataProvider for OperationInputParameter {
     fn id(&self) -> &Option<String> {
         &self.id
     }

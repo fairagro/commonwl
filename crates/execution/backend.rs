@@ -1,6 +1,7 @@
 use crate::{command, inputs::collect_inputs};
 use crankshaft::engine::{
     Task,
+    service::runner::backend::TaskRunError,
     task::{
         Execution, Input, Output,
         input::{self, Contents},
@@ -12,10 +13,13 @@ use cwl_core::{
     files::FileOrDirectory,
     inputs::{DefaultValue, InputDataProvider},
 };
-use nonempty::nonempty;
-use std::{collections::HashMap, fs, path::Path};
+use nonempty::{NonEmpty, nonempty};
+use std::{collections::HashMap, fs, path::Path, process::ExitStatus};
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 use url::Url;
+
+pub mod docker;
 
 pub(crate) enum TaskKind<'a> {
     WorkflowStep(&'a WorkflowStep),
@@ -75,6 +79,7 @@ fn convert_command_line_tool(
 
     //collect inputs and use staging mechanisms for file in dir
     let input_values = collect_inputs(&tool.clone().into(), &inputs)?;
+
     for input in &tool.inputs {
         let value = input_values.get(&input.id().clone().unwrap()).unwrap();
         //we stage here, so we want to only get file or dir
@@ -133,4 +138,12 @@ fn convert_expression_tool(_tool: &ExpressionTool) -> anyhow::Result<Task> {
 
 fn convert_workflow_step(_step: &WorkflowStep) -> anyhow::Result<Task> {
     unimplemented!()
+}
+
+pub trait TaskBackend {
+    async fn run(
+        self,
+        task: Task,
+        token: CancellationToken,
+    ) -> Result<NonEmpty<ExitStatus>, TaskRunError>;
 }

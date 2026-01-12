@@ -1,27 +1,33 @@
-use std::collections::HashMap;
-
 use cwl_core::{
+    OneOrMany,
     documents::CommandLineTool,
-    files::{File, FileOrDirectory},
     inputs::{CommandInputParameter, CommandLineBinding},
+    outputs::{CommandOutputBinding, CommandOutputParameter},
     types::CWLType,
 };
 use cwl_execution::run_command;
+use std::collections::HashMap;
 use tracing_subscriber::filter::LevelFilter;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let tool = CommandLineTool::builder()
-        .base_command("ls")
+        .base_command("touch")
         .inputs(vec![
             CommandInputParameter::builder()
                 .id("my-input")
+                .r#type(CWLType::String)
+                .default("hello.txt")
+                .input_binding(CommandLineBinding::builder().position(1).build())
+                .build(),
+        ])
+        .outputs(vec![
+            CommandOutputParameter::builder()
+                .id("my-output")
                 .r#type(CWLType::File)
-                .default(File::builder().path(".gitignore").build())
-                .input_binding(
-                    CommandLineBinding::builder()
-                        .prefix("-la")
-                        .position(0)
+                .output_binding(
+                    CommandOutputBinding::builder()
+                        .glob(OneOrMany::One("*.txt".to_string()))
                         .build(),
                 )
                 .build(),
@@ -33,7 +39,7 @@ async fn main() -> anyhow::Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let file = FileOrDirectory::File(File::builder().path("Cargo.lock").build());
+    let file = "hello.txt".to_string();
     let inputs = HashMap::from([("my-input".to_string(), serde_yaml::to_value(file)?)]);
 
     run_command(&tool, inputs).await;

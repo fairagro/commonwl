@@ -23,6 +23,20 @@ impl Default for CommandOutputParameterType {
     }
 }
 
+impl From<CWLType> for CommandOutputParameterType {
+    fn from(value: CWLType) -> Self {
+        CommandOutputParameterType::CommandOutputType(OneOrMany::One(CommandOutputType::CWLType(
+            value,
+        )))
+    }
+}
+
+impl From<CommandOutputType> for CommandOutputParameterType {
+    fn from(value: CommandOutputType) -> Self {
+        CommandOutputParameterType::CommandOutputType(OneOrMany::One(value))
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputParameter {
