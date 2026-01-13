@@ -12,14 +12,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions-rust-lang/setup-rust-toolchain@v1
-      - run: git clone https://github.com/common-workflow-language/cwl-v1.2
 
       - name: Run CWL conformance examples
         run: |
           set -e
           shopt -s globstar nullglob
 
-          for file in cwl-v1.2/tests/**/*.cwl; do
+          for file in testdata/cwl/tests/**/*.cwl; do
             echo "Running on $file"
             cargo run --example cwl_load "$file"
           done
