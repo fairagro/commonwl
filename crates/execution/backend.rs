@@ -13,7 +13,7 @@ pub struct TaskRequest<'a> {
 
 pub trait TaskBackend {
     fn run(
-        self,
+        &self,
         task: &TaskRequest<'_>,
         token: CancellationToken,
     ) -> impl Future<Output = Result<NonEmpty<ExitStatus>, TaskRunError>> + Send;

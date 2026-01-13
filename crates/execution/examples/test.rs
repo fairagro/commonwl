@@ -3,6 +3,7 @@ use cwl_core::{
     documents::CommandLineTool,
     inputs::{CommandInputParameter, CommandLineBinding},
     outputs::{CommandOutputBinding, CommandOutputParameter},
+    requirements::DockerRequirement,
     types::CWLType,
 };
 use cwl_execution::run_command;
