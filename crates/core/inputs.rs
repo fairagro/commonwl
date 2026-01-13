@@ -44,6 +44,23 @@ impl Default for CommandInputParameterType {
     }
 }
 
+impl CommandInputParameterType {
+    //specifies if for this input parameter a singular null value is allowed
+    pub fn is_null_allowed(&self) -> bool {
+        matches!(
+            self,
+            CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::CWLType(
+                CWLType::Null
+            )))
+        ) || matches!(
+            self,
+            CommandInputParameterType::CommandInputType(
+                OneOrMany::One(CommandInputType::CommandInputSchema(schema))
+            ) if schema.is_null_allowed()
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum DefaultValue {
@@ -254,6 +271,18 @@ pub enum CommandInputSchema {
     Array(CommandInputArraySchema),
 }
 
+impl CommandInputSchema {
+    pub fn is_null_allowed(&self) -> bool {
+        match self {
+            Self::Array(array) => match &array.items {
+                OneOrMany::Many(items) => items.iter().any(|i| i.is_null_allowed()),
+                OneOrMany::One(item) => item.is_null_allowed(),
+            },
+            _ => false,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -274,6 +303,23 @@ pub enum CommandInputType {
 impl Default for CommandInputType {
     fn default() -> Self {
         CommandInputType::CWLType(CWLType::Null)
+    }
+}
+
+impl CommandInputType {
+    pub fn is_null(&self) -> bool {
+        matches!(self, CommandInputType::CWLType(CWLType::Null))
+    }
+
+    pub fn is_null_allowed(&self) -> bool {
+        if self.is_null() {
+            return true;
+        }
+
+        match self {
+            Self::CommandInputSchema(schema) => schema.is_null_allowed(),
+            _ => false,
+        }
     }
 }
 

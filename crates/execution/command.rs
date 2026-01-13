@@ -1,8 +1,12 @@
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CommandLineTool},
-    inputs::{CommandLineBinding, DefaultValue},
+    inputs::{
+        CommandInputParameter, CommandInputParameterType, CommandInputType, CommandLineBinding,
+        DefaultValue,
+    },
     requirements::ShellCommandRequirement,
+    types::CWLType,
     value_as_string,
 };
 use serde_yaml::Value;
@@ -84,6 +88,16 @@ pub(super) fn build_command(
     //handle inputs
     let mut values = HashMap::new();
     for input in &tool.inputs {
+        //TODO: Handle Value from
+        // we got an actual input value
+        let binding_value = get_input_value(input, inputs)?;
+        if matches!(binding_value, DefaultValue::Any(serde_yaml::Value::Null))
+            && !input.r#type.is_null_allowed()
+        {
+            //We have null value and type is not nullable!
+            anyhow::bail!("No input for `{}` given!", input.id.as_ref().unwrap());
+        }
+
         if let Some(binding) = &input.input_binding {
             let position = binding.position.clone().map(|p| match p {
                 IntegerOrExpression::Int(i) => i,
@@ -96,9 +110,6 @@ pub(super) fn build_command(
                 SortKey::Str(input.id.clone().unwrap_or_default()),
             ];
 
-            //TODO: Handle Value from
-            // we got an actual input value
-            let binding_value = get_input_value(input, inputs)?;
             values.insert(input.id.clone().unwrap_or_default(), binding_value.clone());
 
             bindings.push(BoundBinding { sort_key, binding });

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/commonwl", "crates/core", "crates/execution"]
+members = ["crates/commonwl", "crates/core", "crates/execution", "runner"]
 
 resolver = "3"
 
@@ -10,5 +10,10 @@ repository = "https://github.com/fairagro/commonwl"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+anyhow = "1.0.100"
 cwl_core = { path = "crates/core" }
 serde_yaml = "0.9.34"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tokio = { version = "1.49.0", features = ["full"] }
+tokio-util = "0.7.18"

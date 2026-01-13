@@ -6,10 +6,10 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow.workspace = true
 bon = "3.8.1"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml.workspace = true
 
 [lib]
-path ="lib.rs"
+path = "lib.rs"

@@ -1,25 +1,30 @@
-use crate::backend::{TaskBackend, TaskRequest, docker::DockerBackend};
-use crankshaft::config::backend::docker::Config;
-use cwl_core::documents::{CWLDocument, CommandLineTool};
+use crate::backend::{TaskBackend, TaskRequest};
+use cwl_core::documents::CWLDocument;
 use std::collections::HashMap;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 pub mod backend;
 pub mod command;
+pub(crate) mod docker;
 pub mod inputs;
 
-pub async fn run_command(tool: &CommandLineTool, inputs: HashMap<String, serde_yaml::Value>) {
-    let backend = DockerBackend::new(Config::default()).await.unwrap();
+pub async fn run_command(
+    definition: &CWLDocument,
+    inputs: HashMap<String, serde_yaml::Value>,
+    backend: impl TaskBackend,
+    token: CancellationToken,
+) -> anyhow::Result<()> {
+    if !matches!(definition, CWLDocument::CommandLineTool(_)) {
+        anyhow::bail!("Definition is not of type CommandLineTool!");
+    }
 
     let task_request = TaskRequest {
-        definition: &CWLDocument::CommandLineTool(tool.clone()),
+        definition,
         inputs: &inputs,
     };
 
-    let cancellation = CancellationToken::new();
-    let result = backend.run(&task_request, cancellation).await.unwrap();
-
-    println!("{result:?}");
+    let result = backend.run(&task_request, token).await?;
     info!("Task completed successfully");
+    Ok(())
 }

@@ -1,11 +1,9 @@
+use crate::docker::build_container;
 use crate::inputs::collect_inputs;
 use crate::{
     backend::{TaskBackend, TaskRequest},
     command,
 };
-use anyhow::Context;
-use bollard::body_full;
-use bollard::query_parameters::BuildImageOptions;
 use crankshaft::docker::Docker;
 use crankshaft::{
     config::backend::docker::Config,
@@ -30,9 +28,9 @@ use cwl_core::{
     files::FileOrDirectory,
     inputs::{DefaultValue, InputDataProvider},
 };
-use futures_util::TryStreamExt;
 use nonempty::NonEmpty;
 use nonempty::nonempty;
+use tracing::info;
 use std::{
     path::Path,
     process::ExitStatus,
@@ -61,8 +59,7 @@ impl DockerBackend {
         let backend =
             Arc::new(docker::Backend::initialize_default_with(config, names, None).await?);
 
-        let client =
-            Docker::with_defaults().context("failed to connect to the local Docker daemon")?;
+        let client = Docker::with_defaults()?;
 
         Ok(Self { backend, client })
     }
@@ -73,6 +70,8 @@ impl DockerBackend {
         };
 
         let args = command::build_command(tool, req.inputs)?;
+
+        info!("resolved command to: {}", args.join(" "));
 
         let mut container = "alpine".to_string();
         if let Some(dr) = tool.get_requirement_or_hint::<DockerRequirement>() {
@@ -130,33 +129,7 @@ impl DockerBackend {
     }
 
     async fn build_container(&self, docker_file: &str, docker_image: &str) -> anyhow::Result<()> {
-        let mut archive = tar::Builder::new(vec![]);
-
-        archive.append_path_with_name(docker_file, "Dockerfile")?;
-        let tarball = archive.into_inner()?;
-
-        let options = BuildImageOptions {
-            dockerfile: "Dockerfile".to_string(),
-            t: Some(docker_image.to_string()),
-            rm: true,
-            ..Default::default()
-        };
-
-        let mut stream =
-            self.client
-                .inner()
-                .build_image(options, None, Some(body_full(tarball.into())));
-
-        while let Some(msg) = stream.try_next().await? {
-            if let Some(stream) = msg.stream {
-                tracing::info!("{stream}");
-            }
-            if let Some(error) = msg.error {
-                anyhow::bail!("Docker build error: {error}");
-            }
-        }
-
-        Ok(())
+        build_container(self.client.inner(), docker_file, docker_image).await
     }
 }
 
@@ -166,7 +139,7 @@ impl TaskBackend for DockerBackend {
         task: &TaskRequest<'_>,
         token: CancellationToken,
     ) -> Result<NonEmpty<ExitStatus>, TaskRunError> {
-        let task = self.create_docker_task(task).await.unwrap();
+        let task = self.create_docker_task(task).await?;
         self.backend.run(task, token)?.await
     }
 }
