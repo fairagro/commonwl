@@ -1,12 +1,8 @@
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CommandLineTool},
-    inputs::{
-        CommandInputParameter, CommandInputParameterType, CommandInputType, CommandLineBinding,
-        DefaultValue,
-    },
+    inputs::{CommandLineBinding, DefaultValue},
     requirements::ShellCommandRequirement,
-    types::CWLType,
     value_as_string,
 };
 use serde_yaml::Value;
