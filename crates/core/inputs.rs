@@ -103,6 +103,22 @@ impl Display for DefaultValue {
     }
 }
 
+impl DefaultValue {
+    pub fn is_null(&self) -> bool {
+        match self {
+            Self::Any(value) => value.is_null(),
+            _ => false,
+        }
+    }
+
+    pub fn try_get_value_ref(&self) -> Option<&Value> {
+        match self {
+            Self::FileOrDirectory(_) => None,
+            Self::Any(value) => Some(value),
+        }
+    }
+}
+
 //trait to easily retrieve default data for all input types
 pub trait InputDataProvider {
     fn id(&self) -> &Option<String>;
@@ -292,6 +308,16 @@ pub enum InputSchema {
     Array(InputArraySchema),
 }
 
+impl From<CommandInputSchema> for InputSchema {
+    fn from(value: CommandInputSchema) -> Self {
+        match value {
+            CommandInputSchema::Record(rec) => InputSchema::Record(rec.into()),
+            CommandInputSchema::Enum(enu) => InputSchema::Enum(enu.into()),
+            CommandInputSchema::Array(arr) => InputSchema::Array(arr.into()),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum CommandInputType {
@@ -337,6 +363,18 @@ impl Default for InputType {
     }
 }
 
+impl From<CommandInputType> for InputType {
+    fn from(value: CommandInputType) -> Self {
+        match value {
+            CommandInputType::CWLType(t) => InputType::CWLType(t),
+            CommandInputType::CommandInputSchema(schema) => {
+                InputType::InputSchema(Box::new((*schema).into()))
+            }
+            CommandInputType::String(s) => InputType::String(s),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputRecordSchema {
@@ -367,6 +405,19 @@ pub struct InputRecordSchema {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+impl From<CommandInputRecordSchema> for InputRecordSchema {
+    fn from(value: CommandInputRecordSchema) -> Self {
+        Self {
+            fields: value
+                .fields
+                .map(|fields| fields.into_iter().map(Into::into).collect()),
+            label: value.label,
+            doc: value.doc,
+            name: value.name,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -423,6 +474,22 @@ pub struct InputRecordField {
 
 make_shorthand_impl!(InputRecordField, "name", "type");
 
+impl From<CommandInputRecordField> for InputRecordField {
+    fn from(value: CommandInputRecordField) -> Self {
+        Self {
+            name: value.name,
+            r#type: value.r#type.map(Into::into),
+            doc: value.doc,
+            label: value.label,
+            secondary_files: value.secondary_files,
+            streamable: value.streamable,
+            format: value.format,
+            load_contents: value.load_contents,
+            load_listing: value.load_listing,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputEnumSchema {
@@ -449,6 +516,17 @@ pub struct InputEnumSchema {
     pub doc: Option<OneOrMany<String>>,
 }
 
+impl From<CommandInputEnumSchema> for InputEnumSchema {
+    fn from(value: CommandInputEnumSchema) -> Self {
+        Self {
+            symbols: value.symbols,
+            name: value.name,
+            label: value.label,
+            doc: value.doc,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputArraySchema {
@@ -473,6 +551,17 @@ pub struct InputArraySchema {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+impl From<CommandInputArraySchema> for InputArraySchema {
+    fn from(value: CommandInputArraySchema) -> Self {
+        Self {
+            items: value.items,
+            name: value.name,
+            label: value.label,
+            doc: value.doc,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]

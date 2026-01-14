@@ -132,6 +132,18 @@ impl<'a, const N: usize> From<&'a [&'a str; N]> for OneOrMany<String> {
     }
 }
 
+impl<T> OneOrMany<T> {
+    pub fn map<U, F>(self, mut f: F) -> OneOrMany<U>
+    where
+        F: FnMut(T) -> U,
+    {
+        match self {
+            OneOrMany::One(t) => OneOrMany::One(f(t)),
+            OneOrMany::Many(ts) => OneOrMany::Many(ts.into_iter().map(f).collect()),
+        }
+    }
+}
+
 pub trait ExtractFromEnum<E> {
     fn get(e: &E) -> Option<&Self>
     where

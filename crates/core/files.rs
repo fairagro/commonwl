@@ -32,6 +32,14 @@ impl FileOrDirectory {
         }
     }
 
+    pub fn is_file(&self) -> bool {
+        matches!(self, FileOrDirectory::File(_))
+    }
+
+    pub fn is_dir(&self) -> bool {
+        matches!(self, FileOrDirectory::Directory(_))
+    }
+
     pub fn from_mapping(value: serde_yaml::Value) -> Self {
         serde_yaml::from_value(value).expect("class not found")
     }
