@@ -12,7 +12,7 @@ use crate::{
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::fmt::{self, Display};
+use std::fmt::Display;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
@@ -91,13 +91,13 @@ impl Display for DefaultValue {
         match self {
             DefaultValue::FileOrDirectory(fd) => match fd.path() {
                 Some(path) => write!(f, "{path}"),
-                None => Err(fmt::Error),
+                None => write!(f, "\"no path given\""),
             },
             DefaultValue::Any(value) => match value {
                 Value::String(s) => write!(f, "{s}"),
                 Value::Number(n) => write!(f, "{n}"),
                 Value::Bool(b) => write!(f, "{b}"),
-                _ => Err(fmt::Error),
+                other => write!(f, "{other:?}"),
             },
         }
     }

@@ -1,6 +1,7 @@
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CommandLineTool},
+    files::FileOrDirectory,
     inputs::{CommandLineBinding, DefaultValue},
     requirements::ShellCommandRequirement,
     value_as_string,
@@ -120,11 +121,13 @@ pub(super) fn build_command(
         let mut cmd = vec![];
         for binding in bindings {
             if let SortKey::Str(input_id) = &binding.sort_key[1] {
-                let mut arg = generate_arg(&binding.binding, values[input_id].clone())?;
-                if binding.binding.shell_quote.unwrap_or(true) {
-                    arg = apply_shell_quote(arg);
+                for v in normalize_and_expand(&binding.binding, values[input_id].clone()) {
+                    let mut arg = generate_arg(&binding.binding, v)?;
+                    if binding.binding.shell_quote.unwrap_or(true) {
+                        arg = apply_shell_quote(arg);
+                    }
+                    cmd.extend(arg);
                 }
-                cmd.extend(arg);
             } else {
                 //we have an "Argument" here
                 let mut arg = use_value_from(&binding.binding);
@@ -140,8 +143,10 @@ pub(super) fn build_command(
     } else {
         for binding in bindings {
             if let SortKey::Str(input_id) = &binding.sort_key[1] {
-                let arg = generate_arg(&binding.binding, values[input_id].clone())?;
-                args.extend(arg);
+                for v in normalize_and_expand(&binding.binding, values[input_id].clone()) {
+                    let arg = generate_arg(&binding.binding, v)?;
+                    args.extend(arg);
+                }
             } else {
                 //we have an "Argument" here
                 args.extend(use_value_from(&binding.binding));
@@ -195,7 +200,11 @@ fn generate_arg(binding: &CommandLineBinding, input: DefaultValue) -> anyhow::Re
             }
             _ => argl = vec![DefaultValue::Any(value)],
         },
-        DefaultValue::FileOrDirectory(fd) => argl = vec![DefaultValue::FileOrDirectory(fd)],
+        DefaultValue::FileOrDirectory(fd) => {
+            let mut fd = fd;
+            fd.dry_validation();
+            argl = vec![DefaultValue::FileOrDirectory(fd)]
+        }
     }
 
     Ok(argl
@@ -251,6 +260,37 @@ fn get_shell_command() -> Vec<String> {
         "-c"
     };
     vec![shell.to_string(), param.to_string()]
+}
+
+fn normalize_and_expand(binding: &CommandLineBinding, value: DefaultValue) -> Vec<DefaultValue> {
+    match value {
+        DefaultValue::Any(Value::Sequence(seq))
+            if binding.item_separator.is_none() && binding.value_from.is_none() =>
+        {
+            seq.into_iter()
+                .map(|v| normalize_scalar(DefaultValue::Any(v)))
+                .collect()
+        }
+
+        other => vec![normalize_scalar(other)],
+    }
+}
+
+fn normalize_scalar(value: DefaultValue) -> DefaultValue {
+    match value {
+        DefaultValue::Any(Value::Mapping(map)) => {
+            if let Some(Value::String(class)) = map.get(Value::String("class".into()))
+                && (class == "File" || class == "Directory")
+            {
+                return DefaultValue::FileOrDirectory(FileOrDirectory::from_mapping(
+                    serde_yaml::Value::Mapping(map),
+                ));
+            }
+            DefaultValue::Any(Value::Mapping(map))
+        }
+
+        other => other,
+    }
 }
 
 #[cfg(test)]
@@ -338,6 +378,59 @@ stdout: output.txt"#;
                 &shell_cmd[0],
                 &shell_cmd[1],
                 "cd '$(inputs.indir.path)' && find . | sort"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_command_difficult() {
+        let yaml = include_str!("../../testdata/cwl/tests/bwa-mem-tool.cwl");
+        let tool = &serde_yaml::from_str(yaml).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let mut cmd = build_command(tool, &input_values).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(
+            cmd,
+            vec![
+                "bwa",
+                "mem",
+                "-t",
+                "$(runtime.cores)",
+                "-I",
+                "1,2,3,4",
+                "-m",
+                "3",
+                "chr20.fa",
+                "example_human_Illumina.pe_1.fastq",
+                "example_human_Illumina.pe_2.fastq"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_command_difficult_2() {
+        let yaml = include_str!("../../testdata/cwl/tests/binding-test.cwl");
+        let tool = &serde_yaml::from_str(yaml).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let mut cmd = build_command(tool, &input_values).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(
+            cmd,
+            vec![
+                "bwa",
+                "mem",
+                "chr20.fa",
+                "-XXX",
+                "-YYY",
+                "example_human_Illumina.pe_1.fastq",
+                "-YYY",
+                "example_human_Illumina.pe_2.fastq"
             ]
         );
     }

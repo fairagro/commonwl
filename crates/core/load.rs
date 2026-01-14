@@ -11,7 +11,6 @@ pub fn load_cwl_file<P: AsRef<Path>>(path: P, preprocess: bool) -> anyhow::Resul
     serde_yaml::from_str::<CWLDocument>(&contents).map_err(|e| e.into())
 }
 
-
 pub fn preprocess_cwl_file<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
     let contents = fs::read_to_string(&path)?;
     let mut yaml: Value = serde_yaml::from_str(&contents)?;

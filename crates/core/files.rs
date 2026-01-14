@@ -20,9 +20,20 @@ pub enum FileOrDirectory {
 impl FileOrDirectory {
     pub fn path(&self) -> Option<&String> {
         match self {
-            FileOrDirectory::File(f) => f.path.as_ref(),
-            FileOrDirectory::Directory(d) => d.path.as_ref(),
+            Self::File(f) => f.path.as_ref(),
+            Self::Directory(d) => d.path.as_ref(),
         }
+    }
+
+    pub fn dry_validation(&mut self) {
+        match self {
+            Self::File(f) => f.dry_validation(),
+            Self::Directory(d) => d.dry_validation(),
+        }
+    }
+
+    pub fn from_mapping(value: serde_yaml::Value) -> Self {
+        serde_yaml::from_value(value).expect("class not found")
     }
 }
 
@@ -64,6 +75,18 @@ pub struct File {
     pub contents: Option<String>,
 }
 
+impl File {
+    // according to the spec this fn sets the value of location (if some) to path (if none)
+    // however file's existence is not questioned, yet
+    pub fn dry_validation(&mut self) {
+        if let Some(location) = &self.location
+            && self.path.is_none()
+        {
+            self.path = Some(location.to_string());
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct Directory {
@@ -79,6 +102,18 @@ pub struct Directory {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub listing: Option<Vec<FileOrDirectory>>,
+}
+
+impl Directory {
+    // according to the spec this fn sets the value of location (if some) to path (if none)
+    // however directory's existence is not questioned, yet
+    pub fn dry_validation(&mut self) {
+        if let Some(location) = &self.location
+            && self.path.is_none()
+        {
+            self.path = Some(location.to_string());
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
