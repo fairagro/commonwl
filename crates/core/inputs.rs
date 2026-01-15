@@ -55,6 +55,14 @@ impl CommandInputParameterType {
         ) || matches!(
             self,
             CommandInputParameterType::CommandInputType(
+                OneOrMany::Many(v)
+            ) if v.iter().any(|t| matches!(
+                t,
+                CommandInputType::CWLType(CWLType::Null)
+            ))
+        ) || matches!(
+            self,
+            CommandInputParameterType::CommandInputType(
                 OneOrMany::One(CommandInputType::CommandInputSchema(schema))
             ) if schema.is_null_allowed()
         )
