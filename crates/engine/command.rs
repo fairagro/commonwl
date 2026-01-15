@@ -97,9 +97,9 @@ pub fn build_command(
             anyhow::bail!("No input id");
         };
         //check for value given
-        let Some(value) = values.get(input_id) else {
-            anyhow::bail!("No input for `{}` given!", input_id);
-        };
+        let value = values
+            .get(input_id)
+            .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null));
 
         if matches!(value, DefaultValue::Any(serde_yaml::Value::Null))
             && !input.r#type.is_null_allowed()
@@ -173,8 +173,68 @@ fn collect_input_bindings(
     )) = schema
     {
         match schema.as_ref() {
-            CommandInputSchema::Record(record) => todo!(),
             CommandInputSchema::Enum(r#enum) => todo!(),
+            CommandInputSchema::Record(record) => {
+                //add the root record binding with a value of null
+                if let Some(rec_binding) = &record.input_binding {
+                    let rec_binding = rec_binding.clone();
+                    let mut sort_key = base_sort_key.to_owned();
+                    if let Some(root_binding) = &binding {
+                        sort_key.push(SortKey::Int(
+                            get_binding_position(root_binding).unwrap_or_default(),
+                        ));
+                        sort_key.push(SortKey::Str(name.to_owned()));
+                    }
+                    sort_key.push(SortKey::Int(
+                        get_binding_position(&rec_binding).unwrap_or_default(),
+                    ));
+
+                    let value = DefaultValue::Any(serde_yaml::Value::Null);
+
+                    bindings.push(BoundBinding {
+                        sort_key,
+                        binding: rec_binding,
+                        value,
+                    });
+                }
+
+                if let Some(fields) = &record.fields {
+                    let DefaultValue::Any(serde_yaml::Value::Mapping(map)) = value else {
+                        panic!("previous validation of `{name}` did not work")
+                    };
+                    for (i, field) in fields.iter().enumerate() {
+                        if let Some(fi_binding) = &field.input_binding {
+                            let fi_binding = fi_binding.clone();
+                            let mut sort_key = base_sort_key.to_owned();
+                            if let Some(root_binding) = &binding {
+                                sort_key.push(SortKey::Int(
+                                    get_binding_position(root_binding).unwrap_or_default(),
+                                ));
+                                sort_key.push(SortKey::Str(name.to_owned()));
+                            }
+                            sort_key.push(SortKey::Int(
+                                get_binding_position(&fi_binding).unwrap_or_default(),
+                            ));
+                            sort_key.push(SortKey::Int(i as i32));
+
+                            let value = map
+                                .get(field.name.clone())
+                                .expect("input did not provide input for struct field");
+                            let value = serde_yaml::from_value(value.clone())?;
+                            let schema = field.r#type.clone();
+
+                            collect_input_bindings(
+                                &CommandInputParameterType::CommandInputType(schema),
+                                &Some(fi_binding),
+                                &value,
+                                name,
+                                &sort_key,
+                                bindings,
+                            )?
+                        }
+                    }
+                }
+            }
             CommandInputSchema::Array(array) => {
                 let should_recurse = binding
                     .clone()
@@ -215,26 +275,6 @@ fn collect_input_bindings(
                         )?;
                     }
                 }
-                //add root binding
-                if let Some(binding) = &binding {
-                    let position = binding.position.clone().map(|p| match p {
-                        IntegerOrExpression::Int(i) => i,
-                        IntegerOrExpression::Long(l) => i32::try_from(l).unwrap_or_default(),
-                        IntegerOrExpression::Expression(_s) => todo!(), //evaluate expression
-                    });
-                    let binding = binding.clone();
-                    let mut sort_key = base_sort_key.to_owned();
-                    sort_key.push(SortKey::Int(position.unwrap_or_default()));
-                    sort_key.push(SortKey::Str(name.to_owned()));
-
-                    bindings.push(BoundBinding {
-                        sort_key,
-                        binding,
-                        value: value.clone(),
-                    });
-                }
-
-                return Ok(());
             }
         }
     }
@@ -290,6 +330,13 @@ pub(crate) fn generate_arg(
                     }
                     return Ok(val);
                 } else if let Some(prefix) = &binding.prefix {
+                    return Ok(vec![prefix.clone()]);
+                } else {
+                    return Ok(vec![]);
+                }
+            }
+            serde_yaml::Value::Mapping(_) => {
+                if let Some(prefix) = &binding.prefix {
                     return Ok(vec![prefix.clone()]);
                 } else {
                     return Ok(vec![]);
@@ -515,6 +562,35 @@ stdout: output.txt"#;
                 "example_human_Illumina.pe_2.fastq"
             ]
         );
+    }
+
+    #[test]
+    fn test_build_command_with_record_bindings() {
+        let yaml = include_str!("../../testdata/cwl/tests/record-order.cwl");
+        let tool = &serde_yaml::from_str(yaml).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let mut cmd = build_command(tool, &input_values).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(
+            cmd,
+            vec!["-a", "-b", "1", "-c", "3", "-d", "-e", "2", "-f", "4"]
+        );
+    }
+
+    #[test]
+    fn test_build_command_with_optional_missing() {
+        let yaml = include_str!("../../testdata/cwl/tests/cat1-testcli.cwl");
+        let tool = &serde_yaml::from_str(yaml).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let mut cmd = build_command(tool, &input_values).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(cmd, vec!["cat", "hello.txt"]);
     }
 
     #[test]
