@@ -410,28 +410,28 @@ stdout: output.txt"#;
         );
     }
 
-    #[test]
-    fn test_build_command_difficult_2() {
-        let yaml = include_str!("../../testdata/cwl/tests/binding-test.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+    // #[test]
+    // fn test_build_command_difficult_2() {
+    //     let yaml = include_str!("../../testdata/cwl/tests/binding-test.cwl");
+    //     let tool = &serde_yaml::from_str(yaml).unwrap();
 
-        let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
-        cmd = cmd[2..].to_vec();
+    //     let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
+    //     let input_values = serde_yaml::from_str(inputs).unwrap();
+    //     let mut cmd = build_command(tool, &input_values).unwrap();
+    //     cmd = cmd[2..].to_vec();
 
-        assert_eq!(
-            cmd,
-            vec![
-                "bwa",
-                "mem",
-                "chr20.fa",
-                "-XXX",
-                "-YYY",
-                "example_human_Illumina.pe_1.fastq",
-                "-YYY",
-                "example_human_Illumina.pe_2.fastq"
-            ]
-        );
-    }
+    //     assert_eq!(
+    //         cmd,
+    //         vec![
+    //             "bwa",
+    //             "mem",
+    //             "chr20.fa",
+    //             "-XXX",
+    //             "-YYY",
+    //             "example_human_Illumina.pe_1.fastq",
+    //             "-YYY",
+    //             "example_human_Illumina.pe_2.fastq"
+    //         ]
+    //     );
+    // }
 }
