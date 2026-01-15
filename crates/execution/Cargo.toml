@@ -9,6 +9,7 @@ license.workspace = true
 path = "lib.rs"
 
 [dependencies]
+engine = { path = "../engine" }
 serde_yaml.workspace = true
 anyhow.workspace = true
 crankshaft = { version = "0.8.0", features = ["docker"] }

@@ -37,7 +37,7 @@ pub fn collect_inputs(
         //error if validity can not be confirmed
         if !valid {
             anyhow::bail!(
-                "Value {value} is not valid for `{}`",
+                "Value {value:?} is not valid for `{}`",
                 input.id().clone().unwrap_or_default()
             )
         }

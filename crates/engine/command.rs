@@ -173,7 +173,7 @@ fn collect_input_bindings(
     )) = schema
     {
         match schema.as_ref() {
-            CommandInputSchema::Enum(r#enum) => todo!(),
+            CommandInputSchema::Enum(_) => {}
             CommandInputSchema::Record(record) => {
                 //add the root record binding with a value of null
                 if let Some(rec_binding) = &record.input_binding {
@@ -236,15 +236,21 @@ fn collect_input_bindings(
                 }
             }
             CommandInputSchema::Array(array) => {
+                //at this point we can assume, that input has the correct format
+                let DefaultValue::Any(serde_yaml::Value::Sequence(vec)) = value else {
+                    panic!("previous validation of `{name}` did not work")
+                };
+
+                //do not add binding for empty vec
+                if vec.is_empty() {
+                    return Ok(());
+                }
+
                 let should_recurse = binding
                     .clone()
                     .map(|b| b.item_separator.is_none() && b.value_from.is_none())
                     .unwrap_or(true);
                 if should_recurse {
-                    //at this point we can assume, that input has the correct format
-                    let DefaultValue::Any(serde_yaml::Value::Sequence(vec)) = value else {
-                        panic!("previous validation of `{name}` did not work")
-                    };
                     for (ix, item) in vec.iter().enumerate() {
                         //reassign to DefaultValue
                         let item = serde_yaml::from_value(item.clone())?;
@@ -357,7 +363,7 @@ pub(crate) fn generate_arg(
             if let DefaultValue::Any(serde_yaml::Value::Null) = j {
                 vec![]
             } else {
-                let s = j.to_string();
+                let s = to_str(&j);
                 if sep {
                     if let Some(p) = &binding.prefix {
                         vec![p.clone(), s]
@@ -383,6 +389,20 @@ fn use_value_from(binding: &CommandLineBinding) -> Vec<String> {
         vec![v.clone()]
     } else {
         vec![]
+    }
+}
+
+fn to_str(val: &DefaultValue) -> String {
+    match val {
+        DefaultValue::FileOrDirectory(fd) => match fd.path() {
+            Some(path) => path.to_string(),
+            None => "\"no path given\"".to_owned(),
+        },
+        DefaultValue::Any(value) => match value {
+            serde_yaml::Value::String(s) => s.to_string(),
+            serde_yaml::Value::Number(n) => n.to_string(),
+            _ => String::new(),
+        },
     }
 }
 
@@ -581,6 +601,19 @@ stdout: output.txt"#;
     }
 
     #[test]
+    fn test_build_command_with_empty_array() {
+        let yaml = include_str!("../../testdata/cwl/tests/empty-array-input.cwl");
+        let tool = &serde_yaml::from_str(yaml).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let mut cmd = build_command(tool, &input_values).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(cmd, Vec::<String>::new());
+    }
+
+    #[test]
     fn test_build_command_with_optional_missing() {
         let yaml = include_str!("../../testdata/cwl/tests/cat1-testcli.cwl");
         let tool = &serde_yaml::from_str(yaml).unwrap();
@@ -591,6 +624,19 @@ stdout: output.txt"#;
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, vec!["cat", "hello.txt"]);
+    }
+
+    #[test]
+    fn test_build_command_with_empty_binding() {
+        let yaml = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding.cwl");
+        let tool = &serde_yaml::from_str(yaml).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let mut cmd = build_command(tool, &input_values).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(cmd, Vec::<String>::new());
     }
 
     #[test]

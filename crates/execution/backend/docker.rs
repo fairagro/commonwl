@@ -1,9 +1,6 @@
+use crate::backend::{TaskBackend, TaskRequest};
 use crate::docker::build_container;
 use crate::inputs::collect_inputs;
-use crate::{
-    backend::{TaskBackend, TaskRequest},
-    command,
-};
 use crankshaft::docker::Docker;
 use crankshaft::{
     config::backend::docker::Config,
@@ -30,13 +27,13 @@ use cwl_core::{
 };
 use nonempty::NonEmpty;
 use nonempty::nonempty;
-use tracing::info;
 use std::{
     path::Path,
     process::ExitStatus,
     sync::{Arc, Mutex},
 };
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
 const CONTAINER_INPUT_DIR: &str = "/mnt/task/inputs";
@@ -69,7 +66,7 @@ impl DockerBackend {
             panic!("damn");
         };
 
-        let args = command::build_command(tool, req.inputs)?;
+        let args = engine::command::build_command(tool, req.inputs)?;
 
         info!("resolved command to: {}", args.join(" "));
 
@@ -106,7 +103,7 @@ impl DockerBackend {
             let value = input_values.get(&input.id().clone().unwrap()).unwrap();
             //we stage here, so we want to only get file or dir
             if let DefaultValue::FileOrDirectory(fod) = value {
-                let str = value.to_string();
+                let str = fod.path().unwrap();
                 let ty = if matches!(fod, FileOrDirectory::File(_)) {
                     input::Type::File
                 } else {

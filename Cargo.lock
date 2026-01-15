@@ -523,6 +523,7 @@ dependencies = [
  "bollard",
  "crankshaft",
  "cwl_core",
+ "engine",
  "futures-util",
  "nonempty",
  "serde_yaml",

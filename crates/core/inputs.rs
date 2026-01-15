@@ -12,7 +12,6 @@ use crate::{
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
-use std::fmt::Display;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
@@ -91,23 +90,6 @@ impl From<files::Directory> for DefaultValue {
 impl From<&str> for DefaultValue {
     fn from(value: &str) -> Self {
         DefaultValue::Any(serde_yaml::Value::String(value.to_string()))
-    }
-}
-
-impl Display for DefaultValue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            DefaultValue::FileOrDirectory(fd) => match fd.path() {
-                Some(path) => write!(f, "{path}"),
-                None => write!(f, "\"no path given\""),
-            },
-            DefaultValue::Any(value) => match value {
-                Value::String(s) => write!(f, "{s}"),
-                Value::Number(n) => write!(f, "{n}"),
-                Value::Bool(b) => write!(f, "{b}"),
-                other => write!(f, "{other:?}"),
-            },
-        }
     }
 }
 

@@ -5,7 +5,6 @@ use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 pub mod backend;
-pub mod command;
 pub(crate) mod docker;
 pub mod inputs;
 
