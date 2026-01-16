@@ -8,8 +8,6 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::input::collect_inputs;
-
 #[derive(Debug)]
 pub struct PathMapper {
     pub mappings: HashMap<PathBuf, PathBuf>,
