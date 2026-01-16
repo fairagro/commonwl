@@ -31,7 +31,12 @@ pub fn collect_inputs(
                 validate_command_input(&command_input.r#type, &value)
             }
             //we are allowed to unwrap here, read the trait comment
-            _ => validate_input_type(input.r#type().unwrap(), &value),
+            _ => match input.r#type().unwrap() {
+                OneOrMany::One(item) => validate_input_type(&item.clone(), &value),
+                OneOrMany::Many(items) => items
+                    .iter()
+                    .any(|i| validate_input_type(&i.clone(), &value)),
+            },
         };
 
         //error if validity can not be confirmed

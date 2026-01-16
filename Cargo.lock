@@ -643,6 +643,7 @@ dependencies = [
  "cwl_core",
  "serde_yaml",
  "shlex",
+ "url",
 ]
 
 [[package]]

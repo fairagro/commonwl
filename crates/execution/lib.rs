@@ -23,7 +23,7 @@ pub async fn run_command(
         inputs: &inputs,
     };
 
-    let result = backend.run(&task_request, token).await?;
+    let _result = backend.run(&task_request, token).await?;
     info!("Task completed successfully");
     Ok(())
 }

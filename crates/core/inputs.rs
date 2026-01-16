@@ -114,7 +114,7 @@ pub trait InputDataProvider {
     fn id(&self) -> &Option<String>;
     fn default(&self) -> &Option<DefaultValue>;
     //type returns None for CommandLineTool (try different approach) and Some for other Docs
-    fn r#type(&self) -> Option<&InputType>;
+    fn r#type(&self) -> Option<&OneOrMany<InputType>>;
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
@@ -167,7 +167,7 @@ impl InputDataProvider for CommandInputParameter {
         &self.default
     }
 
-    fn r#type(&self) -> Option<&InputType> {
+    fn r#type(&self) -> Option<&OneOrMany<InputType>> {
         None
     }
 }
@@ -177,7 +177,7 @@ impl InputDataProvider for CommandInputParameter {
 pub struct WorkflowInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
-    pub r#type: InputType,
+    pub r#type: OneOrMany<InputType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
@@ -224,8 +224,14 @@ impl InputDataProvider for WorkflowInputParameter {
         &self.default
     }
 
-    fn r#type(&self) -> Option<&InputType> {
+    fn r#type(&self) -> Option<&OneOrMany<InputType>> {
         Some(&self.r#type)
+    }
+}
+
+impl Default for OneOrMany<InputType> {
+    fn default() -> Self {
+        OneOrMany::One(InputType::CWLType(CWLType::Null))
     }
 }
 
@@ -234,7 +240,7 @@ impl InputDataProvider for WorkflowInputParameter {
 pub struct OperationInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
-    pub r#type: InputType,
+    pub r#type: OneOrMany<InputType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
@@ -277,7 +283,7 @@ impl InputDataProvider for OperationInputParameter {
         &self.default
     }
 
-    fn r#type(&self) -> Option<&InputType> {
+    fn r#type(&self) -> Option<&OneOrMany<InputType>> {
         Some(&self.r#type)
     }
 }
