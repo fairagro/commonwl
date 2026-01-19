@@ -642,6 +642,7 @@ dependencies = [
  "anyhow",
  "cwl_core",
  "pathdiff",
+ "serde",
  "serde_yaml",
  "shlex",
  "url",

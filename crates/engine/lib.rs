@@ -1,6 +1,10 @@
-use crate::input::load_input_file_from_file;
+use crate::input::{InputObject, load_input_file_from_file};
 use anyhow::Ok;
-use cwl_core::{documents::CWLDocument, load_cwl_file};
+use cwl_core::{
+    documents::CWLDocument,
+    load_cwl_file,
+    requirements::{ToolHints, ToolRequirements},
+};
 use std::{collections::HashMap, env, path::Path};
 
 pub mod command;
@@ -12,6 +16,8 @@ pub struct ExecutionRequest {
     pub specification: CWLDocument,
     pub inputs: HashMap<String, serde_yaml::Value>,
     pub working_dir: std::path::PathBuf,
+    pub requirements: Vec<ToolRequirements>,
+    pub hints: Vec<ToolHints>,
 }
 
 pub fn load_execution_context(
@@ -27,15 +33,20 @@ pub fn load_execution_context(
 
 pub fn load_execution_context_with_inputs(
     specification_path: impl AsRef<Path>,
-    inputs: HashMap<String, serde_yaml::Value>,
+    mut inputs: InputObject,
 ) -> anyhow::Result<ExecutionRequest> {
     let doc = load_cwl_file(&specification_path, true)?;
 
     let working_dir = env::current_dir()?;
     let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
+
+    //add documents hints and requirements to inputs
+
     let ctx = ExecutionRequest {
         specification: doc,
-        inputs,
+        inputs: inputs.inputs,
+        requirements: inputs.requirements,
+        hints: inputs.hints,
         working_dir: base_path.to_path_buf(),
     };
 
@@ -44,16 +55,15 @@ pub fn load_execution_context_with_inputs(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_load_execution_context() {
-        let spec_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/cat-tool.cwl");
-        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/cat-job.json");
+        let spec_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
 
         let ctx = load_execution_context(&spec_path, inputs_path);
         assert!(ctx.is_ok());

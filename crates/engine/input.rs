@@ -5,17 +5,26 @@ use cwl_core::{
         CommandInputParameterType, DefaultValue, InputArraySchema, InputDataProvider,
         InputEnumSchema, InputRecordSchema, InputSchema, InputType,
     },
+    requirements::{ToolHints, ToolRequirements},
     types::CWLType,
 };
+use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
 
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct InputObject {
+    pub inputs: HashMap<String, serde_yaml::Value>,
+    pub requirements: Vec<ToolRequirements>,
+    pub hints: Vec<ToolHints>,
+}
+
 pub fn load_input_file_from_file(
     path: impl AsRef<Path>,
     base_path: impl AsRef<Path>,
-) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
+) -> anyhow::Result<InputObject> {
     let content = std::fs::read_to_string(path.as_ref())?;
     let mut values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
 
@@ -30,7 +39,22 @@ pub fn load_input_file_from_file(
         adjust_path_to_base(item, &diff_path, &mut HashSet::new());
     }
 
-    Ok(values)
+    let mut input_object = InputObject::default();
+
+    //trying to get inputs:
+    if let Some(req_raw) = values.remove("cwl:requirements") {
+        let reqs: Vec<ToolRequirements> = serde_yaml::from_value(req_raw)?;
+        input_object.requirements = reqs;
+    }
+    if let Some(hints_raw) = values.remove("cwl:hints") {
+        let hints: Vec<ToolHints> = serde_yaml::from_value(hints_raw)?;
+        input_object.hints = hints;
+    }
+
+    //move inputs off scope here
+    input_object.inputs = values;
+
+    Ok(input_object)
 }
 
 fn adjust_path_to_base(
@@ -326,6 +350,7 @@ mod tests {
 
         let inputs = inputs.unwrap();
         let file1_loc = inputs
+            .inputs
             .get("file1")
             .unwrap()
             .as_mapping()
@@ -338,7 +363,7 @@ mod tests {
     }
 
     #[test]
-    fn test_load_input_file_differentbase() {
+    fn test_load_input_file_different_base() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
         let inputs_path =
@@ -349,6 +374,7 @@ mod tests {
 
         let inputs = inputs.unwrap();
         let file1_loc = inputs
+            .inputs
             .get("file1")
             .unwrap()
             .as_mapping()
@@ -358,5 +384,19 @@ mod tests {
             .as_str()
             .unwrap();
         assert_eq!(file1_loc, "../hello.txt");
+    }
+
+    #[test]
+    fn test_load_input_file_requirements() {
+        let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
+        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/env-job4.yaml");
+
+        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
+        assert!(inputs.is_ok());
+
+        let inputs = inputs.unwrap();
+        assert_eq!(inputs.requirements.len(), 1);
     }
 }

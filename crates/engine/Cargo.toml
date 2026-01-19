@@ -9,6 +9,7 @@ license.workspace = true
 path = "lib.rs"
 
 [dependencies]
+serde.workspace = true
 serde_yaml.workspace = true
 anyhow.workspace = true
 cwl_core.workspace = true

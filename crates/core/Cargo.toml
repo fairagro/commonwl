@@ -8,7 +8,7 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 bon = "3.8.1"
-serde = { version = "1.0.228", features = ["derive"] }
+serde.workspace = true
 serde_yaml.workspace = true
 
 [lib]
