@@ -41,3 +41,25 @@ pub fn load_execution_context_with_inputs(
 
     Ok(ctx)
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::*;
+
+    #[test]
+    fn test_load_execution_context() {
+        let spec_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/cat-tool.cwl");
+        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/cat-job.json");
+
+        let ctx = load_execution_context(&spec_path, inputs_path);
+        assert!(ctx.is_ok());
+
+        let ctx = ctx.unwrap();
+        assert_eq!(ctx.inputs.len(), 1);
+        assert_eq!(ctx.working_dir, spec_path.parent().unwrap());
+    }
+}
