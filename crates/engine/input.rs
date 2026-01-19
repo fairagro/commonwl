@@ -7,7 +7,72 @@ use cwl_core::{
     },
     types::CWLType,
 };
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    path::{Path, PathBuf},
+};
+
+pub fn load_input_file_from_file(
+    path: impl AsRef<Path>,
+    base_path: impl AsRef<Path>,
+) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
+    let content = std::fs::read_to_string(path.as_ref())?;
+    let mut values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
+
+    //calculate path relativity
+    let diff_path = pathdiff::diff_paths(
+        path.as_ref().parent().unwrap_or(Path::new(".")),
+        base_path.as_ref(),
+    )
+    .unwrap_or(PathBuf::from(path.as_ref()));
+
+    for item in values.values_mut() {
+        adjust_path_to_base(item, &diff_path, &mut HashSet::new());
+    }
+
+    Ok(values)
+}
+
+fn adjust_path_to_base(
+    value: &mut serde_yaml::Value,
+    diff_path: &Path,
+    visited: &mut HashSet<*const serde_yaml::Value>,
+) {
+    let ptr = value as *const _;
+    if !visited.insert(ptr) {
+        return; // already visited → break cycle
+    }
+
+    match value {
+        serde_yaml::Value::Sequence(values) => {
+            for v in values {
+                adjust_path_to_base(v, diff_path, visited);
+            }
+        }
+        serde_yaml::Value::Mapping(mapping) => {
+            for (_, v) in mapping.iter_mut() {
+                adjust_path_to_base(v, diff_path, visited);
+            }
+
+            if let Some(path_val) = mapping.get("path").and_then(|v| v.as_str()) {
+                let mut p = PathBuf::from(path_val);
+                if !p.is_absolute() {
+                    p = diff_path.join(p);
+                }
+                mapping.insert("path".into(), p.to_string_lossy().to_string().into());
+            }
+
+            if let Some(path_val) = mapping.get("location").and_then(|v| v.as_str()) {
+                let mut p = PathBuf::from(path_val);
+                if !p.is_absolute() {
+                    p = diff_path.join(p);
+                }
+                mapping.insert("location".into(), p.to_string_lossy().to_string().into());
+            }
+        }
+        _ => {}
+    }
+}
 
 pub fn collect_inputs(
     doc: &CWLDocument,
@@ -247,5 +312,51 @@ mod tests {
         assert!(inputs.is_ok());
 
         assert_eq!(inputs.unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_load_input_file_same_base() {
+        let tool_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+
+        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
+        assert!(inputs.is_ok());
+
+        let inputs = inputs.unwrap();
+        let file1_loc = inputs
+            .get("file1")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get("location")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(file1_loc, "hello.txt");
+    }
+
+    #[test]
+    fn test_load_input_file_differentbase() {
+        let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+
+        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
+        assert!(inputs.is_ok());
+
+        let inputs = inputs.unwrap();
+        let file1_loc = inputs
+            .get("file1")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get("location")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(file1_loc, "../hello.txt");
     }
 }

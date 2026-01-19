@@ -12,5 +12,6 @@ path = "lib.rs"
 serde_yaml.workspace = true
 anyhow.workspace = true
 cwl_core.workspace = true
+pathdiff = "0.2.3"
 shlex = "1.3.0"
 url = "2.5.8"
