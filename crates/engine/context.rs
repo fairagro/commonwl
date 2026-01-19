@@ -1,8 +1,6 @@
+use crate::pathmapper::PathMapper;
 use cwl_core::inputs::DefaultValue;
 use std::{collections::HashMap, path::PathBuf};
-use url::Url;
-
-pub type PathMapper = HashMap<String, (PathBuf, Url)>;
 
 pub struct TaskSpawnContext {
     pub work_dir: PathBuf,
