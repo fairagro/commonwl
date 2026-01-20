@@ -1,5 +1,5 @@
 [package]
-name = "engine"
+name = "cwl_engine"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

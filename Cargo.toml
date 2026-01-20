@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/commonwl", "crates/core", "crates/engine", "crates/execution", "runner"]
+members = ["crates/commonwl", "crates/core", "crates/engine"]
 
 resolver = "3"
 

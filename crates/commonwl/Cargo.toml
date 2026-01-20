@@ -7,11 +7,11 @@ license.workspace = true
 
 [dependencies]
 cwl_core = { path = "../core" }
-cwl_execution = { path = "../execution", optional = true }
+cwl_engine = { path = "../engine", optional = true }
 
 [features]
 default = []
-execution = ["cwl_execution"]
+engine = ["cwl_engine"]
 
 [lib]
 path = "lib.rs"
