@@ -5,7 +5,7 @@ use cwl_core::{
         CommandInputParameterType, DefaultValue, InputArraySchema, InputDataProvider,
         InputEnumSchema, InputRecordSchema, InputSchema, InputType,
     },
-    requirements::{ToolHints, ToolRequirements},
+    requirements::ToolHints,
     types::CWLType,
 };
 use serde::Deserialize;
@@ -14,10 +14,12 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use crate::requirements::ProcessRequirements;
+
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct InputObject {
     pub inputs: HashMap<String, serde_yaml::Value>,
-    pub requirements: Vec<ToolRequirements>,
+    pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ToolHints>,
 }
 
@@ -43,7 +45,7 @@ pub fn load_input_file_from_file(
 
     //trying to get inputs:
     if let Some(req_raw) = values.remove("cwl:requirements") {
-        let reqs: Vec<ToolRequirements> = serde_yaml::from_value(req_raw)?;
+        let reqs: Vec<ProcessRequirements> = serde_yaml::from_value(req_raw)?;
         input_object.requirements = reqs;
     }
     if let Some(hints_raw) = values.remove("cwl:hints") {
