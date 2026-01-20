@@ -133,6 +133,8 @@ mod tests {
         let request = load_execution_context(specification_path, inputs_path).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = backend.run(&request, cancellation_token).await;
+
         assert!(result.is_ok());
+        //add check for exit status and outputs
     }
 }
