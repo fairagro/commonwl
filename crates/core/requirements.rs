@@ -86,7 +86,7 @@ pub enum WorkflowRequirements {
 impl FromShortHand for WorkflowRequirements {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "untagged")]
+#[serde(untagged)]
 pub enum ToolHints {
     Requirement(ToolRequirements),
     Any(serde_yaml::Value),
@@ -94,7 +94,7 @@ pub enum ToolHints {
 impl FromShortHand for ToolHints {}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "untagged")]
+#[serde(untagged)]
 pub enum WorkflowHints {
     Requirement(WorkflowRequirements),
     Any(serde_yaml::Value),

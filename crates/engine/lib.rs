@@ -1,9 +1,9 @@
 use crate::{
     input::{InputObject, load_input_file_from_file},
-    requirements::{ProcessRequirements, collect_requirements},
+    requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
 };
 use anyhow::Ok;
-use cwl_core::{documents::CWLDocument, load_cwl_file, requirements::ToolHints};
+use cwl_core::{documents::CWLDocument, load_cwl_file};
 use std::{collections::HashMap, env, path::Path};
 
 pub mod command;
@@ -17,7 +17,7 @@ pub struct ExecutionRequest {
     pub inputs: HashMap<String, serde_yaml::Value>,
     pub working_dir: std::path::PathBuf,
     pub requirements: Vec<ProcessRequirements>,
-    pub hints: Vec<ToolHints>,
+    pub hints: Vec<ProcessHints>,
 }
 
 /// Load an execution context from a CWL specification file and an inputs file.
@@ -51,12 +51,11 @@ pub fn load_execution_context_from_document(
     inputs: InputObject,
     base_path: impl AsRef<Path>,
 ) -> anyhow::Result<ExecutionRequest> {
-    
     let ctx = ExecutionRequest {
         requirements: collect_requirements(&specification, &inputs),
+        hints: collect_hints(&specification, &inputs),
         specification,
         inputs: inputs.inputs,
-        hints: inputs.hints,
         working_dir: base_path.as_ref().to_path_buf(),
     };
 

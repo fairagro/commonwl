@@ -6,7 +6,7 @@ use cwl_core::{
         MultipleInputFeatureRequirement, NetworkAccess, ResourceRequirement,
         ScatterFeatureRequirement, SchemaDefRequirement, ShellCommandRequirement,
         SoftwareRequirement, StepInputExpressionRequirement, SubworkflowFeatureRequirement,
-        ToolRequirements, ToolTimeLimit, WorkReuse, WorkflowRequirements,
+        ToolHints, ToolRequirements, ToolTimeLimit, WorkReuse, WorkflowHints, WorkflowRequirements,
     },
 };
 use serde::Deserialize;
@@ -116,6 +116,13 @@ impl From<WorkflowRequirements> for ProcessRequirements {
     }
 }
 
+#[derive(Deserialize, Debug, Clone)]
+#[serde(untagged)]
+pub enum ProcessHints {
+    Requirement(ProcessRequirements),
+    Any(serde_yaml::Value),
+}
+
 pub fn collect_requirements(
     specification: &CWLDocument,
     inputs: &InputObject,
@@ -151,13 +158,71 @@ pub fn collect_requirements(
             .collect(),
     };
 
-    merge(&mut requirements, &inputs.requirements);
+    merge::<ProcessRequirements>(&mut requirements, &inputs.requirements);
     requirements
 }
 
-fn merge(dst: &mut Vec<ProcessRequirements>, src: &[ProcessRequirements]) {
+pub fn collect_hints(specification: &CWLDocument, inputs: &InputObject) -> Vec<ProcessHints> {
+    let mut hints: Vec<ProcessHints> = match &specification {
+        CWLDocument::CommandLineTool(tool) => tool
+            .hints
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|h| match h {
+                ToolHints::Requirement(r) => {
+                    ProcessHints::Requirement(ProcessRequirements::from(r))
+                }
+                ToolHints::Any(v) => ProcessHints::Any(v),
+            })
+            .collect(),
+        CWLDocument::Workflow(workflow) => workflow
+            .hints
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|h| match h {
+                WorkflowHints::Requirement(r) => {
+                    ProcessHints::Requirement(ProcessRequirements::from(r))
+                }
+                WorkflowHints::Any(v) => ProcessHints::Any(v),
+            })
+            .collect(),
+        CWLDocument::ExpressionTool(tool) => tool
+            .hints
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|h| match h {
+                WorkflowHints::Requirement(r) => {
+                    ProcessHints::Requirement(ProcessRequirements::from(r))
+                }
+                WorkflowHints::Any(v) => ProcessHints::Any(v),
+            })
+            .collect(),
+        CWLDocument::Operation(operation) => operation
+            .hints
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|h| match h {
+                WorkflowHints::Requirement(r) => {
+                    ProcessHints::Requirement(ProcessRequirements::from(r))
+                }
+                WorkflowHints::Any(v) => ProcessHints::Any(v),
+            })
+            .collect(),
+    };
+
+    
+    merge::<ProcessHints>(&mut hints, &inputs.hints);
+
+    hints
+}
+
+fn merge<T: Clone>(dst: &mut Vec<T>, src: &[T]) {
     for req in src {
-        if let Some(r) = dst.iter_mut().find(|r| same_variant(r, req)) {
+        if let Some(r) = dst.iter_mut().find(|r| same_variant::<T>(r, req)) {
             *r = req.clone();
         } else {
             dst.push(req.clone());
@@ -165,7 +230,7 @@ fn merge(dst: &mut Vec<ProcessRequirements>, src: &[ProcessRequirements]) {
     }
 }
 
-fn same_variant(a: &ProcessRequirements, b: &ProcessRequirements) -> bool {
+fn same_variant<T>(a: &T, b: &T) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
 }
 
