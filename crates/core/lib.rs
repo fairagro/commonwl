@@ -158,3 +158,10 @@ pub fn value_as_string(value: &Value) -> anyhow::Result<String> {
         _ => anyhow::bail!("Value is not a string, number, or bool"),
     }
 }
+
+pub fn docstring(doc: OneOrMany<String>) -> String {
+    match doc {
+        OneOrMany::One(s) => s,
+        OneOrMany::Many(vec) => vec.join("\n"),
+    }
+}

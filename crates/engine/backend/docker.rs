@@ -14,10 +14,17 @@ use crankshaft::{
                 backend::{TaskRunError, docker},
             },
         },
-        task::Execution,
+        task::{
+            Execution, Input, Output,
+            input::{self, Contents},
+            output,
+        },
     },
 };
-use cwl_core::{documents::CWLDocument, requirements::DockerRequirement};
+use cwl_core::{
+    docstring, documents::CWLDocument, files::FileOrDirectory, inputs::DefaultValue,
+    requirements::DockerRequirement,
+};
 use nonempty::{NonEmpty, nonempty};
 use std::{
     path::Path,
@@ -25,12 +32,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tokio_util::sync::CancellationToken;
+use url::Url;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
 const CONTAINER_INPUT_DIR: &str = "/mnt/task/inputs";
 const CONTAINER_STDOUT_FILE: &str = "/mnt/task/stdout";
 const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
-
 
 pub struct DockerBackend {
     //wrapper to Bollard Docker client
@@ -61,16 +68,19 @@ impl TaskBackend for DockerBackend {
         request: &super::ExecutionRequest,
         token: CancellationToken,
     ) -> Result<NonEmpty<ExitStatus>, TaskRunError> {
-        let inputs = collect_inputs(&request.specification, &request.inputs)?;
+        let mut inputs = collect_inputs(&request.specification, &request.inputs)?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
-        let _path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
+        let path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
         let CWLDocument::CommandLineTool(tool) = &request.specification else {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
 
-        let args = command::build_command(tool, &request.inputs)?;
+        //collect command string and correct args for staged paths
+        let args =
+            path_mapper.correct_execution_path(command::build_command(tool, &request.inputs)?);
 
+        //handle docker requirement
         let mut container = "alpine".to_string();
         if let Some(dr) = tool.get_requirement_or_hint::<DockerRequirement>() {
             if let Some(df) = &dr.docker_file
@@ -83,34 +93,116 @@ impl TaskBackend for DockerBackend {
             }
         }
 
-        let task = Task::builder()
+        let stdout_file = if let Some(s) = &tool.stdout {
+            &format!("/mnt/task/{s}")
+        } else {
+            CONTAINER_STDOUT_FILE
+        };
+
+        let stderr_file = if let Some(s) = &tool.stdout {
+            &format!("/mnt/task/{s}")
+        } else {
+            CONTAINER_STDERR_FILE
+        };
+
+        //build crankshaft task object
+        let mut task = Task::builder()
             .maybe_name(tool.label.clone())
+            .maybe_description(tool.doc.as_ref().map(|d| docstring(d.clone())))
             .executions(nonempty![
                 Execution::builder()
                     .work_dir(CONTAINER_WORKDIR)
                     .program(&args[0])
                     .args(&args[1..])
                     .image(container)
-                    .stdout(CONTAINER_STDOUT_FILE)
-                    .stderr(CONTAINER_STDERR_FILE)
+                    .stdout(stdout_file)
+                    .stderr(stderr_file)
                     .build()
             ])
             .build();
 
-        // need to correct input/output paths here for command
+        //add file inputs to task
+        for input in inputs.values_mut() {
+            add_input_to_task(input, &mut task, &path_mapper)?;
+        }
+
+        //handle stdout/stderr outputs if wanted
+        if let Some(stderr) = &tool.stderr {
+            task.add_output(
+                Output::builder()
+                    .name("stderr")
+                    .path(stderr_file)
+                    .url(Url::from_file_path(request.working_dir.join(stderr)).unwrap())
+                    .ty(output::Type::File)
+                    .build(),
+            );
+        }
+        if let Some(stdout) = &tool.stdout {
+            task.add_output(
+                Output::builder()
+                    .name("stderr")
+                    .path(stdout_file)
+                    .url(Url::from_file_path(request.working_dir.join(stdout)).unwrap())
+                    .ty(output::Type::File)
+                    .build(),
+            );
+        }
+
+        dbg!(&task);
         // need to handle iwdr
-        // need to stage inputs based on path mapper
         // need to collect outputs
 
         self.backend.run(task, token)?.await
     }
 }
 
+fn add_input_to_task(
+    df: &mut DefaultValue,
+    task: &mut Task,
+    path_mapper: &PathMapper,
+) -> anyhow::Result<()> {
+    match df {
+        DefaultValue::FileOrDirectory(fod) => {
+            let input_type = match fod {
+                FileOrDirectory::File(_) => input::Type::File,
+                FileOrDirectory::Directory(_) => input::Type::Directory,
+            };
+            fod.dry_validation();
+            let p = fod.path().unwrap();
+            let guest_path = path_mapper.get_guest(p).unwrap();
+            let host_path = path_mapper.get_host(guest_path).unwrap();
+
+            task.add_input(
+                Input::builder()
+                    .path(guest_path.to_string_lossy())
+                    .contents(Contents::Path(host_path.into()))
+                    .ty(input_type)
+                    .build(),
+            );
+        }
+        DefaultValue::Any(v) => match v {
+            serde_yaml::Value::Sequence(values) => {
+                for v in values {
+                    let mut dv = serde_yaml::from_value(v.clone())?;
+                    add_input_to_task(&mut dv, task, path_mapper)?;
+                }
+            }
+            serde_yaml::Value::Mapping(mapping) => {
+                for v in mapping.values() {
+                    let mut dv = serde_yaml::from_value(v.clone())?;
+                    add_input_to_task(&mut dv, task, path_mapper)?;
+                }
+            }
+            _ => {}
+        },
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::backend::load_execution_context;
-
     use super::*;
+    use crate::backend::load_execution_context;
 
     #[tokio::test]
     async fn test_docker_backend_creation() {
@@ -125,7 +217,7 @@ mod tests {
             .join("../../testdata/cwl/tests")
             .canonicalize()
             .unwrap();
-        let specification_path = base_dir.join("cat3-tool-shortcut.cwl");
+        let specification_path = base_dir.join("cat3-tool-mediumcut.cwl");
         let inputs_path = base_dir.join("cat-job.json");
 
         let config = Config::default();

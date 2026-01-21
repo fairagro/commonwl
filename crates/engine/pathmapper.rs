@@ -10,7 +10,8 @@ use std::{
 
 #[derive(Debug)]
 pub struct PathMapper {
-    pub mappings: HashMap<PathBuf, PathBuf>,
+    mappings: HashMap<PathBuf, PathBuf>,
+    local_mappings: HashMap<PathBuf, PathBuf>,
 }
 
 impl PathMapper {
@@ -24,7 +25,47 @@ impl PathMapper {
         for value in inputs.values() {
             Self::collect_files(value, base_dir, stage_dir, &mut mappings)?
         }
-        Ok(Self { mappings })
+
+        let locals = mappings
+            .keys()
+            .map(|host_path| {
+                let relative_path = host_path.strip_prefix(base_dir).unwrap_or(host_path);
+                (relative_path.to_path_buf(), mappings[host_path].clone())
+            })
+            .collect::<HashMap<_, _>>();
+
+        Ok(Self {
+            mappings,
+            local_mappings: locals,
+        })
+    }
+
+    pub fn correct_execution_path(&self, mut args: Vec<String>) -> Vec<String> {
+        for arg in &mut args {
+            let pb = PathBuf::from(arg.clone());
+            *arg = self
+                .get_guest(&pb)
+                .unwrap_or(&pb)
+                .to_string_lossy()
+                .into_owned();
+        }
+        args
+    }
+
+    pub fn get_guest(&self, host_path: impl AsRef<Path>) -> Option<&PathBuf> {
+        let host = host_path.as_ref();
+
+        self.local_mappings
+            .get(host)
+            .or_else(|| self.mappings.get(host))
+    }
+
+    pub fn get_host(&self, guest_path: impl AsRef<Path>) -> Option<&PathBuf> {
+        let guest = guest_path.as_ref();
+        self.mappings
+            .iter()
+            .find(|(_, v)| v.as_path() == guest)
+            .map(|(k, _)| k)
     }
 
     fn collect_files(
