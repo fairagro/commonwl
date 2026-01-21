@@ -27,9 +27,7 @@ use cwl_core::{
 };
 use nonempty::{NonEmpty, nonempty};
 use std::{
-    path::Path,
-    process::ExitStatus,
-    sync::{Arc, Mutex},
+    env, fs, path::Path, process::ExitStatus, sync::{Arc, Mutex}
 };
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -126,13 +124,16 @@ impl TaskBackend for DockerBackend {
             add_input_to_task(input, &mut task, &path_mapper)?;
         }
 
+        let outdir = env::current_dir().unwrap().join("tmp");
+        fs::create_dir_all(&outdir).unwrap();
+
         //handle stdout/stderr outputs if wanted
         if let Some(stderr) = &tool.stderr {
             task.add_output(
                 Output::builder()
                     .name("stderr")
                     .path(stderr_file)
-                    .url(Url::from_file_path(request.working_dir.join(stderr)).unwrap())
+                    .url(Url::from_file_path(outdir.join(stderr)).unwrap())
                     .ty(output::Type::File)
                     .build(),
             );
@@ -142,14 +143,24 @@ impl TaskBackend for DockerBackend {
                 Output::builder()
                     .name("stderr")
                     .path(stdout_file)
-                    .url(Url::from_file_path(request.working_dir.join(stdout)).unwrap())
+                    .url(Url::from_file_path(outdir.join(stdout)).unwrap())
                     .ty(output::Type::File)
                     .build(),
             );
         }
 
-        dbg!(&task);
         // need to handle iwdr
+
+        //add outdir mount (as a workaround we use currentdir for now)
+        task.add_output(
+            Output::builder()
+                .name("outdir")
+                .path(CONTAINER_WORKDIR)
+                .url(Url::from_file_path(outdir).unwrap())
+                .ty(output::Type::Directory)
+                .build(),
+        );
+
         // need to collect outputs
 
         self.backend.run(task, token)?.await
@@ -225,7 +236,7 @@ mod tests {
         let request = load_execution_context(specification_path, inputs_path).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = backend.run(&request, cancellation_token).await;
-
+        dbg!(&result);
         assert!(result.is_ok());
         //add check for exit status and outputs
     }
