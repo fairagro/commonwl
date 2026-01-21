@@ -15,7 +15,7 @@ use crankshaft::{
             },
         },
         task::{
-            Execution, Input, Output,
+            Execution, Input, Output, Resources,
             input::{self, Contents},
             output,
         },
@@ -27,7 +27,10 @@ use cwl_core::{
 };
 use nonempty::{NonEmpty, nonempty};
 use std::{
-    env, fs, path::Path, process::ExitStatus, sync::{Arc, Mutex}
+    fs,
+    path::Path,
+    process::ExitStatus,
+    sync::{Arc, Mutex},
 };
 use tokio_util::sync::CancellationToken;
 use url::Url;
@@ -117,6 +120,13 @@ impl TaskBackend for DockerBackend {
                     .stderr(stderr_file)
                     .build()
             ])
+            .resources(
+                Resources::builder()
+                    .cpu(request.runtime.cores)
+                    //.disk(request.runtime.outdir_size) //we don't use this currently
+                    .ram(request.runtime.ram)
+                    .build(),
+            )
             .build();
 
         //add file inputs to task
@@ -124,8 +134,9 @@ impl TaskBackend for DockerBackend {
             add_input_to_task(input, &mut task, &path_mapper)?;
         }
 
-        let outdir = env::current_dir().unwrap().join("tmp");
-        fs::create_dir_all(&outdir).unwrap();
+        // TODO: create temp dir to output to there and then copy requested files to outdir
+        let outdir = &request.runtime.outdir;
+        fs::create_dir_all(outdir).unwrap();
 
         //handle stdout/stderr outputs if wanted
         if let Some(stderr) = &tool.stderr {
@@ -212,6 +223,8 @@ fn add_input_to_task(
 
 #[cfg(test)]
 mod tests {
+    use tempfile::tempdir;
+
     use super::*;
     use crate::backend::load_execution_context;
 
@@ -233,11 +246,15 @@ mod tests {
 
         let config = Config::default();
         let backend = DockerBackend::new(config).await.unwrap();
-        let request = load_execution_context(specification_path, inputs_path).unwrap();
+        let tmpdir = tempdir().unwrap();
+        let request =
+            load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = backend.run(&request, cancellation_token).await;
-        dbg!(&result);
         assert!(result.is_ok());
-        //add check for exit status and outputs
+
+        //check if output file exists
+        let out_file = tmpdir.path().join("cat-out");
+        assert!(out_file.exists());
     }
 }
