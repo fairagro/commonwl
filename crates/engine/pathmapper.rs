@@ -72,6 +72,7 @@ impl PathMapper {
             .map(|(k, _)| k)
     }
 
+    //add from inside working directory
     pub fn add(&mut self, new_path: impl AsRef<Path>) -> anyhow::Result<()> {
         let relative_source = if new_path.as_ref().is_absolute() {
             new_path.as_ref().strip_prefix(&self.base_dir)?
@@ -86,6 +87,24 @@ impl PathMapper {
         self.local_mappings.insert(relative_source, dest.clone());
         self.mappings.insert(abs_source, dest);
 
+        Ok(())
+    }
+
+    //add item from outside working directory
+    pub fn add_extra(
+        &mut self,
+        new_path: impl AsRef<Path>,
+        relative_part: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
+        assert!(new_path.as_ref().is_absolute());
+
+        let source = new_path.as_ref();
+        let relative_source = relative_part.as_ref();
+
+        let dest = self.stage_dir.join(relative_source);
+        self.local_mappings
+            .insert(relative_source.to_path_buf(), dest.clone());
+        self.mappings.insert(source.to_path_buf(), dest);
         Ok(())
     }
 
@@ -167,15 +186,23 @@ impl PathMapper {
         //ensure path is filled
         let mut dir = dir.to_owned();
         dir.dry_validation();
+
+        if dir.path.is_none() && dir.basename.is_some() && dir.listing.is_some() {
+            //ignore synthetic dir
+            return Ok(());
+        }
+
         let Some(path) = dir.path else {
-            anyhow::bail!("File is missing a path")
+            anyhow::bail!("No path for directory given!")
         };
 
         let host_path = Self::resolve_location(&path, base_dir)?;
         let Some(filename) = host_path.file_name() else {
-            anyhow::bail!("File is missing a path")
+            anyhow::bail!("Directory is missing a path")
         };
         let staged_path = stage_dir.join(filename);
+
+        //add directory itself
 
         //recursively walk dir with new roots
         for entry in fs::read_dir(&host_path)? {
@@ -193,6 +220,8 @@ impl PathMapper {
             };
             Self::collect_files(&value, &host_path, &staged_path, mappings)?
         }
+
+        mappings.insert(host_path, staged_path);
 
         Ok(())
     }
@@ -247,7 +276,7 @@ mod tests {
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().mappings.len(), 3);
+        assert_eq!(result.unwrap().mappings.len(), 5);
     }
 
     #[test]
@@ -283,6 +312,25 @@ mod tests {
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
         assert!(result.is_ok());
+        assert_eq!(result.unwrap().mappings.len(), 7);
+    }
+
+    #[test]
+    fn test_pathmapper_init_directory() {
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests");
+        let cwl_file = base_dir.join("recursive-input-directory.cwl");
+        let input_file = base_dir.join("recursive-input-directory.yml");
+
+        let stage_dir = PathBuf::from("/mnt/69420/");
+
+        let specification = load_cwl_file(cwl_file, true).unwrap();
+        let inputs: HashMap<String, serde_yaml::Value> =
+            serde_yaml::from_str(&fs::read_to_string(input_file).unwrap()).unwrap();
+        let inputs = collect_inputs(&specification, &inputs).unwrap();
+
+        let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
+        assert!(result.is_ok());
+
         assert_eq!(result.unwrap().mappings.len(), 5);
     }
 }

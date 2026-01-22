@@ -2,7 +2,7 @@ use crate::{
     backend::{ExecutionRequest, TaskBackend},
     command,
     docker::build_container,
-    input::{collect_inputs, get_stdin},
+    input::{collect_inputs, flatten_inputs, get_stdin},
     output::collect_command_outputs,
     pathmapper::PathMapper,
 };
@@ -23,9 +23,9 @@ use crankshaft::{
     },
 };
 use cwl_core::{
-    docstring, documents::CWLDocument, files::FileOrDirectory, inputs::DefaultValue,
-    requirements::DockerRequirement,
+    docstring, documents::CWLDocument, files::FileOrDirectory, requirements::DockerRequirement,
 };
+use dircpy::copy_dir;
 use nonempty::{NonEmpty, nonempty};
 use std::{
     fs,
@@ -72,7 +72,7 @@ impl TaskBackend for DockerBackend {
         request: &ExecutionRequest,
         token: CancellationToken,
     ) -> anyhow::Result<NonEmpty<ExitStatus>> {
-        let mut inputs = collect_inputs(&request.specification, &request.inputs)?;
+        let inputs = collect_inputs(&request.specification, &request.inputs)?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
         let mut path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
@@ -146,13 +146,65 @@ impl TaskBackend for DockerBackend {
             )
             .build();
 
-        //add file inputs to task
-        for input in inputs.values_mut() {
-            add_input_to_task(input, &mut task, &path_mapper)?;
-        }
-
         let outdir = tempdir()?;
         let tmpdir = tempdir()?;
+
+        //add file inputs to task
+        for mut input in flatten_inputs(inputs.values()) {
+            input.dry_validation();
+            let mut path = input.path().cloned();
+
+            let ty = match input {
+                FileOrDirectory::File(_) => input::Type::File,
+                FileOrDirectory::Directory(_) => input::Type::Directory,
+            };
+
+            if path.is_none()
+                && let FileOrDirectory::Directory(dir) = &input
+                && let Some(listing) = &dir.listing
+            {
+                //create from listing
+                let basename = dir.basename.as_ref().unwrap(); //mandatory in this case
+                let host_path = tmpdir.path().join(basename);
+                fs::create_dir(&host_path)?;
+
+                //fix path
+                let host_path_str = host_path.to_string_lossy().into_owned();
+                path = Some(host_path_str);
+
+                for item in listing {
+                    let mut item = item.clone();
+                    item.dry_validation();
+
+                    let c_path = item.path().unwrap();
+                    let c_host_path = host_path.join(c_path);
+                    path_mapper.add_extra(&c_host_path, c_path)?;
+
+                    let source_path = request.working_dir.join(c_path);
+                    //copy into tmpdir
+                    match item {
+                        FileOrDirectory::File(_) => {
+                            fs::copy(&source_path, &c_host_path)?;
+                        }
+                        FileOrDirectory::Directory(_) => copy_dir(&source_path, &c_host_path)?,
+                    }
+                }
+
+                path_mapper.add_extra(&host_path, basename)?;
+            }
+
+            if let Some(path) = path {
+                let guest_path = path_mapper.get_guest(path).unwrap();
+                let host_path = path_mapper.get_host(guest_path).unwrap();
+                task.add_input(
+                    Input::builder()
+                        .contents(Contents::Path(host_path.to_path_buf()))
+                        .path(guest_path.to_string_lossy())
+                        .ty(ty)
+                        .build(),
+                );
+            }
+        }
 
         //add outdir mount
         task.add_input(
@@ -221,49 +273,6 @@ impl TaskBackend for DockerBackend {
     }
 }
 
-fn add_input_to_task(
-    df: &mut DefaultValue,
-    task: &mut Task,
-    path_mapper: &PathMapper,
-) -> anyhow::Result<()> {
-    match df {
-        DefaultValue::FileOrDirectory(fod) => {
-            let input_type = match fod {
-                FileOrDirectory::File(_) => input::Type::File,
-                FileOrDirectory::Directory(_) => input::Type::Directory,
-            };
-            fod.dry_validation();
-            let p = fod.path().unwrap();
-            let guest_path = path_mapper.get_guest(p).unwrap();
-            let host_path = path_mapper.get_host(guest_path).unwrap();
-
-            task.add_input(
-                Input::builder()
-                    .path(guest_path.to_string_lossy())
-                    .contents(Contents::Path(host_path.into()))
-                    .ty(input_type)
-                    .build(),
-            );
-        }
-        DefaultValue::Any(v) => match v {
-            serde_yaml::Value::Sequence(values) => {
-                for v in values {
-                    let mut dv = serde_yaml::from_value(v.clone())?;
-                    add_input_to_task(&mut dv, task, path_mapper)?;
-                }
-            }
-            serde_yaml::Value::Mapping(mapping) => {
-                for v in mapping.values() {
-                    let mut dv = serde_yaml::from_value(v.clone())?;
-                    add_input_to_task(&mut dv, task, path_mapper)?;
-                }
-            }
-            _ => {}
-        },
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -317,5 +326,30 @@ mod tests {
         let cancellation_token = CancellationToken::new();
         let result = backend.run(&request, cancellation_token).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_docker_backend_run_simple_with_value_from() {
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests")
+            .canonicalize()
+            .unwrap();
+        let specification_path = base_dir.join("cat3-from-dir.cwl");
+        let inputs_path = base_dir.join("cat-from-dir-job.yaml");
+
+        let config = Config::default();
+        let backend = DockerBackend::new(config).await.unwrap();
+        let tmpdir = tempdir().unwrap();
+        let request =
+            load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+        let cancellation_token = CancellationToken::new();
+        let result = backend.run(&request, cancellation_token).await;
+
+        assert!(result.is_ok());
+
+        //check if output file exists
+        let out_file = tmpdir.path().join("output");
+
+        assert!(out_file.exists());
     }
 }

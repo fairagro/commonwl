@@ -1,6 +1,11 @@
+use crate::{
+    command::to_str,
+    requirements::{ProcessHints, ProcessRequirements},
+};
 use cwl_core::{
     OneOrMany,
     documents::{CWLDocument, CommandLineTool},
+    files::FileOrDirectory,
     inputs::{
         CommandInputParameterType, DefaultValue, InputArraySchema, InputDataProvider,
         InputEnumSchema, InputRecordSchema, InputSchema, InputType,
@@ -11,11 +16,6 @@ use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-};
-
-use crate::{
-    command::to_str,
-    requirements::{ProcessHints, ProcessRequirements},
 };
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -171,7 +171,7 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
     if let Some(stdin) = &tool.stdin {
         return Some(stdin.to_string());
     }
-    
+
     if let Some(input) = tool
         .inputs
         .iter()
@@ -182,6 +182,40 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
             .map(to_str);
     }
     None
+}
+
+//flattens inputs of any type to a list of file or directory
+pub fn flatten_inputs<'a, I: Iterator<Item = &'a DefaultValue>>(inputs: I) -> Vec<FileOrDirectory> {
+    let mut flattened = vec![];
+    for input in inputs {
+        flatten_inputs_impl(input, &mut flattened);
+    }
+    flattened
+}
+
+fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) {
+    match dv {
+        DefaultValue::FileOrDirectory(fod) => {
+            flattened.push(fod.clone());
+        }
+        DefaultValue::Any(__v__) => match __v__ {
+            serde_yaml::Value::Sequence(__values__) => {
+                for __v__ in __values__ {
+                    if let Ok(__dv__) = serde_yaml::from_value(__v__.clone()) {
+                        flatten_inputs_impl(&__dv__, flattened);
+                    }
+                }
+            }
+            serde_yaml::Value::Mapping(__mapping__) => {
+                for v in __mapping__.values() {
+                    if let Ok(__dv__) = serde_yaml::from_value(v.clone()) {
+                        flatten_inputs_impl(&__dv__, flattened);
+                    }
+                }
+            }
+            _ => {}
+        },
+    }
 }
 
 pub fn validate_command_input(schema: &CommandInputParameterType, value: &DefaultValue) -> bool {
