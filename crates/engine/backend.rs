@@ -4,7 +4,6 @@ use crate::{
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
 };
 use anyhow::Ok;
-use crankshaft::engine::service::runner::backend::TaskRunError;
 use cwl_core::{documents::CWLDocument, load_cwl_file};
 use nonempty::NonEmpty;
 use std::{
@@ -22,7 +21,7 @@ pub trait TaskBackend {
         &self,
         request: &ExecutionRequest,
         token: CancellationToken,
-    ) -> impl Future<Output = Result<NonEmpty<ExitStatus>, TaskRunError>> + Send;
+    ) -> impl Future<Output = anyhow::Result<NonEmpty<ExitStatus>>> + Send;
 }
 
 #[derive(Debug, Clone)]

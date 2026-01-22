@@ -12,6 +12,8 @@ use std::{
 pub struct PathMapper {
     mappings: HashMap<PathBuf, PathBuf>,
     local_mappings: HashMap<PathBuf, PathBuf>,
+    base_dir: PathBuf,
+    stage_dir: PathBuf,
 }
 
 impl PathMapper {
@@ -37,6 +39,8 @@ impl PathMapper {
         Ok(Self {
             mappings,
             local_mappings: locals,
+            base_dir: base_dir.to_path_buf(),
+            stage_dir: stage_dir.to_path_buf(),
         })
     }
 
@@ -66,6 +70,23 @@ impl PathMapper {
             .iter()
             .find(|(_, v)| v.as_path() == guest)
             .map(|(k, _)| k)
+    }
+
+    pub fn add(&mut self, new_path: impl AsRef<Path>) -> anyhow::Result<()> {
+        let relative_source = if new_path.as_ref().is_absolute() {
+            new_path.as_ref().strip_prefix(&self.base_dir)?
+        } else {
+            new_path.as_ref()
+        }
+        .to_path_buf();
+
+        let dest = self.stage_dir.join(&relative_source);
+        let abs_source = self.base_dir.join(&relative_source);
+
+        self.local_mappings.insert(relative_source, dest.clone());
+        self.mappings.insert(abs_source, dest);
+
+        Ok(())
     }
 
     fn collect_files(

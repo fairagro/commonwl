@@ -151,11 +151,6 @@ pub fn build_command(
     //remove empty args
     args.retain(|s| !s.is_empty());
 
-    //append stdin i guess?
-    if let Some(stdin) = &tool.stdin {
-        args.push(stdin.clone());
-    }
-
     Ok(args)
 }
 
@@ -392,7 +387,7 @@ fn use_value_from(binding: &CommandLineBinding) -> Vec<String> {
     }
 }
 
-fn to_str(val: &DefaultValue) -> String {
+pub(crate) fn to_str(val: &DefaultValue) -> String {
     match val {
         DefaultValue::FileOrDirectory(fd) => match fd.path() {
             Some(path) => path.to_string(),
@@ -472,22 +467,6 @@ stdout: output.txt";
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
         let cmd = build_command(tool, &input_values).unwrap();
-        let cmdline = cmd.join(" ");
-        assert_eq!(cmdline, "cat hello.txt");
-    }
-
-    #[test]
-    fn test_build_command_stdin() {
-        let yaml = r"
-class: CommandLineTool
-cwlVersion: v1.2
-inputs: []
-outputs: []
-baseCommand: [cat]
-stdin: hello.txt";
-        let tool = &serde_yaml::from_str(yaml).unwrap();
-
-        let cmd = build_command(tool, &HashMap::new()).unwrap();
         let cmdline = cmd.join(" ");
         assert_eq!(cmdline, "cat hello.txt");
     }

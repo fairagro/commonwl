@@ -17,7 +17,7 @@ use serde_yaml::Value;
 #[serde(untagged)]
 pub enum CommandInputParameterType {
     #[serde(rename = "stdin")]
-    Stdin,
+    Stdin(String),
     CommandInputType(OneOrMany<CommandInputType>),
 }
 

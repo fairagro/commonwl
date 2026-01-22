@@ -1,6 +1,7 @@
 pub mod command;
 pub mod context;
 pub mod input;
+pub mod output;
 pub mod pathmapper;
 pub mod requirements;
 pub mod backend;

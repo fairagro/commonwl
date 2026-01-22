@@ -1,5 +1,9 @@
 use crate::{
-    backend::TaskBackend, command, docker::build_container, input::collect_inputs,
+    backend::TaskBackend,
+    command,
+    docker::build_container,
+    input::{collect_inputs, get_stdin},
+    output::collect_command_outputs,
     pathmapper::PathMapper,
 };
 use crankshaft::{
@@ -9,10 +13,7 @@ use crankshaft::{
         Task,
         service::{
             name::{GeneratorIterator, UniqueAlphanumeric},
-            runner::{
-                Backend,
-                backend::{TaskRunError, docker},
-            },
+            runner::{Backend, backend::docker},
         },
         task::{
             Execution, Input, Output, Resources,
@@ -32,6 +33,7 @@ use std::{
     process::ExitStatus,
     sync::{Arc, Mutex},
 };
+use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 use url::Url;
 
@@ -68,17 +70,17 @@ impl TaskBackend for DockerBackend {
         &self,
         request: &super::ExecutionRequest,
         token: CancellationToken,
-    ) -> Result<NonEmpty<ExitStatus>, TaskRunError> {
+    ) -> anyhow::Result<NonEmpty<ExitStatus>> {
         let mut inputs = collect_inputs(&request.specification, &request.inputs)?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
-        let path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
+        let mut path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
         let CWLDocument::CommandLineTool(tool) = &request.specification else {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
 
         //collect command string and correct args for staged paths
-        let args =
+        let mut args =
             path_mapper.correct_execution_path(command::build_command(tool, &request.inputs)?);
 
         //handle docker requirement
@@ -100,11 +102,23 @@ impl TaskBackend for DockerBackend {
             CONTAINER_STDOUT_FILE
         };
 
-        let stderr_file = if let Some(s) = &tool.stdout {
+        let stderr_file = if let Some(s) = &tool.stderr {
             &format!("/mnt/task/{s}")
         } else {
             CONTAINER_STDERR_FILE
         };
+
+        //correct the stdin value
+        let mut stdin = get_stdin(tool, &inputs);
+        if let Some(stdin) = &mut stdin {
+            path_mapper.add(&stdin)?;
+            *stdin = path_mapper
+                .get_guest(&stdin)
+                .unwrap() //allowed as we just added it!
+                .to_string_lossy()
+                .into_owned();
+            args.push(stdin.to_string());
+        }
 
         //build crankshaft task object
         let mut task = Task::builder()
@@ -118,6 +132,7 @@ impl TaskBackend for DockerBackend {
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
+                    .maybe_stdin(stdin)
                     .build()
             ])
             .resources(
@@ -135,46 +150,69 @@ impl TaskBackend for DockerBackend {
         }
 
         // TODO: create temp dir to output to there and then copy requested files to outdir
-        let outdir = &request.runtime.outdir;
-        fs::create_dir_all(outdir).unwrap();
+        let outdir = tempdir()?;
+        let tmpdir = tempdir()?;
 
         //handle stdout/stderr outputs if wanted
-        if let Some(stderr) = &tool.stderr {
-            task.add_output(
-                Output::builder()
-                    .name("stderr")
-                    .path(stderr_file)
-                    .url(Url::from_file_path(outdir.join(stderr)).unwrap())
-                    .ty(output::Type::File)
-                    .build(),
-            );
-        }
-        if let Some(stdout) = &tool.stdout {
-            task.add_output(
-                Output::builder()
-                    .name("stderr")
-                    .path(stdout_file)
-                    .url(Url::from_file_path(outdir.join(stdout)).unwrap())
-                    .ty(output::Type::File)
-                    .build(),
-            );
-        }
+        let stderr_out_file = if let Some(stderr) = &tool.stderr {
+            outdir.path().join(stderr)
+        } else {
+            tmpdir.path().join("stderr")
+        };
+        task.add_output(
+            Output::builder()
+                .name("stderr")
+                .path(stderr_file)
+                .url(Url::from_file_path(&stderr_out_file).unwrap())
+                .ty(output::Type::File)
+                .build(),
+        );
+
+        let stdout_out_file = if let Some(stdout) = &tool.stdout {
+            outdir.path().join(stdout)
+        } else {
+            tmpdir.path().join("stdout")
+        };
+        task.add_output(
+            Output::builder()
+                .name("stdout")
+                .path(stdout_file)
+                .url(Url::from_file_path(&stdout_out_file).unwrap())
+                .ty(output::Type::File)
+                .build(),
+        );
 
         // need to handle iwdr
 
-        //add outdir mount (as a workaround we use currentdir for now)
+        //add outdir mount
         task.add_output(
             Output::builder()
                 .name("outdir")
                 .path(CONTAINER_WORKDIR)
-                .url(Url::from_file_path(outdir).unwrap())
+                .url(Url::from_file_path(outdir.path()).unwrap())
                 .ty(output::Type::Directory)
                 .build(),
         );
 
-        // need to collect outputs
+        let status = self.backend.run(task, token)?.await?;
 
-        self.backend.run(task, token)?.await
+        //evaluate stderr/stdout
+        let stdout = fs::read_to_string(stdout_out_file)?;
+        if !stdout.is_empty() {
+            eprintln!("{stdout}");
+        }
+        let stderr = fs::read_to_string(stderr_out_file)?;
+        if !stderr.is_empty() {
+            eprintln!("{stderr}");
+        }
+
+        // need to collect outputs
+        let outputs =
+            collect_command_outputs(&tool.outputs, outdir.path(), &request.runtime.outdir)?;
+        let json = serde_json::to_string_pretty(&outputs)?;
+        println!("{json}");
+        //evaluate exitstatus based on tool's expected exit codes
+        Ok(status)
     }
 }
 
@@ -223,10 +261,9 @@ fn add_input_to_task(
 
 #[cfg(test)]
 mod tests {
-    use tempfile::tempdir;
-
     use super::*;
     use crate::backend::load_execution_context;
+    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_docker_backend_creation() {
@@ -241,7 +278,7 @@ mod tests {
             .join("../../testdata/cwl/tests")
             .canonicalize()
             .unwrap();
-        let specification_path = base_dir.join("cat3-tool-mediumcut.cwl");
+        let specification_path = base_dir.join("cat-tool-shortcut.cwl");
         let inputs_path = base_dir.join("cat-job.json");
 
         let config = Config::default();
@@ -254,7 +291,7 @@ mod tests {
         assert!(result.is_ok());
 
         //check if output file exists
-        let out_file = tmpdir.path().join("cat-out");
+        let out_file = tmpdir.path().join("output");
         assert!(out_file.exists());
     }
 }

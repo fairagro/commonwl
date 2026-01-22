@@ -1,6 +1,6 @@
 use cwl_core::{
     OneOrMany,
-    documents::CWLDocument,
+    documents::{CWLDocument, CommandLineTool},
     inputs::{
         CommandInputParameterType, DefaultValue, InputArraySchema, InputDataProvider,
         InputEnumSchema, InputRecordSchema, InputSchema, InputType,
@@ -13,7 +13,10 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use crate::requirements::{ProcessHints, ProcessRequirements};
+use crate::{
+    command::to_str,
+    requirements::{ProcessHints, ProcessRequirements},
+};
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct InputObject {
@@ -93,6 +96,10 @@ fn adjust_path_to_base(
                     p = diff_path.join(p);
                 }
                 mapping.insert("location".into(), p.to_string_lossy().to_string().into());
+                //insert to path also if none
+                if mapping.get("path").is_none() {
+                    mapping.insert("path".into(), p.to_string_lossy().to_string().into());
+                }
             }
         }
         _ => {}
@@ -160,9 +167,26 @@ pub(crate) fn get_input_value(
     )
 }
 
+pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>) -> Option<String> {
+    if let Some(stdin) = &tool.stdin {
+        return Some(stdin.to_string());
+    }
+
+    if let Some(input) = tool
+        .inputs
+        .iter()
+        .find(|i| matches!(i.r#type, CommandInputParameterType::Stdin(_)))
+    {
+        return inputs
+            .get(&input.id.clone().unwrap_or_default())
+            .map(to_str);
+    }
+    None
+}
+
 pub fn validate_command_input(schema: &CommandInputParameterType, value: &DefaultValue) -> bool {
     match schema {
-        CommandInputParameterType::Stdin => !value.is_null(), // for stdin we accept any existing value
+        CommandInputParameterType::Stdin(_) => !value.is_null(), // for stdin we accept any existing value
         CommandInputParameterType::CommandInputType(one_or_many) => match one_or_many {
             OneOrMany::One(item) => validate_input_type(&item.clone().into(), value),
             OneOrMany::Many(items) => items
@@ -273,7 +297,7 @@ fn validate_enum_schema(schema: &InputEnumSchema, value: &DefaultValue) -> bool 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cwl_core::{documents::CommandLineTool, files::File};
+    use cwl_core::{documents::CommandLineTool, files::File, load_cwl_file};
     use std::collections::HashMap;
 
     #[test]
@@ -399,5 +423,25 @@ mod tests {
 
         let inputs = inputs.unwrap();
         assert_eq!(inputs.requirements.len(), 1);
+    }
+
+    #[test]
+    fn test_get_stdin() {
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests")
+            .canonicalize()
+            .unwrap();
+        let specification_path = base_dir.join("cat-tool-shortcut.cwl");
+        let inputs_path = base_dir.join("cat-job.json");
+
+        let inputs = load_input_file_from_file(&inputs_path, base_dir).unwrap();
+        let doc = load_cwl_file(specification_path, false).unwrap();
+        let inputs = collect_inputs(&doc, &inputs.inputs).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!("Oh no!")
+        };
+        let stdin = get_stdin(&tool, &inputs);
+        assert_eq!(stdin, Some("hello.txt".into()));
     }
 }

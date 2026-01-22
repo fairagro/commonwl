@@ -92,6 +92,18 @@ impl From<i64> for Integer {
     }
 }
 
+impl From<u32> for Integer {
+    fn from(value: u32) -> Self {
+        Integer::Int(value as i32)
+    }
+}
+
+impl From<u64> for Integer {
+    fn from(value: u64) -> Self {
+        Integer::Long(value as i64)
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
@@ -140,6 +152,13 @@ impl<T> OneOrMany<T> {
         match self {
             OneOrMany::One(t) => OneOrMany::One(f(t)),
             OneOrMany::Many(ts) => OneOrMany::Many(ts.into_iter().map(f).collect()),
+        }
+    }
+
+    pub fn as_one(&self) -> &T {
+        match self {
+            OneOrMany::One(t) => t,
+            OneOrMany::Many(v) => v.first().expect("Called as_one on an empty Many"),
         }
     }
 }
