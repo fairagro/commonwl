@@ -6,3 +6,4 @@ pub mod pathmapper;
 pub mod requirements;
 pub mod backend;
 pub mod docker;
+pub mod expression;
