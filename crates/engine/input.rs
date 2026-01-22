@@ -171,11 +171,11 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
     if let Some(stdin) = &tool.stdin {
         return Some(stdin.to_string());
     }
-
+    
     if let Some(input) = tool
         .inputs
         .iter()
-        .find(|i| matches!(i.r#type, CommandInputParameterType::Stdin(_)))
+        .find(|i| matches!(i.r#type, CommandInputParameterType::Stdin))
     {
         return inputs
             .get(&input.id.clone().unwrap_or_default())
@@ -186,7 +186,7 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
 
 pub fn validate_command_input(schema: &CommandInputParameterType, value: &DefaultValue) -> bool {
     match schema {
-        CommandInputParameterType::Stdin(_) => !value.is_null(), // for stdin we accept any existing value
+        CommandInputParameterType::Stdin => !value.is_null(), // for stdin we accept any existing value
         CommandInputParameterType::CommandInputType(one_or_many) => match one_or_many {
             OneOrMany::One(item) => validate_input_type(&item.clone().into(), value),
             OneOrMany::Many(items) => items

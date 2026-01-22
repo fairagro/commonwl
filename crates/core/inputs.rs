@@ -13,12 +13,28 @@ use bon::Builder;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum CommandInputParameterType {
     #[serde(rename = "stdin")]
-    Stdin(String),
+    Stdin,
     CommandInputType(OneOrMany<CommandInputType>),
+}
+
+impl<'de> Deserialize<'de> for CommandInputParameterType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de> {
+        let value = serde_yaml::Value::deserialize(deserializer)?;
+
+        if value == Value::String("stdin".to_string()) {
+            return Ok(Self::Stdin);
+        }
+
+        OneOrMany::<CommandInputType>::deserialize(value)
+            .map(Self::CommandInputType)
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl From<CWLType> for CommandInputParameterType {

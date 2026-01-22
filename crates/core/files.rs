@@ -1,6 +1,9 @@
+use std::{fs, path::Path};
+
 use crate::Integer;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
+use sha1::{Digest, Sha1};
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -93,6 +96,38 @@ impl File {
             self.path = Some(location.to_string());
         }
     }
+
+    pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
+        let path_as_str = path.to_string_lossy();
+        let basename = path.file_name().map(|f| f.to_string_lossy().into_owned());
+        let nameroot = path.file_stem().map(|s| s.to_string_lossy().into_owned());
+        let nameext = path
+            .extension()
+            .map(|e| format!(".{}", e.to_string_lossy()));
+        let dirname = path.parent().map(|p| p.to_string_lossy().into_owned());
+        let metadata = fs::metadata(path)?;
+
+        let size = metadata.len();
+
+        let mut hasher = Sha1::new();
+        let hash = fs::read(path).ok().map(|f| {
+            hasher.update(&f);
+            let hash = hasher.finalize();
+            format!("sha1${hash:x}")
+        });
+
+        let file = File::builder()
+            .location(format!("file://{}", &path_as_str))
+            .path(path_as_str)
+            .maybe_basename(basename)
+            .maybe_nameroot(nameroot)
+            .maybe_nameext(nameext)
+            .maybe_dirname(dirname)
+            .size(size)
+            .maybe_checksum(hash)
+            .build();
+        Ok(file)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
@@ -121,6 +156,50 @@ impl Directory {
         {
             self.path = Some(location.to_string());
         }
+    }
+
+    pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> anyhow::Result<()> {
+        self.dry_validation();
+        let Some(path) = &self.path else {
+            anyhow::bail!("No path given!");
+        };
+
+        match load_listing {
+            LoadListingEnum::NoListing => self.listing = Some(vec![]),
+            LoadListingEnum::ShallowListing => self.listing = Some(Self::read_dir(path, false)?),
+            LoadListingEnum::DeepListing => self.listing = Some(Self::read_dir(path, true)?),
+        }
+        Ok(())
+    }
+
+    fn read_dir(path: &str, recursive: bool) -> anyhow::Result<Vec<FileOrDirectory>> {
+        let mut entries = Vec::new();
+
+        let read_dir = fs::read_dir(path)?;
+
+        for entry in read_dir.flatten() {
+            let path_buf = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+
+            if path_buf.is_dir() {
+                let mut dir = Directory {
+                    path: Some(path_buf.to_string_lossy().to_string()),
+                    basename: Some(name),
+                    ..Default::default()
+                };
+                dir.location = dir.path.as_ref().map(|s| format!("file://{s}"));
+                
+                if recursive {
+                    dir.load_listing(LoadListingEnum::DeepListing)?;
+                }
+
+                entries.push(FileOrDirectory::Directory(dir));
+            } else {
+                entries.push(FileOrDirectory::File(File::new_from_path(&path_buf)?));
+            }
+        }
+
+        Ok(entries)
     }
 }
 

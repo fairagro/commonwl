@@ -7,7 +7,7 @@ use crate::{OneOrMany, files::LoadListingEnum};
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum CommandOutputParameterType {
     #[serde(rename = "stdout")]
@@ -15,6 +15,27 @@ pub enum CommandOutputParameterType {
     #[serde(rename = "stderr")]
     Stderr,
     CommandOutputType(OneOrMany<CommandOutputType>),
+}
+
+impl<'de> Deserialize<'de> for CommandOutputParameterType {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_yaml::Value::deserialize(deserializer)?;
+
+        if value == serde_yaml::Value::String("stderr".to_string()) {
+            return Ok(Self::Stderr);
+        }
+
+        if value == serde_yaml::Value::String("stdout".to_string()) {
+            return Ok(Self::Stdout);
+        }
+
+        OneOrMany::<CommandOutputType>::deserialize(value)
+            .map(Self::CommandOutputType)
+            .map_err(serde::de::Error::custom)
+    }
 }
 
 impl Default for CommandOutputParameterType {

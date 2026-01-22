@@ -1,5 +1,5 @@
 use crate::{
-    backend::TaskBackend,
+    backend::{ExecutionRequest, TaskBackend},
     command,
     docker::build_container,
     input::{collect_inputs, get_stdin},
@@ -35,6 +35,7 @@ use std::{
 };
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
+use tracing::info;
 use url::Url;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
@@ -68,7 +69,7 @@ impl DockerBackend {
 impl TaskBackend for DockerBackend {
     async fn run(
         &self,
-        request: &super::ExecutionRequest,
+        request: &ExecutionRequest,
         token: CancellationToken,
     ) -> anyhow::Result<NonEmpty<ExitStatus>> {
         let mut inputs = collect_inputs(&request.specification, &request.inputs)?;
@@ -107,8 +108,7 @@ impl TaskBackend for DockerBackend {
         } else {
             CONTAINER_STDERR_FILE
         };
-
-        //correct the stdin value
+        //correct and add the stdin value
         let mut stdin = get_stdin(tool, &inputs);
         if let Some(stdin) = &mut stdin {
             path_mapper.add(&stdin)?;
@@ -119,6 +119,8 @@ impl TaskBackend for DockerBackend {
                 .into_owned();
             args.push(stdin.to_string());
         }
+
+        info!("Executing: {}", args.join(" "));
 
         //build crankshaft task object
         let mut task = Task::builder()
@@ -149,11 +151,21 @@ impl TaskBackend for DockerBackend {
             add_input_to_task(input, &mut task, &path_mapper)?;
         }
 
-        // TODO: create temp dir to output to there and then copy requested files to outdir
         let outdir = tempdir()?;
         let tmpdir = tempdir()?;
 
-        //handle stdout/stderr outputs if wanted
+        //add outdir mount
+        task.add_input(
+            Input::builder()
+                .name("outdir")
+                .contents(Contents::Path(outdir.path().to_path_buf()))
+                .path(CONTAINER_WORKDIR)
+                .ty(input::Type::Directory)
+                .read_only(false)
+                .build(),
+        );
+
+        //handle stderr output
         let stderr_out_file = if let Some(stderr) = &tool.stderr {
             outdir.path().join(stderr)
         } else {
@@ -168,6 +180,7 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
+        //handle stdout output
         let stdout_out_file = if let Some(stdout) = &tool.stdout {
             outdir.path().join(stdout)
         } else {
@@ -183,16 +196,6 @@ impl TaskBackend for DockerBackend {
         );
 
         // need to handle iwdr
-
-        //add outdir mount
-        task.add_output(
-            Output::builder()
-                .name("outdir")
-                .path(CONTAINER_WORKDIR)
-                .url(Url::from_file_path(outdir.path()).unwrap())
-                .ty(output::Type::Directory)
-                .build(),
-        );
 
         let status = self.backend.run(task, token)?.await?;
 
@@ -211,7 +214,9 @@ impl TaskBackend for DockerBackend {
             collect_command_outputs(&tool.outputs, outdir.path(), &request.runtime.outdir)?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");
+
         //evaluate exitstatus based on tool's expected exit codes
+
         Ok(status)
     }
 }
@@ -293,5 +298,24 @@ mod tests {
         //check if output file exists
         let out_file = tmpdir.path().join("output");
         assert!(out_file.exists());
+    }
+
+    #[tokio::test]
+    async fn test_docker_backend_run_simple_with_dir() {
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests")
+            .canonicalize()
+            .unwrap();
+        let specification_path = base_dir.join("dir3.cwl");
+        let inputs_path = base_dir.join("dir3-job.yml");
+
+        let config = Config::default();
+        let backend = DockerBackend::new(config).await.unwrap();
+        let tmpdir = tempdir().unwrap();
+        let request =
+            load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+        let cancellation_token = CancellationToken::new();
+        let result = backend.run(&request, cancellation_token).await;
+        assert!(result.is_ok());
     }
 }
