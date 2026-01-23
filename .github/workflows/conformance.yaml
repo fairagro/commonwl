@@ -1,0 +1,45 @@
+name: 📎 Conformance Runner
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+jobs:
+  ci-pipeline:
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: "true"
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Install CWL Test
+        run: |
+          python3 -m venv .venv
+          source .venv/bin/activate
+          pip install cwltest
+      - name: Run Conformance Tests       
+        continue-on-error: true
+        run: |
+          cargo build --release && cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance --badgedir badges
+          exit 0
+      - name: Generate Summary
+        run: |
+          TABLE="| Subject        | Status | Badge                                      |"
+          TABLE="$TABLE\n|----------------|--------|--------------------------------------------|"
+
+          for file in cwl-v1.2/badges/*.json; do
+                  SUBJECT=$(jq -r '.subject' $file)
+                  STATUS=$(jq -r '.status' $file)
+                  COLOR=$(jq -r '.color' $file)
+                  BADGE_URL="https://img.shields.io/badge/$SUBJECT-${STATUS}25-$COLOR"
+                  TABLE="$TABLE\n| $SUBJECT       | $STATUS | ![$SUBJECT]( $BADGE_URL )                  |"
+          done
+
+          echo -e "$TABLE" 
+          echo -e "$TABLE" >> $GITHUB_STEP_SUMMARY
