@@ -7,19 +7,19 @@ use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, System};
 pub struct Runtime {
     pub outdir: PathBuf,
     pub tmpdir: PathBuf,
-    pub cores: f64,
-    pub ram: f64,
-    pub outdir_size: f64,
-    pub tmpdir_size: f64,
+    pub cores: u64,
+    pub ram: u64,
+    pub outdir_size: u64,
+    pub tmpdir_size: u64,
 }
 
 impl Default for Runtime {
     fn default() -> Self {
         Self {
-            cores: get_processor_count() as f64,
-            ram: get_available_ram() as f64,
-            outdir_size: get_available_disk_space() as f64,
-            tmpdir_size: get_available_disk_space() as f64,
+            cores: get_processor_count() as u64,
+            ram: get_available_ram(),
+            outdir_size: get_available_disk_space(),
+            tmpdir_size: get_available_disk_space(),
             outdir: PathBuf::from("."),
             tmpdir: PathBuf::from("."),
         }

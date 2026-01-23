@@ -6,11 +6,11 @@ use std::collections::HashMap;
 pub fn do_eval(
     expression: &str,
     context: Option<serde_json::Value>,
-    inputs: HashMap<String, DefaultValue>,
+    inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
 ) -> anyhow::Result<serde_yaml::Value> {
-    let expr = unwrap_expr(expression);
-
+    let expr = unwrap_expr(expression).ok_or(anyhow::Error::msg("No expression"))?;
+    
     let context = context.unwrap_or_default();
 
     let inputs = serde_json::to_value(inputs)?;
@@ -26,8 +26,7 @@ pub fn do_eval(
     Ok(yaml)
 }
 
-fn unwrap_expr(expr: &str) -> &str {
+fn unwrap_expr(expr: &str) -> Option<&str> {
     expr.strip_prefix("$(")
         .and_then(|s| s.strip_suffix(")"))
-        .unwrap_or(expr)
 }

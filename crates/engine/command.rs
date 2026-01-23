@@ -125,7 +125,7 @@ pub fn build_command(
         let mut cmd = vec![];
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
-                use_value_from(&bound.binding)
+                use_value_from(&bound.binding, &values, runtime)?
             } else {
                 generate_arg(&bound.binding, bound.value, runtime)?
             };
@@ -141,7 +141,7 @@ pub fn build_command(
     } else {
         for bound in bindings {
             let arg = if is_argument(&bound) {
-                use_value_from(&bound.binding)
+                use_value_from(&bound.binding, &values, runtime)?
             } else {
                 generate_arg(&bound.binding, bound.value, runtime)?
             };
@@ -312,7 +312,7 @@ pub(crate) fn generate_arg(
     }
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
-        let result = expression::do_eval(value_from, Some(json_value), HashMap::new(), runtime)?;
+        let result = expression::do_eval(value_from, Some(json_value), &HashMap::new(), runtime)?;
         value = serde_yaml::from_value(result)?;
     }
     let mut argl = vec![];
@@ -381,15 +381,24 @@ pub(crate) fn generate_arg(
         .collect::<Vec<String>>())
 }
 
-fn use_value_from(binding: &CommandLineBinding) -> Vec<String> {
+fn use_value_from(binding: &CommandLineBinding, inputs: &HashMap<String, DefaultValue>, runtime: &Runtime) -> anyhow::Result<Vec<String>> {
+    //evaluate first
+    let mut value = binding.value_from.clone().unwrap_or_default();
+
+    //try to evaluate expression
+    if let Ok(result) = expression::do_eval(&value, None, inputs, runtime) {
+        let dv: DefaultValue = serde_yaml::from_value(result)?;
+        value = to_str(&dv);
+    }
+
     if let Some(p) = &binding.prefix
-        && let Some(v) = &binding.value_from
+        && binding.value_from.is_some()
     {
-        vec![p.clone(), v.clone()]
-    } else if let Some(v) = &binding.value_from {
-        vec![v.clone()]
+        Ok(vec![p.clone(), value])
+    } else if binding.value_from.is_some() {
+        Ok(vec![value])
     } else {
-        vec![]
+        Ok(vec![])
     }
 }
 
@@ -511,7 +520,7 @@ stdout: output.txt"#;
             vec![
                 &shell_cmd[0],
                 &shell_cmd[1],
-                "cd '$(inputs.indir.path)' && find . | sort"
+                "cd testdir && find . | sort"
             ]
         );
     }
@@ -532,7 +541,7 @@ stdout: output.txt"#;
                 "bwa",
                 "mem",
                 "-t",
-                "$(runtime.cores)",
+                "8",
                 "-I",
                 "1,2,3,4",
                 "-m",

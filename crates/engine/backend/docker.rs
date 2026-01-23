@@ -153,9 +153,9 @@ impl TaskBackend for DockerBackend {
             ])
             .resources(
                 Resources::builder()
-                    .cpu(request.runtime.cores)
+                    .cpu(request.runtime.cores as f64)
                     //.disk(request.runtime.outdir_size) //we don't use this currently
-                    .ram(request.runtime.ram)
+                    .ram(request.runtime.ram as f64)
                     .build(),
             )
             .build();

@@ -113,7 +113,12 @@ pub fn collect_inputs(
     let mut values = HashMap::new();
     for input in doc.get_input_data_providers() {
         // collect the actual value
-        let value = get_input_value(input, inputs)?;
+        let mut value = get_input_value(input, inputs)?;
+
+        //update file path field
+        if let DefaultValue::FileOrDirectory(fod) = &mut value {
+            fod.dry_validation();
+        }
 
         //do some validation
         let valid = match doc {
