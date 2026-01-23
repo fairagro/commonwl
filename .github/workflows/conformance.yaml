@@ -33,7 +33,7 @@ jobs:
           TABLE="| Subject        | Status | Badge                                      |"
           TABLE="$TABLE\n|----------------|--------|--------------------------------------------|"
 
-          for file in cwl-v1.2/badges/*.json; do
+          for file in badges/*.json; do
                   SUBJECT=$(jq -r '.subject' $file)
                   STATUS=$(jq -r '.status' $file)
                   COLOR=$(jq -r '.color' $file)
