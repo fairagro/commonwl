@@ -1,4 +1,4 @@
-use crate::{expression, input::collect_inputs};
+use crate::{context::Runtime, expression, input::collect_inputs};
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CWLDocument, CommandLineTool},
@@ -27,6 +27,7 @@ enum SortKey {
 pub fn build_command(
     tool: &CommandLineTool,
     inputs: &HashMap<String, serde_yaml::Value>,
+    runtime: &Runtime,
 ) -> anyhow::Result<Vec<String>> {
     let mut args: Vec<String> = vec![];
 
@@ -126,7 +127,7 @@ pub fn build_command(
             let mut arg = if is_argument(&bound) {
                 use_value_from(&bound.binding)
             } else {
-                generate_arg(&bound.binding, bound.value)?
+                generate_arg(&bound.binding, bound.value, runtime)?
             };
 
             if bound.binding.shell_quote.unwrap_or(true) {
@@ -142,7 +143,7 @@ pub fn build_command(
             let arg = if is_argument(&bound) {
                 use_value_from(&bound.binding)
             } else {
-                generate_arg(&bound.binding, bound.value)?
+                generate_arg(&bound.binding, bound.value, runtime)?
             };
             args.extend(arg);
         }
@@ -302,6 +303,7 @@ fn collect_input_bindings(
 pub(crate) fn generate_arg(
     binding: &CommandLineBinding,
     mut value: DefaultValue,
+    runtime: &Runtime,
 ) -> anyhow::Result<Vec<String>> {
     let sep = binding.separate.unwrap_or(true);
 
@@ -310,7 +312,7 @@ pub(crate) fn generate_arg(
     }
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
-        let result = expression::do_eval(value_from, Some(json_value))?;
+        let result = expression::do_eval(value_from, Some(json_value), HashMap::new(), runtime)?;
         value = serde_yaml::from_value(result)?;
     }
     let mut argl = vec![];
@@ -470,7 +472,7 @@ stdout: output.txt";
 }"#;
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, &input_values).unwrap();
+        let cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         let cmdline = cmd.join(" ");
         assert_eq!(cmdline, "cat hello.txt");
     }
@@ -500,7 +502,7 @@ stdout: output.txt"#;
         let tool = &serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, &input_values).unwrap();
+        let cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
 
         let shell_cmd = get_shell_command();
 
@@ -521,7 +523,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -549,7 +551,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -574,7 +576,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -590,7 +592,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -603,7 +605,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, vec!["cat", "hello.txt"]);
@@ -616,7 +618,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -627,7 +629,7 @@ stdout: output.txt"#;
         let b = CommandLineBinding::builder().build(); //all none
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
         assert_eq!(res, vec!["foo"]);
     }
 
@@ -639,7 +641,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
         assert_eq!(res, vec!["--opt", "foo"]);
     }
 
@@ -651,7 +653,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
         assert_eq!(res, vec!["--opt=foo"]);
     }
 
@@ -667,7 +669,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
         assert_eq!(res, vec!["--list", "a,b,c"]);
     }
 
@@ -680,7 +682,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
         assert_eq!(res, vec!["--list"]); //values need to be added recursively respecting the CommandLineBinding of their input schema
     }
 
@@ -712,13 +714,13 @@ stdout: output.txt"#;
                 serde_yaml::Value::String("b".into()),
                 serde_yaml::Value::String("c".into()),
             ]));
-            let mut res = generate_arg(&b, v.clone()).unwrap(); //generates only -Y
+            let mut res = generate_arg(&b, v.clone(), &Runtime::default()).unwrap(); //generates only -Y
             if let Some(inner_b) = &array_schema.input_binding {
                 if let Some(serde_yaml::Value::Sequence(vec)) = v.try_get_value_ref() {
                     for inner_v in vec {
                         //re-serde
                         let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
-                        res.extend(generate_arg(inner_b, v).unwrap());
+                        res.extend(generate_arg(inner_b, v, &Runtime::default()).unwrap());
                     }
                 }
             } else {

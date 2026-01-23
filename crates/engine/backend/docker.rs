@@ -92,8 +92,11 @@ impl TaskBackend for DockerBackend {
         )?;
 
         //collect command string and correct args for staged paths
-        let mut args =
-            path_mapper.correct_execution_path(command::build_command(tool, &request.inputs)?);
+        let mut args = path_mapper.correct_execution_path(command::build_command(
+            tool,
+            &request.inputs,
+            &request.runtime,
+        )?);
 
         //handle docker requirement
         let mut container = "alpine".to_string();
