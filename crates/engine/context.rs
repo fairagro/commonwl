@@ -1,3 +1,4 @@
+use cwl_core::{NumberOrExpression, requirements::ResourceRequirement};
 use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::LazyLock};
 use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, System};
@@ -23,6 +24,53 @@ impl Default for Runtime {
             outdir: PathBuf::from("."),
             tmpdir: PathBuf::from("."),
         }
+    }
+}
+
+pub fn build_runtime(req: Option<&ResourceRequirement>) -> Runtime {
+    let mut runtime = Runtime::default();
+    if let Some(req) = req {
+        runtime.cores = resolve_min_max(
+            req.cores_min.as_ref(),
+            req.cores_max.as_ref(),
+            runtime.cores,
+        );
+
+        runtime.ram = resolve_min_max(req.ram_min.as_ref(), req.ram_max.as_ref(), runtime.ram);
+
+        runtime.tmpdir_size = resolve_min_max(
+            req.tmpdir_min.as_ref(),
+            req.tmpdir_max.as_ref(),
+            runtime.tmpdir_size,
+        );
+
+        runtime.outdir_size = resolve_min_max(
+            req.outdir_min.as_ref(),
+            req.outdir_max.as_ref(),
+            runtime.outdir_size,
+        );
+    }
+    runtime
+}
+
+fn resolve_min_max(
+    min: Option<&NumberOrExpression>,
+    max: Option<&NumberOrExpression>,
+    default: u64,
+) -> u64 {
+    match (min.map(handle_value), max.map(handle_value)) {
+        (Some(min), Some(max)) => min.max(max),
+        (Some(v), None) | (None, Some(v)) => v,
+        (None, None) => default,
+    }
+}
+
+fn handle_value(val: &NumberOrExpression) -> u64 {
+    match val {
+        NumberOrExpression::Int(i) => *i as u64,
+        NumberOrExpression::Long(l) => *l as u64,
+        NumberOrExpression::Float(f) => f32::ceil(*f) as u64,
+        NumberOrExpression::Expression(_) => todo!(),
     }
 }
 

@@ -1,5 +1,4 @@
 use crate::{
-    context::Runtime,
     input::{InputObject, load_input_file_from_file},
     pathmapper::PathMapper,
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
@@ -31,9 +30,9 @@ pub struct ExecutionRequest {
     pub specification: CWLDocument,
     pub inputs: HashMap<String, serde_yaml::Value>,
     pub working_dir: PathBuf,
+    pub out_dir: PathBuf,
     pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ProcessHints>,
-    pub runtime: Runtime,
 }
 
 /// Load an execution context from a CWL specification file and an inputs file.
@@ -70,21 +69,13 @@ pub fn load_execution_context_from_document(
     base_path: impl AsRef<Path>,
     outputs_path: Option<&Path>,
 ) -> anyhow::Result<ExecutionRequest> {
-    let runtime = Runtime {
-        outdir: outputs_path.unwrap_or(base_path.as_ref()).to_path_buf(),
-        tmpdir: PathBuf::from("."), //do not know when this is even used...?
-        ..Default::default()
-    };
-
-    //TODO: use resource requirement values
-
     let ctx = ExecutionRequest {
         requirements: collect_requirements(&specification, &inputs),
         hints: collect_hints(&specification, &inputs),
         specification,
         inputs: inputs.inputs,
         working_dir: base_path.as_ref().to_path_buf(),
-        runtime,
+        out_dir: outputs_path.unwrap_or(base_path.as_ref()).to_path_buf(),
     };
 
     Ok(ctx)

@@ -1,6 +1,7 @@
 use crate::{
     backend::{ExecutionRequest, TaskBackend, handle_synthetic_directories},
     command,
+    context::build_runtime,
     docker::build_container,
     input::{collect_inputs, flatten_inputs, get_stdin},
     output::collect_command_outputs,
@@ -23,7 +24,10 @@ use crankshaft::{
     },
 };
 use cwl_core::{
-    docstring, documents::CWLDocument, files::FileOrDirectory, requirements::DockerRequirement,
+    docstring,
+    documents::CWLDocument,
+    files::FileOrDirectory,
+    requirements::{DockerRequirement, ResourceRequirement},
 };
 use nonempty::{NonEmpty, nonempty};
 use std::{
@@ -82,6 +86,10 @@ impl TaskBackend for DockerBackend {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
 
+        let req = tool.get_requirement_or_hint::<ResourceRequirement>();
+        let mut runtime = build_runtime(req);
+        runtime.outdir = request.out_dir.clone();
+
         //handle synthethic directories
         let mut flattened_inputs = flatten_inputs(inputs.values());
         handle_synthetic_directories(
@@ -95,7 +103,7 @@ impl TaskBackend for DockerBackend {
         let mut args = path_mapper.correct_execution_path(command::build_command(
             tool,
             &request.inputs,
-            &request.runtime,
+            &runtime,
         )?);
 
         //handle docker requirement
@@ -153,9 +161,9 @@ impl TaskBackend for DockerBackend {
             ])
             .resources(
                 Resources::builder()
-                    .cpu(request.runtime.cores as f64)
+                    .cpu(runtime.cores as f64)
                     //.disk(request.runtime.outdir_size) //we don't use this currently
-                    .ram(request.runtime.ram as f64)
+                    .ram(runtime.ram as f64)
                     .build(),
             )
             .build();
@@ -239,8 +247,7 @@ impl TaskBackend for DockerBackend {
         }
 
         // need to collect outputs
-        let outputs =
-            collect_command_outputs(&tool.outputs, outdir.path(), &request.runtime.outdir)?;
+        let outputs = collect_command_outputs(&tool.outputs, outdir.path(), &runtime.outdir)?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");
 
