@@ -188,7 +188,7 @@ impl Directory {
                     ..Default::default()
                 };
                 dir.location = dir.path.as_ref().map(|s| format!("file://{s}"));
-                
+
                 if recursive {
                     dir.load_listing(LoadListingEnum::DeepListing)?;
                 }

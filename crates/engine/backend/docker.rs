@@ -1,5 +1,5 @@
 use crate::{
-    backend::{ExecutionRequest, TaskBackend},
+    backend::{ExecutionRequest, TaskBackend, handle_synthetic_directories},
     command,
     docker::build_container,
     input::{collect_inputs, flatten_inputs, get_stdin},
@@ -25,7 +25,6 @@ use crankshaft::{
 use cwl_core::{
     docstring, documents::CWLDocument, files::FileOrDirectory, requirements::DockerRequirement,
 };
-use dircpy::copy_dir;
 use nonempty::{NonEmpty, nonempty};
 use std::{
     fs,
@@ -75,10 +74,22 @@ impl TaskBackend for DockerBackend {
         let inputs = collect_inputs(&request.specification, &request.inputs)?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
+        let outdir = tempdir()?;
+        let tmpdir = tempdir()?;
+
         let mut path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
         let CWLDocument::CommandLineTool(tool) = &request.specification else {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
+
+        //handle synthethic directories
+        let mut flattened_inputs = flatten_inputs(inputs.values());
+        handle_synthetic_directories(
+            &mut flattened_inputs,
+            &mut path_mapper,
+            &request.working_dir,
+            tmpdir.path(),
+        )?;
 
         //collect command string and correct args for staged paths
         let mut args =
@@ -146,52 +157,15 @@ impl TaskBackend for DockerBackend {
             )
             .build();
 
-        let outdir = tempdir()?;
-        let tmpdir = tempdir()?;
-
         //add file inputs to task
-        for mut input in flatten_inputs(inputs.values()) {
+        for mut input in flattened_inputs {
             input.dry_validation();
-            let mut path = input.path().cloned();
+            let path = input.path().cloned();
 
             let ty = match input {
                 FileOrDirectory::File(_) => input::Type::File,
                 FileOrDirectory::Directory(_) => input::Type::Directory,
             };
-
-            if path.is_none()
-                && let FileOrDirectory::Directory(dir) = &input
-                && let Some(listing) = &dir.listing
-            {
-                //create from listing
-                let basename = dir.basename.as_ref().unwrap(); //mandatory in this case
-                let host_path = tmpdir.path().join(basename);
-                fs::create_dir(&host_path)?;
-
-                //fix path
-                let host_path_str = host_path.to_string_lossy().into_owned();
-                path = Some(host_path_str);
-
-                for item in listing {
-                    let mut item = item.clone();
-                    item.dry_validation();
-
-                    let c_path = item.path().unwrap();
-                    let c_host_path = host_path.join(c_path);
-                    path_mapper.add_extra(&c_host_path, c_path)?;
-
-                    let source_path = request.working_dir.join(c_path);
-                    //copy into tmpdir
-                    match item {
-                        FileOrDirectory::File(_) => {
-                            fs::copy(&source_path, &c_host_path)?;
-                        }
-                        FileOrDirectory::Directory(_) => copy_dir(&source_path, &c_host_path)?,
-                    }
-                }
-
-                path_mapper.add_extra(&host_path, basename)?;
-            }
 
             if let Some(path) = path {
                 let guest_path = path_mapper.get_guest(path).unwrap();
@@ -346,9 +320,8 @@ mod tests {
         let result = backend.run(&request, cancellation_token).await;
 
         assert!(result.is_ok());
-
         //check if output file exists
-        let out_file = tmpdir.path().join("output");
+        let out_file = tmpdir.path().join("output.txt");
 
         assert!(out_file.exists());
     }

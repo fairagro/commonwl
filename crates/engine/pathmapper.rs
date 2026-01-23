@@ -72,7 +72,6 @@ impl PathMapper {
             .map(|(k, _)| k)
     }
 
-    //add from inside working directory
     pub fn add(&mut self, new_path: impl AsRef<Path>) -> anyhow::Result<()> {
         let relative_source = if new_path.as_ref().is_absolute() {
             new_path.as_ref().strip_prefix(&self.base_dir)?
@@ -90,22 +89,29 @@ impl PathMapper {
         Ok(())
     }
 
-    //add item from outside working directory
-    pub fn add_extra(
+    pub fn add_tripel(
         &mut self,
         new_path: impl AsRef<Path>,
-        relative_part: impl AsRef<Path>,
+        staged_path: impl AsRef<Path>,
+        relative_path: impl AsRef<Path>,
     ) -> anyhow::Result<()> {
-        assert!(new_path.as_ref().is_absolute());
-
-        let source = new_path.as_ref();
-        let relative_source = relative_part.as_ref();
-
-        let dest = self.stage_dir.join(relative_source);
-        self.local_mappings
-            .insert(relative_source.to_path_buf(), dest.clone());
-        self.mappings.insert(source.to_path_buf(), dest);
+        if !staged_path.as_ref().is_absolute() && !new_path.as_ref().is_absolute() {
+            anyhow::bail!("Paths need to be absolute")
+        }
+        self.local_mappings.insert(
+            relative_path.as_ref().to_path_buf(),
+            staged_path.as_ref().to_path_buf(),
+        );
+        self.mappings.insert(
+            new_path.as_ref().to_path_buf(),
+            staged_path.as_ref().to_path_buf(),
+        );
         Ok(())
+    }
+
+    /// create staged path from a relative path
+    pub fn predict_staged_path(&self, relative_path: impl AsRef<Path>) -> PathBuf {
+        self.stage_dir.join(relative_path)
     }
 
     fn collect_files(

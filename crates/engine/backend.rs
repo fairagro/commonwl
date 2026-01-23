@@ -1,14 +1,16 @@
 use crate::{
     context::Runtime,
     input::{InputObject, load_input_file_from_file},
+    pathmapper::PathMapper,
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
 };
 use anyhow::Ok;
-use cwl_core::{documents::CWLDocument, load_cwl_file};
+use cwl_core::{documents::CWLDocument, files::FileOrDirectory, load_cwl_file};
+use dircpy::copy_dir;
 use nonempty::NonEmpty;
 use std::{
     collections::HashMap,
-    env,
+    env, fs,
     path::{Path, PathBuf},
     process::ExitStatus,
 };
@@ -86,6 +88,61 @@ pub fn load_execution_context_from_document(
     };
 
     Ok(ctx)
+}
+
+/// Creates the synthetic directory and adds it to the pathmapper
+pub(crate) fn handle_synthetic_directories(
+    flattened_inputs: &mut Vec<FileOrDirectory>,
+    path_mapper: &mut PathMapper,
+    work_dir: &Path,
+    tmpdir: &Path,
+) -> anyhow::Result<()> {
+    for mut input in flattened_inputs {
+        input.dry_validation();
+        let mut path = input.path().cloned();
+
+        if path.is_none()
+            && let FileOrDirectory::Directory(dir) = &mut input
+            && let Some(listing) = &dir.listing
+            && let Some(basename) = &dir.basename
+        {
+            //create from listing
+            let host_path = tmpdir.join(basename);
+            fs::create_dir(&host_path)?;
+
+            let base_path = Path::new(basename);
+
+            //fix path
+            let host_path_str = host_path.to_string_lossy().into_owned();
+            path = Some(host_path_str);
+            dir.path = path;
+
+            for item in listing {
+                let mut item = item.clone();
+                item.dry_validation();
+
+                let c_path = item.path().unwrap();
+                let c_host_path = host_path.join(c_path);
+                let staged_path = path_mapper.predict_staged_path(base_path.join(c_path));
+
+                path_mapper.add_tripel(&c_host_path, staged_path, c_path)?;
+
+                let source_path = work_dir.join(c_path);
+                //copy into tmpdir
+                match item {
+                    FileOrDirectory::File(_) => {
+                        fs::copy(&source_path, &c_host_path)?;
+                    }
+                    FileOrDirectory::Directory(_) => copy_dir(&source_path, &c_host_path)?,
+                }
+            }
+
+            let staged_path = path_mapper.predict_staged_path(basename);
+            path_mapper.add_tripel(&host_path, staged_path, basename)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
