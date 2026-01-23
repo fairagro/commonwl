@@ -151,6 +151,7 @@ impl TaskBackend for DockerBackend {
             .executions(nonempty![
                 Execution::builder()
                     .work_dir(CONTAINER_WORKDIR)
+                    .env(request.environment.clone())
                     .program(&args[0])
                     .args(&args[1..])
                     .image(container)

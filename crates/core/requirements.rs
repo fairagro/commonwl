@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::deserialize::{
     deserialize_map_list_envname, deserialize_map_list_package, make_shorthand_impl,
 };
@@ -189,6 +191,15 @@ pub struct InitialWorkDirRequirement {
 pub struct EnvVarRequirement {
     #[serde(deserialize_with = "deserialize_map_list_envname", rename = "envDef")]
     pub env_def: Vec<EnvironmentDef>,
+}
+
+impl EnvVarRequirement {
+    pub fn to_map(self) -> HashMap<String, String> {
+        self.env_def
+            .into_iter()
+            .map(|e| (e.env_name, e.env_value))
+            .collect()
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]

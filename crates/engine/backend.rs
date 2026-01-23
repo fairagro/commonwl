@@ -1,4 +1,5 @@
 use crate::{
+    environment::build_environment,
     input::{InputObject, load_input_file_from_file},
     pathmapper::PathMapper,
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
@@ -6,6 +7,7 @@ use crate::{
 use anyhow::Ok;
 use cwl_core::{documents::CWLDocument, files::FileOrDirectory, load_cwl_file};
 use dircpy::copy_dir;
+use indexmap::IndexMap;
 use nonempty::NonEmpty;
 use std::{
     collections::HashMap,
@@ -33,6 +35,7 @@ pub struct ExecutionRequest {
     pub out_dir: PathBuf,
     pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ProcessHints>,
+    pub environment: IndexMap<String, String>,
 }
 
 /// Load an execution context from a CWL specification file and an inputs file.
@@ -69,6 +72,8 @@ pub fn load_execution_context_from_document(
     base_path: impl AsRef<Path>,
     outputs_path: Option<&Path>,
 ) -> anyhow::Result<ExecutionRequest> {
+    let environment = build_environment(&inputs);
+
     let ctx = ExecutionRequest {
         requirements: collect_requirements(&specification, &inputs),
         hints: collect_hints(&specification, &inputs),
@@ -76,6 +81,7 @@ pub fn load_execution_context_from_document(
         inputs: inputs.inputs,
         working_dir: base_path.as_ref().to_path_buf(),
         out_dir: outputs_path.unwrap_or(base_path.as_ref()).to_path_buf(),
+        environment,
     };
 
     Ok(ctx)

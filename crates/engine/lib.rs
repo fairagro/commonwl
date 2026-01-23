@@ -7,3 +7,4 @@ pub mod requirements;
 pub mod backend;
 pub mod docker;
 pub mod expression;
+pub mod environment;

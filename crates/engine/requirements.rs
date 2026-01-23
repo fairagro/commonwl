@@ -1,4 +1,6 @@
+use crate::input::InputObject;
 use cwl_core::{
+    ExtractFromEnum,
     documents::CWLDocument,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
@@ -11,7 +13,42 @@ use cwl_core::{
 };
 use serde::Deserialize;
 
-use crate::input::InputObject;
+macro_rules! impl_conversion_methods {
+    ($enum:ident, $variant:ident) => {
+        impl From<$variant> for $enum {
+            fn from(value: $variant) -> Self {
+                $enum::$variant(value)
+            }
+        }
+
+        impl ExtractFromEnum<$enum> for $variant {
+            fn get(e: &$enum) -> Option<&Self> {
+                if let $enum::$variant(v) = e {
+                    Some(v)
+                } else {
+                    None
+                }
+            }
+        }
+    };
+}
+
+impl_conversion_methods!(ProcessRequirements, InlineJavascriptRequirement);
+impl_conversion_methods!(ProcessRequirements, LoadListingRequirement);
+impl_conversion_methods!(ProcessRequirements, SchemaDefRequirement);
+impl_conversion_methods!(ProcessRequirements, DockerRequirement);
+impl_conversion_methods!(ProcessRequirements, SoftwareRequirement);
+impl_conversion_methods!(ProcessRequirements, InitialWorkDirRequirement);
+impl_conversion_methods!(ProcessRequirements, EnvVarRequirement);
+impl_conversion_methods!(ProcessRequirements, ShellCommandRequirement);
+impl_conversion_methods!(ProcessRequirements, ResourceRequirement);
+impl_conversion_methods!(ProcessRequirements, WorkReuse);
+impl_conversion_methods!(ProcessRequirements, NetworkAccess);
+impl_conversion_methods!(ProcessRequirements, InplaceUpdateRequirement);
+impl_conversion_methods!(ProcessRequirements, ToolTimeLimit);
+impl_conversion_methods!(ProcessRequirements, SubworkflowFeatureRequirement);
+impl_conversion_methods!(ProcessRequirements, ScatterFeatureRequirement);
+impl_conversion_methods!(ProcessRequirements, StepInputExpressionRequirement);
 
 // CWL does care about the distinction between tool requirements and workflow requirements,
 // but we don't care about that distinction here.
@@ -214,7 +251,6 @@ pub fn collect_hints(specification: &CWLDocument, inputs: &InputObject) -> Vec<P
             .collect(),
     };
 
-    
     merge::<ProcessHints>(&mut hints, &inputs.hints);
 
     hints

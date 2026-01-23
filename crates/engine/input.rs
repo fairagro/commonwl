@@ -3,7 +3,7 @@ use crate::{
     requirements::{ProcessHints, ProcessRequirements},
 };
 use cwl_core::{
-    OneOrMany,
+    ExtractFromEnum, OneOrMany,
     documents::{CWLDocument, CommandLineTool},
     files::FileOrDirectory,
     inputs::{
@@ -23,6 +23,43 @@ pub struct InputObject {
     pub inputs: HashMap<String, serde_yaml::Value>,
     pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ProcessHints>,
+}
+impl InputObject {
+    pub fn get_requirement<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.requirements.iter().find_map(|req| T::get(req))
+    }
+
+    pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        let maybe_req = self.requirements.iter().find_map(|req| T::get(req));
+        let maybe_hint = self.hints.iter().find_map(|hint| {
+            if let ProcessHints::Requirement(inner) = hint {
+                T::get(inner)
+            } else {
+                None
+            }
+        });
+        maybe_req.or(maybe_hint)
+    }
+
+    pub fn has_requirement<T>(&self) -> bool
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.get_requirement::<T>().is_some()
+    }
+
+    pub fn has_requirement_or_hint<T>(&self) -> bool
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.get_requirement_or_hint::<T>().is_some()
+    }
 }
 
 pub fn load_input_file_from_file(
