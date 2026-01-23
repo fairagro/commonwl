@@ -17,6 +17,29 @@ pub fn collect_command_outputs(
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
+    if source_dir.join("cwl.output.json").exists() {
+        let contents = fs::read_to_string(source_dir.join("cwl.output.json"))?;
+        let mut values: HashMap<String, DefaultValue> = serde_json::from_str(&contents)?;
+        for value in values.values_mut() {
+            match value {
+                DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
+                    f.dry_validation();
+                    let path = f.path.clone().unwrap();
+                    let path = Path::new(&path);
+                    *value = handle_file(path, source_dir, dest_dir)?
+                }
+                DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
+                    d.dry_validation();
+                    let path = d.path.clone().unwrap();
+                    let path = Path::new(&path);
+                    *value = handle_dir(path, source_dir, dest_dir)?
+                }
+                _ => {}
+            }
+        }
+        return Ok(values);
+    }
+
     //we start with simple cases for now: Files and Directories with glob patterns
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
@@ -56,7 +79,7 @@ pub fn collect_command_outputs(
                     output_map.insert(output_id, handle_dir(&item, source_dir, dest_dir)?);
                 }
             }
-            _ => todo!(),
+            _ => todo!()
         }
     }
 
@@ -78,7 +101,10 @@ fn handle_dir(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result
     let dest_path_as_str = dest_path.to_string_lossy();
 
     copy_dir(path, &dest_path)?;
-    let cmd = Command::new("ls").arg("-la").arg(source_dir.to_string_lossy().into_owned()).output()?;
+    let cmd = Command::new("ls")
+        .arg("-la")
+        .arg(source_dir.to_string_lossy().into_owned())
+        .output()?;
     println!("{}", String::from_utf8_lossy(&cmd.stdout));
 
     let basename = dest_path
