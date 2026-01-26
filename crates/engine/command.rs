@@ -6,7 +6,7 @@ use cwl_core::{
         CommandInputParameterType, CommandInputSchema, CommandInputType, CommandLineBinding,
         DefaultValue,
     },
-    requirements::ShellCommandRequirement,
+    requirements::{InlineJavascriptRequirement, ShellCommandRequirement},
     value_as_string,
 };
 use std::{borrow::Cow, collections::HashMap};
@@ -30,6 +30,8 @@ pub fn build_command(
     runtime: &Runtime,
 ) -> anyhow::Result<Vec<String>> {
     let mut args: Vec<String> = vec![];
+
+    let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
 
     if let Some(base_command) = &tool.base_command {
         let cmd = match &base_command {
@@ -125,9 +127,9 @@ pub fn build_command(
         let mut cmd = vec![];
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, &values, runtime)?
+                use_value_from(&bound.binding, &values, runtime, ijsr)?
             } else {
-                generate_arg(&bound.binding, bound.value, runtime)?
+                generate_arg(&bound.binding, bound.value, runtime, ijsr)?
             };
 
             if bound.binding.shell_quote.unwrap_or(true) {
@@ -141,9 +143,9 @@ pub fn build_command(
     } else {
         for bound in bindings {
             let arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, &values, runtime)?
+                use_value_from(&bound.binding, &values, runtime, ijsr)?
             } else {
-                generate_arg(&bound.binding, bound.value, runtime)?
+                generate_arg(&bound.binding, bound.value, runtime, ijsr)?
             };
             args.extend(arg);
         }
@@ -304,6 +306,7 @@ pub(crate) fn generate_arg(
     binding: &CommandLineBinding,
     mut value: DefaultValue,
     runtime: &Runtime,
+    ijsr: Option<&InlineJavascriptRequirement>,
 ) -> anyhow::Result<Vec<String>> {
     let sep = binding.separate.unwrap_or(true);
 
@@ -312,7 +315,8 @@ pub(crate) fn generate_arg(
     }
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
-        let result = expression::do_eval(value_from, Some(json_value), &HashMap::new(), runtime)?;
+        let result =
+            expression::do_eval(value_from, Some(json_value), &HashMap::new(), runtime, ijsr)?;
         value = serde_yaml::from_value(result)?;
     }
     let mut argl = vec![];
@@ -385,12 +389,13 @@ fn use_value_from(
     binding: &CommandLineBinding,
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
+    ijsr: Option<&InlineJavascriptRequirement>,
 ) -> anyhow::Result<Vec<String>> {
     //evaluate first
     let mut value = binding.value_from.clone().unwrap_or_default();
 
     //try to evaluate expression
-    if let Ok(result) = expression::do_eval(&value, None, inputs, runtime) {
+    if let Ok(result) = expression::do_eval(&value, None, inputs, runtime, ijsr) {
         let dv: DefaultValue = serde_yaml::from_value(result)?;
         value = to_str(&dv);
     }
@@ -638,7 +643,7 @@ stdout: output.txt"#;
         let b = CommandLineBinding::builder().build(); //all none
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
         assert_eq!(res, vec!["foo"]);
     }
 
@@ -650,7 +655,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
         assert_eq!(res, vec!["--opt", "foo"]);
     }
 
@@ -662,7 +667,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
         assert_eq!(res, vec!["--opt=foo"]);
     }
 
@@ -678,7 +683,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
         assert_eq!(res, vec!["--list", "a,b,c"]);
     }
 
@@ -691,7 +696,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default()).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
         assert_eq!(res, vec!["--list"]); //values need to be added recursively respecting the CommandLineBinding of their input schema
     }
 
@@ -723,13 +728,13 @@ stdout: output.txt"#;
                 serde_yaml::Value::String("b".into()),
                 serde_yaml::Value::String("c".into()),
             ]));
-            let mut res = generate_arg(&b, v.clone(), &Runtime::default()).unwrap(); //generates only -Y
+            let mut res = generate_arg(&b, v.clone(), &Runtime::default(), None).unwrap(); //generates only -Y
             if let Some(inner_b) = &array_schema.input_binding {
                 if let Some(serde_yaml::Value::Sequence(vec)) = v.try_get_value_ref() {
                     for inner_v in vec {
                         //re-serde
                         let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
-                        res.extend(generate_arg(inner_b, v, &Runtime::default()).unwrap());
+                        res.extend(generate_arg(inner_b, v, &Runtime::default(), None).unwrap());
                     }
                 }
             } else {

@@ -1,5 +1,5 @@
 use crate::context::Runtime;
-use cwl_core::inputs::DefaultValue;
+use cwl_core::{inputs::DefaultValue, requirements::InlineJavascriptRequirement};
 use std::{collections::HashMap, ops::Range};
 
 #[derive(Debug)]
@@ -28,6 +28,7 @@ pub fn do_eval(
     context: Option<serde_json::Value>,
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
+    ijsr: Option<&InlineJavascriptRequirement>,
 ) -> anyhow::Result<serde_yaml::Value> {
     let expressions = parse_expressions(expression);
     if expressions.is_empty() {
@@ -40,12 +41,12 @@ pub fn do_eval(
     let runtime = serde_json::to_value(runtime)?;
 
     let map = HashMap::from([("self", context), ("inputs", inputs), ("runtime", runtime)]);
-    if expressions.len() == 1 && expressions[0].indices.start == 0 {
+
+    if expressions.len() == 1 && expressions[0].indices.start == 0 && ijsr.is_none() {
         return simple_expression_eval(&expressions[0].expression(), &map);
     }
-
     //string interpolation
-    let v = replace_expressions(expression, expressions, map)?;
+    let v = replace_expressions(expression, expressions, map, ijsr)?;
     Ok(v)
 }
 
@@ -64,7 +65,12 @@ fn replace_expressions(
     expr: &str,
     expressions: Vec<Expression>,
     map: HashMap<&str, serde_json::Value>,
+    ijsr: Option<&InlineJavascriptRequirement>,
 ) -> anyhow::Result<serde_yaml::Value> {
+    if ijsr.is_some() {
+        todo!()
+    }
+
     let evaluations = expressions
         .iter()
         .map(|e| simple_expression_eval(&e.expression(), &map))
@@ -153,7 +159,7 @@ mod tests {
     #[test]
     fn test_parse_expressions() {
         let input = "$(runtime.tmpdir)";
-        let result = do_eval(input, None, &HashMap::new(), &Runtime::default()).unwrap();
+        let result = do_eval(input, None, &HashMap::new(), &Runtime::default(), None).unwrap();
         let str = serde_yaml::to_string(&result).unwrap();
         assert_eq!(str.trim(), ".");
     }
