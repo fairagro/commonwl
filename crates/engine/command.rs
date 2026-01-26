@@ -537,7 +537,11 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let runtime = Runtime {
+            cores: 69,
+            ..Default::default()
+        };
+        let mut cmd = build_command(tool, &input_values, &runtime).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -546,7 +550,7 @@ stdout: output.txt"#;
                 "bwa",
                 "mem",
                 "-t",
-                "8",
+                "69",
                 "-I",
                 "1,2,3,4",
                 "-m",
