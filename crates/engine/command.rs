@@ -1,4 +1,4 @@
-use crate::{context::Runtime, expression, input::collect_inputs};
+use crate::{context::Runtime, expression, input::collect_inputs, input::validate_command_input};
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CWLDocument, CommandLineTool},
@@ -165,7 +165,21 @@ fn collect_input_bindings(
     base_sort_key: &[SortKey],
     bindings: &mut Vec<BoundBinding>,
 ) -> anyhow::Result<()> {
-    //check if recursion is needed
+    let matched_schema =
+        if let CommandInputParameterType::CommandInputType(OneOrMany::Many(types)) = schema {
+            types
+                .iter()
+                .find(|&t| validate_command_input(&t.clone().into(), value))
+                .map(|ty| CommandInputParameterType::from(ty.clone()))
+        } else {
+            None
+        };
+    let schema = if let Some(schema) = &matched_schema {
+        schema
+    } else {
+        schema
+    };
+
     if let CommandInputParameterType::CommandInputType(OneOrMany::One(
         CommandInputType::CommandInputSchema(schema),
     )) = schema
@@ -200,7 +214,7 @@ fn collect_input_bindings(
                     let DefaultValue::Any(serde_yaml::Value::Mapping(map)) = value else {
                         panic!("previous validation of `{name}` did not work")
                     };
-                    for (i, field) in fields.iter().enumerate() {
+                    for field in fields {
                         if let Some(fi_binding) = &field.input_binding {
                             let fi_binding = fi_binding.clone();
                             let mut sort_key = base_sort_key.to_owned();
@@ -213,22 +227,30 @@ fn collect_input_bindings(
                             sort_key.push(SortKey::Int(
                                 get_binding_position(&fi_binding).unwrap_or_default(),
                             ));
-                            sort_key.push(SortKey::Int(i as i32));
 
-                            let value = map
-                                .get(field.name.clone())
-                                .expect("input did not provide input for struct field");
-                            let value = serde_yaml::from_value(value.clone())?;
-                            let schema = field.r#type.clone();
+                            let is_optional = match &field.r#type {
+                                OneOrMany::One(t) => t.is_null_allowed(),
+                                OneOrMany::Many(items) => items.iter().any(|i| i.is_null_allowed()),
+                            };
+                            if let Some(value) = map.get(field.name.clone()) {
+                                let value = serde_yaml::from_value(value.clone())?;
+                                let schema = field.r#type.clone();
 
-                            collect_input_bindings(
-                                &CommandInputParameterType::CommandInputType(schema),
-                                &Some(fi_binding),
-                                &value,
-                                name,
-                                &sort_key,
-                                bindings,
-                            )?
+                                collect_input_bindings(
+                                    &CommandInputParameterType::CommandInputType(schema),
+                                    &Some(fi_binding),
+                                    &value,
+                                    &field.name,
+                                    &sort_key,
+                                    bindings,
+                                )?
+                            } else if !is_optional {
+                                //not found but not optional
+                                anyhow::bail!(
+                                    "input did not provide input for struct field {}",
+                                    field.name.clone()
+                                );
+                            }
                         }
                     }
                 }
@@ -462,8 +484,10 @@ mod tests {
     use super::*;
     use cwl_core::{
         inputs::{CommandInputArraySchema, CommandInputParameter},
+        load_cwl_file,
         types::CWLType,
     };
+    use std::path::PathBuf;
 
     #[test]
     fn test_build_command() {
@@ -583,6 +607,52 @@ stdout: output.txt"#;
                 "example_human_Illumina.pe_1.fastq",
                 "-YYY",
                 "example_human_Illumina.pe_2.fastq"
+            ]
+        );
+    }
+
+    #[test]
+    fn test_build_command_with_schema_def() {
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/tmap-tool.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let inputs = include_str!("../../testdata/cwl/tests/tmap-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+
+        let mut cmd = build_command(&tool, &input_values, &Runtime::default()).unwrap();
+        cmd = cmd[2..].to_vec();
+
+        assert_eq!(
+            cmd,
+            vec![
+                "tmap",
+                "mapall",
+                "stage1",
+                "map1",
+                "--min-seq-length",
+                "20",
+                "map2",
+                "--min-seq-length",
+                "20",
+                "stage2",
+                "map1",
+                "--max-seq-length",
+                "20",
+                "--min-seq-length",
+                "10",
+                "--seed-length",
+                "16",
+                "map2",
+                "--max-seed-hits",
+                "-1",
+                "--max-seq-length",
+                "20",
+                "--min-seq-length",
+                "10"
             ]
         );
     }

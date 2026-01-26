@@ -53,6 +53,12 @@ impl From<CommandInputSchema> for CommandInputParameterType {
     }
 }
 
+impl From<CommandInputType> for CommandInputParameterType {
+    fn from(value: CommandInputType) -> Self {
+        CommandInputParameterType::CommandInputType(OneOrMany::One(value))
+    }
+}
+
 impl Default for CommandInputParameterType {
     fn default() -> Self {
         CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::default()))

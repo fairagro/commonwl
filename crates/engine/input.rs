@@ -177,7 +177,6 @@ pub fn collect_inputs(
                     .any(|i| validate_input_type(&i.clone(), &value)),
             },
         };
-
         //error if validity can not be confirmed
         if !valid {
             anyhow::bail!(
@@ -333,7 +332,14 @@ fn validate_record_schema(schema: &InputRecordSchema, value: &DefaultValue) -> b
                     }),
                 }
             } else {
-                false
+                // Field is missing - check if it's optional (has null in union type)
+                match &f.r#type {
+                    OneOrMany::One(InputType::CWLType(CWLType::Null)) => true,
+                    OneOrMany::Many(items) => items
+                        .iter()
+                        .any(|item| matches!(item, InputType::CWLType(CWLType::Null))),
+                    _ => false,
+                }
             }
         });
     }
@@ -350,7 +356,7 @@ fn validate_array_schema(schema: &InputArraySchema, value: &DefaultValue) -> boo
                 OneOrMany::One(t) => validate_input_type(&t.clone().into(), &item_value),
                 OneOrMany::Many(ts) => ts
                     .iter()
-                    .all(|t| validate_input_type(&t.clone().into(), &item_value)),
+                    .any(|t| validate_input_type(&t.clone().into(), &item_value)),
             }
         })
     } else {
