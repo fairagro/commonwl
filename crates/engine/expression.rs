@@ -1,4 +1,4 @@
-use crate::{command::to_str, context::Runtime};
+use crate::context::Runtime;
 use cwl_core::inputs::DefaultValue;
 use std::{collections::HashMap, ops::Range};
 
@@ -41,7 +41,7 @@ pub fn do_eval(
 
     let map = HashMap::from([("self", context), ("inputs", inputs), ("runtime", runtime)]);
     if expressions.len() == 1 && expressions[0].indices.start == 0 {
-        return simple_expression_eval(&expressions[0].expression, &map);
+        return simple_expression_eval(&expressions[0].expression(), &map);
     }
 
     //string interpolation
@@ -67,7 +67,7 @@ fn replace_expressions(
 ) -> anyhow::Result<serde_yaml::Value> {
     let evaluations = expressions
         .iter()
-        .map(|e| simple_expression_eval(&e.expression, &map))
+        .map(|e| simple_expression_eval(&e.expression(), &map))
         .collect::<anyhow::Result<Vec<serde_yaml::Value>>>()?;
 
     let mut result = expr.to_string();
@@ -149,4 +149,12 @@ fn split_ranges(s: &str, delim: char) -> Vec<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_parse_expressions() {
+        let input = "$(runtime.tmpdir)";
+        let result = do_eval(input, None, &HashMap::new(), &Runtime::default()).unwrap();
+        let str = serde_yaml::to_string(&result).unwrap();
+        assert_eq!(str.trim(), ".");
+    }
 }
