@@ -381,7 +381,11 @@ pub(crate) fn generate_arg(
         .collect::<Vec<String>>())
 }
 
-fn use_value_from(binding: &CommandLineBinding, inputs: &HashMap<String, DefaultValue>, runtime: &Runtime) -> anyhow::Result<Vec<String>> {
+fn use_value_from(
+    binding: &CommandLineBinding,
+    inputs: &HashMap<String, DefaultValue>,
+    runtime: &Runtime,
+) -> anyhow::Result<Vec<String>> {
     //evaluate first
     let mut value = binding.value_from.clone().unwrap_or_default();
 
@@ -517,11 +521,7 @@ stdout: output.txt"#;
 
         assert_eq!(
             cmd,
-            vec![
-                &shell_cmd[0],
-                &shell_cmd[1],
-                "cd testdir && find . | sort"
-            ]
+            vec![&shell_cmd[0], &shell_cmd[1], "cd testdir && find . | sort"]
         );
     }
 

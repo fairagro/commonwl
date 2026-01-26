@@ -238,17 +238,23 @@ impl TaskBackend for DockerBackend {
         let status = self.backend.run(task, token)?.await?;
 
         //evaluate stderr/stdout
-        let stdout = fs::read_to_string(stdout_out_file)?;
+        let stdout = fs::read_to_string(&stdout_out_file)?;
         if !stdout.is_empty() {
             eprintln!("{stdout}");
         }
-        let stderr = fs::read_to_string(stderr_out_file)?;
+        let stderr = fs::read_to_string(&stderr_out_file)?;
         if !stderr.is_empty() {
             eprintln!("{stderr}");
         }
 
         // need to collect outputs
-        let outputs = collect_command_outputs(&tool.outputs, outdir.path(), &runtime.outdir)?;
+        let outputs = collect_command_outputs(
+            &tool.outputs,
+            outdir.path(),
+            &runtime.outdir,
+            &stdout_out_file,
+            &stderr_out_file,
+        )?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");
 

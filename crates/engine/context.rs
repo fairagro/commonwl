@@ -5,6 +5,7 @@ use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, System};
 
 // Runtime Environment like described in CWL Spec
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Runtime {
     pub outdir: PathBuf,
     pub tmpdir: PathBuf,

@@ -14,6 +14,8 @@ pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
     source_dir: &Path,
     dest_dir: &Path,
+    stdout_file: &Path,
+    stderr_file: &Path,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
@@ -79,7 +81,13 @@ pub fn collect_command_outputs(
                     output_map.insert(output_id, handle_dir(&item, source_dir, dest_dir)?);
                 }
             }
-            _ => todo!()
+            CommandOutputParameterType::Stdout => {
+                output_map.insert(output_id, handle_file(stdout_file, source_dir, dest_dir)?);
+            }
+            CommandOutputParameterType::Stderr => {
+                output_map.insert(output_id, handle_file(stderr_file, source_dir, dest_dir)?);
+            }
+            _ => todo!(),
         }
     }
 
@@ -87,7 +95,13 @@ pub fn collect_command_outputs(
 }
 
 fn handle_file(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result<DefaultValue> {
-    let relative_path = path.strip_prefix(source_dir)?.to_path_buf();
+    let relative_path = if let Ok(relative_path) = path.strip_prefix(source_dir) {
+        relative_path
+    } else {
+        Path::new(path.file_name().unwrap_or_default())
+    }
+    .to_path_buf();
+
     let dest_path = dest_dir.join(&relative_path);
 
     fs::copy(path, &dest_path)?;
