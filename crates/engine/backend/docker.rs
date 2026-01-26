@@ -3,6 +3,7 @@ use crate::{
     command,
     context::build_runtime,
     docker::build_container,
+    expression::do_eval,
     input::{collect_inputs, flatten_inputs, get_stdin},
     output::collect_command_outputs,
     pathmapper::PathMapper,
@@ -27,7 +28,7 @@ use cwl_core::{
     docstring,
     documents::CWLDocument,
     files::FileOrDirectory,
-    requirements::{DockerRequirement, ResourceRequirement},
+    requirements::{DockerRequirement, InlineJavascriptRequirement, ResourceRequirement},
 };
 use nonempty::{NonEmpty, nonempty};
 use std::{
@@ -133,6 +134,15 @@ impl TaskBackend for DockerBackend {
         //correct and add the stdin value
         let mut stdin = get_stdin(tool, &inputs);
         if let Some(stdin) = &mut stdin {
+            //evaluate expression
+            let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
+            *stdin = if let Ok(value) = do_eval(stdin, None, &inputs, &runtime, ijsr) {
+                serde_yaml::to_string(&value)?.trim().to_owned()
+            } else {
+                stdin.to_string()
+            };
+
+            //handle paths
             path_mapper.add(&stdin)?;
             *stdin = path_mapper
                 .get_guest(&stdin)
