@@ -104,7 +104,7 @@ fn simple_expression_eval(
     map: &HashMap<&str, serde_json::Value>,
 ) -> anyhow::Result<serde_yaml::Value> {
     let mut context = Context::default();
-    
+
     for (key, value) in map {
         let value = JsValue::from_json(value, &mut context).map_err(|e| anyhow::anyhow!("{e}"))?;
         let key = PropertyKey::String(JsString::from_str(key)?);
@@ -302,6 +302,7 @@ fn to_str(value: &serde_yaml::Value) -> String {
         serde_yaml::Value::String(s) => s.to_string(),
         serde_yaml::Value::Number(n) => n.to_string(),
         serde_yaml::Value::Bool(b) => b.to_string(),
+        serde_yaml::Value::Null => "null".to_string(),
         _ => String::new(),
     }
 }
