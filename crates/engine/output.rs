@@ -3,6 +3,7 @@ use cwl_core::{
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
     inputs::DefaultValue,
     outputs::{CommandOutputParameter, CommandOutputParameterType, CommandOutputType},
+    requirements::InlineJavascriptRequirement,
     types::CWLType,
 };
 use dircpy::copy_dir;
@@ -10,12 +11,15 @@ use glob::glob;
 use std::{collections::HashMap, fs, path::Path, process::Command};
 use tracing::info;
 
+use crate::{context::Runtime, expression::do_eval};
+
 pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
     source_dir: &Path,
     dest_dir: &Path,
     stdout_file: &Path,
     stderr_file: &Path,
+    ijsr: Option<&InlineJavascriptRequirement>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
@@ -87,7 +91,45 @@ pub fn collect_command_outputs(
             CommandOutputParameterType::Stderr => {
                 output_map.insert(output_id, handle_file(stderr_file, source_dir, dest_dir)?);
             }
-            _ => todo!(),
+            _ => {
+                if let Some(binding) = &output.output_binding {
+                    if let Some(globs) = &binding.glob {
+                        let glob_ = globs.as_one();
+                        let full_glob = format!("{}/{}", source_dir.display(), glob_);
+
+                        let entry = glob(&full_glob)?.next();
+                        let Some(Ok(entry)) = entry else {
+                            info!(
+                                "Output glob {full_glob} did not match any directories for {output_id}"
+                            );
+                            continue;
+                        };
+                        let contents = fs::read_to_string(&entry)?;
+                        if let Some(expression) = &binding.output_eval {
+                            let mut file = File::new_from_path(&entry)?;
+                            file.contents = Some(contents);
+                            let context = serde_json::to_value(vec![file])?; //could be array also so vec is expected
+                            let value = do_eval(
+                                expression,
+                                Some(context),
+                                &HashMap::new(),
+                                &Runtime::default(),
+                                ijsr,
+                            )?;
+                            output_map.insert(output_id, DefaultValue::Any(value));
+                        } else {
+                            output_map.insert(
+                                output_id,
+                                DefaultValue::Any(serde_yaml::Value::String(contents)),
+                            );
+                        }
+                    } else if let Some(expression) = &binding.output_eval {
+                        let value =
+                            do_eval(expression, None, &HashMap::new(), &Runtime::default(), ijsr)?;
+                        output_map.insert(output_id, DefaultValue::Any(value));
+                    }
+                }
+            }
         }
     }
 

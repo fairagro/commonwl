@@ -1,6 +1,7 @@
 use crate::context::Runtime;
+use boa_engine::{Context, JsString, JsValue, Source, property::PropertyKey};
 use cwl_core::{inputs::DefaultValue, requirements::InlineJavascriptRequirement};
-use std::{collections::HashMap, ops::Range};
+use std::{collections::HashMap, ops::Range, str::FromStr};
 
 #[derive(Debug)]
 enum ExpressionType {
@@ -42,8 +43,12 @@ pub fn do_eval(
 
     let map = HashMap::from([("self", context), ("inputs", inputs), ("runtime", runtime)]);
 
-    if expressions.len() == 1 && expressions[0].indices.start == 0 && ijsr.is_none() {
-        return simple_expression_eval(&expressions[0].expression(), &map);
+    if expressions.len() == 1 && expressions[0].indices.start == 0 {
+        if ijsr.is_none() {
+            return simple_expression_eval(&expressions[0].expression(), &map);
+        } else {
+            return boa_eval(&expressions[0].expression(), &map);
+        }
     }
     //string interpolation
     let v = replace_expressions(expression, expressions, map, ijsr)?;
@@ -59,6 +64,30 @@ fn simple_expression_eval(
     let data = jmespath::Variable::from_serializable(map)?;
     let result = expr.search(data)?;
     Ok(serde_yaml::to_value(&result)?)
+}
+
+fn boa_eval(
+    expression: &str,
+    map: &HashMap<&str, serde_json::Value>,
+) -> anyhow::Result<serde_yaml::Value> {
+    let mut context = Context::default();
+    for (key, value) in map {
+        let value = JsValue::from_json(value, &mut context).map_err(|e| anyhow::anyhow!("{e}"))?;
+        let key = PropertyKey::String(JsString::from_str(key)?);
+        context
+            .global_object()
+            .set(key, value, true, &mut context)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+
+    let result = context
+        .eval(Source::from_bytes(expression))
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let str = &result
+        .to_string(&mut context)
+        .unwrap()
+        .to_std_string_escaped();
+    Ok(serde_yaml::to_value(str)?)
 }
 
 fn replace_expressions(

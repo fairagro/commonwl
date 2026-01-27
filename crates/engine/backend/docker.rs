@@ -87,8 +87,10 @@ impl TaskBackend for DockerBackend {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
 
-        let req = tool.get_requirement_or_hint::<ResourceRequirement>();
-        let mut runtime = build_runtime(req);
+        let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
+        let dr = tool.get_requirement_or_hint::<DockerRequirement>();
+        let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
+        let mut runtime = build_runtime(rr);
         runtime.outdir = request.out_dir.clone();
 
         //handle synthethic directories
@@ -109,7 +111,7 @@ impl TaskBackend for DockerBackend {
 
         //handle docker requirement
         let mut container = "alpine".to_string();
-        if let Some(dr) = tool.get_requirement_or_hint::<DockerRequirement>() {
+        if let Some(dr) = dr {
             if let Some(df) = &dr.docker_file
                 && let Some(dt) = &dr.docker_image_id
             {
@@ -135,7 +137,6 @@ impl TaskBackend for DockerBackend {
         let mut stdin = get_stdin(tool, &inputs);
         if let Some(stdin) = &mut stdin {
             //evaluate expression
-            let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
             *stdin = if let Ok(value) = do_eval(stdin, None, &inputs, &runtime, ijsr) {
                 serde_yaml::to_string(&value)?.trim().to_owned()
             } else {
@@ -264,6 +265,7 @@ impl TaskBackend for DockerBackend {
             &runtime.outdir,
             &stdout_out_file,
             &stderr_out_file,
+            ijsr,
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");
