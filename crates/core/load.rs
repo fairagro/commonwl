@@ -91,7 +91,6 @@ fn extract_schema_definitions(
             }
         }
     }
-
     Ok(schemas)
 }
 
@@ -103,6 +102,14 @@ fn replace_schema_references(
         serde_yaml::Value::String(s) => {
             if s.starts_with('#') && schemas.contains_key(s) {
                 *value = schemas[s].clone();
+            } else if s.contains('#')
+                && let Some(ar) = s.split_once('#')
+            {
+                //by doing this we accept that each id can be given only once!
+                let s = format!("#{}", ar.1);
+                if schemas.contains_key(&s) {
+                    *value = schemas[&s].clone();
+                }
             }
         }
         serde_yaml::Value::Sequence(arr) => {

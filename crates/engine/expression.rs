@@ -198,7 +198,7 @@ fn replace_expressions(
 
     for (i, e) in expressions.iter().enumerate() {
         let expr = &expr[e.indices.clone()];
-        result = result.replace(expr, &serde_json::to_string(&evaluations[i])?);
+        result = result.replace(expr, evaluations[i].as_str().unwrap());
     }
 
     Ok(serde_yaml::to_value(result)?)

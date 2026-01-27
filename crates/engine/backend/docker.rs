@@ -301,6 +301,9 @@ impl TaskBackend for DockerBackend {
         }
 
         // need to collect outputs
+        if !&runtime.outdir.exists() {
+            fs::create_dir_all(&runtime.outdir)?;
+        }
         let outputs = collect_command_outputs(
             &tool.outputs,
             outdir.path(),
