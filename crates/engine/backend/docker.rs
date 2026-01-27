@@ -3,10 +3,11 @@ use crate::{
     command,
     context::build_runtime,
     docker::build_container,
-    expression::do_eval,
+    expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
     output::collect_command_outputs,
     pathmapper::PathMapper,
+    workdir::stage_work_dir,
 };
 use crankshaft::{
     config::backend::docker::Config,
@@ -28,7 +29,10 @@ use cwl_core::{
     docstring,
     documents::CWLDocument,
     files::FileOrDirectory,
-    requirements::{DockerRequirement, InlineJavascriptRequirement, ResourceRequirement},
+    requirements::{
+        DockerRequirement, InitialWorkDirRequirement, InlineJavascriptRequirement,
+        ResourceRequirement,
+    },
 };
 use nonempty::{NonEmpty, nonempty};
 use std::{
@@ -87,9 +91,12 @@ impl TaskBackend for DockerBackend {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
 
+        //get neccessary requirements
         let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
         let dr = tool.get_requirement_or_hint::<DockerRequirement>();
         let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
+        let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
+
         let mut runtime = build_runtime(rr);
         runtime.outdir = request.out_dir.clone();
 
@@ -103,11 +110,7 @@ impl TaskBackend for DockerBackend {
         )?;
 
         //collect command string and correct args for staged paths
-        let mut args = path_mapper.correct_execution_path(command::build_command(
-            tool,
-            &request.inputs,
-            &runtime,
-        )?);
+        let mut args = command::build_command(tool, &request.inputs, &runtime, Some(&path_mapper))?;
 
         //handle docker requirement
         let mut container = "alpine".to_string();
@@ -133,11 +136,21 @@ impl TaskBackend for DockerBackend {
         } else {
             CONTAINER_STDERR_FILE
         };
+
         //correct and add the stdin value
         let mut stdin = get_stdin(tool, &inputs);
         if let Some(stdin) = &mut stdin {
             //evaluate expression
-            *stdin = if let Ok(value) = do_eval(stdin, None, &inputs, &runtime, ijsr) {
+            *stdin = if let Ok(value) = do_eval(
+                stdin,
+                &EvaluationContext {
+                    runtime: Some(&runtime),
+                    inputs: Some(&inputs),
+                    ijsr,
+                    workdir: Some(&request.working_dir),
+                    ..Default::default()
+                },
+            ) {
                 serde_yaml::to_string(&value)?.trim().to_owned()
             } else {
                 stdin.to_string()
@@ -203,6 +216,22 @@ impl TaskBackend for DockerBackend {
             }
         }
 
+        // handle iwdr copy/link to outdir
+        if let Some(iwdr) = iwdr {
+            stage_work_dir(
+                iwdr,
+                &request.working_dir,
+                outdir.path(),
+                &EvaluationContext {
+                    runtime: Some(&runtime),
+                    inputs: Some(&inputs),
+                    ijsr,
+                    workdir: Some(&request.working_dir),
+                    ..Default::default()
+                },
+            )?;
+        }
+
         //add outdir mount
         task.add_input(
             Input::builder()
@@ -244,8 +273,6 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
-        // need to handle iwdr
-
         let status = self.backend.run(task, token)?.await?;
 
         //evaluate stderr/stdout
@@ -266,6 +293,7 @@ impl TaskBackend for DockerBackend {
             &stdout_out_file,
             &stderr_out_file,
             ijsr,
+            &runtime,
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");

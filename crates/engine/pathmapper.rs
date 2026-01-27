@@ -44,6 +44,10 @@ impl PathMapper {
         })
     }
 
+    pub fn base_dir(&self) -> &Path {
+        &self.base_dir
+    }
+
     pub fn correct_execution_path(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
             let pb = PathBuf::from(arg.clone());

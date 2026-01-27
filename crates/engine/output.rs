@@ -11,7 +11,10 @@ use glob::glob;
 use std::{collections::HashMap, fs, path::Path, process::Command};
 use tracing::info;
 
-use crate::{context::Runtime, expression::do_eval};
+use crate::{
+    context::Runtime,
+    expression::{EvaluationContext, do_eval},
+};
 
 pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
@@ -20,6 +23,7 @@ pub fn collect_command_outputs(
     stdout_file: &Path,
     stderr_file: &Path,
     ijsr: Option<&InlineJavascriptRequirement>,
+    runtime: &Runtime,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
@@ -111,10 +115,13 @@ pub fn collect_command_outputs(
                             let context = serde_json::to_value(vec![file])?; //could be array also so vec is expected
                             let value = do_eval(
                                 expression,
-                                Some(context),
-                                &HashMap::new(),
-                                &Runtime::default(),
-                                ijsr,
+                                &EvaluationContext {
+                                    context: Some(&context),
+                                    runtime: Some(runtime),
+                                    ijsr,
+                                    workdir: Some(source_dir),
+                                    ..Default::default()
+                                },
                             )?;
                             output_map.insert(output_id, DefaultValue::Any(value));
                         } else {
@@ -124,8 +131,16 @@ pub fn collect_command_outputs(
                             );
                         }
                     } else if let Some(expression) = &binding.output_eval {
-                        let value =
-                            do_eval(expression, None, &HashMap::new(), &Runtime::default(), ijsr)?;
+                        let value = do_eval(
+                            expression,
+                            &EvaluationContext {
+                                context: None,
+                                runtime: Some(runtime),
+                                workdir: Some(source_dir),
+                                ijsr,
+                                ..Default::default()
+                            },
+                        )?;
                         output_map.insert(output_id, DefaultValue::Any(value));
                     }
                 }

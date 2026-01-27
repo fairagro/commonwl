@@ -210,7 +210,7 @@ pub struct Dirent {
     pub entry: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    pub entry_name: Option<String>,
+    pub entryname: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub writable: Option<bool>,

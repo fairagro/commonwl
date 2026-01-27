@@ -1,4 +1,9 @@
-use crate::{context::Runtime, expression, input::collect_inputs, input::validate_command_input};
+use crate::{
+    context::Runtime,
+    expression::{self, EvaluationContext},
+    input::{collect_inputs, validate_command_input},
+    pathmapper::PathMapper,
+};
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CWLDocument, CommandLineTool},
@@ -28,6 +33,7 @@ pub fn build_command(
     tool: &CommandLineTool,
     inputs: &HashMap<String, serde_yaml::Value>,
     runtime: &Runtime,
+    path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     let mut args: Vec<String> = vec![];
 
@@ -127,9 +133,9 @@ pub fn build_command(
         let mut cmd = vec![];
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, &values, runtime, ijsr)?
+                use_value_from(&bound.binding, &values, runtime, ijsr, path_mapper)?
             } else {
-                generate_arg(&bound.binding, bound.value, runtime, ijsr)?
+                generate_arg(&bound.binding, bound.value, runtime, ijsr, path_mapper)?
             };
 
             if bound.binding.shell_quote.unwrap_or(true) {
@@ -143,9 +149,9 @@ pub fn build_command(
     } else {
         for bound in bindings {
             let arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, &values, runtime, ijsr)?
+                use_value_from(&bound.binding, &values, runtime, ijsr, path_mapper)?
             } else {
-                generate_arg(&bound.binding, bound.value, runtime, ijsr)?
+                generate_arg(&bound.binding, bound.value, runtime, ijsr, path_mapper)?
             };
             args.extend(arg);
         }
@@ -153,6 +159,11 @@ pub fn build_command(
 
     //remove empty args
     args.retain(|s| !s.is_empty());
+
+    //correct paths
+    if let Some(path_mapper) = path_mapper {
+        args = path_mapper.correct_execution_path(args);
+    }
 
     Ok(args)
 }
@@ -329,6 +340,7 @@ pub(crate) fn generate_arg(
     mut value: DefaultValue,
     runtime: &Runtime,
     ijsr: Option<&InlineJavascriptRequirement>,
+    path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     let sep = binding.separate.unwrap_or(true);
 
@@ -337,8 +349,16 @@ pub(crate) fn generate_arg(
     }
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
-        let result =
-            expression::do_eval(value_from, Some(json_value), &HashMap::new(), runtime, ijsr)?;
+        let result = expression::do_eval(
+            value_from,
+            &EvaluationContext {
+                context: Some(&json_value),
+                runtime: Some(runtime),
+                ijsr,
+                workdir: path_mapper.map(|m| m.base_dir()),
+                ..Default::default()
+            },
+        )?;
         value = serde_yaml::from_value(result)?;
     }
     let mut argl = vec![];
@@ -412,12 +432,22 @@ fn use_value_from(
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
     ijsr: Option<&InlineJavascriptRequirement>,
+    path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     //evaluate first
     let mut value = binding.value_from.clone().unwrap_or_default();
 
     //try to evaluate expression
-    if let Ok(result) = expression::do_eval(&value, None, inputs, runtime, ijsr) {
+    if let Ok(result) = expression::do_eval(
+        &value,
+        &EvaluationContext {
+            inputs: Some(inputs),
+            runtime: Some(runtime),
+            ijsr,
+            workdir: path_mapper.map(|m| m.base_dir()),
+            ..Default::default()
+        },
+    ) {
         let dv: DefaultValue = serde_yaml::from_value(result)?;
         value = to_str(&dv);
     }
@@ -514,7 +544,7 @@ stdout: output.txt";
 }"#;
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
         let cmdline = cmd.join(" ");
         assert_eq!(cmdline, "cat hello.txt");
     }
@@ -544,7 +574,7 @@ stdout: output.txt"#;
         let tool = &serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
 
         let shell_cmd = get_shell_command();
 
@@ -565,7 +595,7 @@ stdout: output.txt"#;
             cores: 69,
             ..Default::default()
         };
-        let mut cmd = build_command(tool, &input_values, &runtime).unwrap();
+        let mut cmd = build_command(tool, &input_values, &runtime, None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -593,7 +623,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -623,7 +653,7 @@ stdout: output.txt"#;
         let inputs = include_str!("../../testdata/cwl/tests/tmap-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
 
-        let mut cmd = build_command(&tool, &input_values, &Runtime::default()).unwrap();
+        let mut cmd = build_command(&tool, &input_values, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -664,7 +694,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -680,7 +710,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -693,7 +723,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, vec!["cat", "hello.txt"]);
@@ -706,7 +736,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default()).unwrap();
+        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -717,7 +747,7 @@ stdout: output.txt"#;
         let b = CommandLineBinding::builder().build(); //all none
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["foo"]);
     }
 
@@ -729,7 +759,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--opt", "foo"]);
     }
 
@@ -741,7 +771,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--opt=foo"]);
     }
 
@@ -757,7 +787,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--list", "a,b,c"]);
     }
 
@@ -770,7 +800,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--list"]); //values need to be added recursively respecting the CommandLineBinding of their input schema
     }
 
@@ -802,13 +832,13 @@ stdout: output.txt"#;
                 serde_yaml::Value::String("b".into()),
                 serde_yaml::Value::String("c".into()),
             ]));
-            let mut res = generate_arg(&b, v.clone(), &Runtime::default(), None).unwrap(); //generates only -Y
+            let mut res = generate_arg(&b, v.clone(), &Runtime::default(), None, None).unwrap(); //generates only -Y
             if let Some(inner_b) = &array_schema.input_binding {
                 if let Some(serde_yaml::Value::Sequence(vec)) = v.try_get_value_ref() {
                     for inner_v in vec {
                         //re-serde
                         let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
-                        res.extend(generate_arg(inner_b, v, &Runtime::default(), None).unwrap());
+                        res.extend(generate_arg(inner_b, v, &Runtime::default(), None, None).unwrap());
                     }
                 }
             } else {

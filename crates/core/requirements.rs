@@ -107,7 +107,20 @@ impl FromShortHand for WorkflowHints {}
 #[serde(rename_all = "camelCase")]
 pub struct InlineJavascriptRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expression_lib: Option<Vec<String>>,
+    pub expression_lib: Option<Vec<ExpressionLibItem>>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[serde(untagged)]
+pub enum ExpressionLibItem {
+    Include(Include),
+    Expression(String),
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash)]
+pub struct Include {
+    #[serde(rename = "$include")]
+    pub include: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
@@ -183,7 +196,7 @@ pub enum WorkDirItems {
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct InitialWorkDirRequirement {
-    listing: WorkDirItems,
+    pub listing: WorkDirItems,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
@@ -324,6 +337,34 @@ mod tests {
 
         let contents = include_str!("../../testdata/tool_requirements_list.yaml");
         let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_mixed() {
+        let contents = r#"
+        requirements:
+          - class: InitialWorkDirRequirement
+            listing:
+              - entryname: foo.txt
+                entry: $(t("The file is <%= data.inputs.file1.path.split('/').slice(-1)[0] %>\n"))
+          - class: InlineJavascriptRequirement
+            expressionLib:
+              - { $include: underscore.js }
+              - "var t = function(s) { return _.template(s, {variable: 'data'})({'inputs': inputs}); };"
+        "#;
+        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_ijsr_mixed_items() {
+        let contents = r#"        
+        expressionLib:
+          - { $include: underscore.js }
+          - "var t = function(s) { return _.template(s, {variable: 'data'})({'inputs': inputs}); };"
+        "#;
+        let res = serde_yaml::from_str::<InlineJavascriptRequirement>(contents);
         assert!(res.is_ok());
     }
 }

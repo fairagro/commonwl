@@ -1,7 +1,19 @@
 use crate::context::Runtime;
 use boa_engine::{Context, JsString, JsValue, Source, property::PropertyKey};
-use cwl_core::{inputs::DefaultValue, requirements::InlineJavascriptRequirement};
-use std::{collections::HashMap, ops::Range, str::FromStr};
+use cwl_core::{
+    inputs::DefaultValue,
+    requirements::{ExpressionLibItem, InlineJavascriptRequirement},
+};
+use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
+
+#[derive(Debug, Default)]
+pub struct EvaluationContext<'a> {
+    pub context: Option<&'a serde_json::Value>,
+    pub inputs: Option<&'a HashMap<String, DefaultValue>>,
+    pub runtime: Option<&'a Runtime>,
+    pub ijsr: Option<&'a InlineJavascriptRequirement>,
+    pub workdir: Option<&'a Path>,
+}
 
 #[derive(Debug)]
 enum ExpressionType {
@@ -26,32 +38,38 @@ impl Expression {
 
 pub fn do_eval(
     expression: &str,
-    context: Option<serde_json::Value>,
-    inputs: &HashMap<String, DefaultValue>,
-    runtime: &Runtime,
-    ijsr: Option<&InlineJavascriptRequirement>,
+    eval_context: &EvaluationContext,
 ) -> anyhow::Result<serde_yaml::Value> {
     let expressions = parse_expressions(expression);
     if expressions.is_empty() {
         anyhow::bail!("No Expression")
     }
 
-    let context = context.unwrap_or_default();
+    let context = eval_context.context.unwrap_or_default();
 
-    let inputs = serde_json::to_value(inputs)?;
-    let runtime = serde_json::to_value(runtime)?;
+    let inputs = serde_json::to_value(eval_context.inputs)?;
+    let runtime = serde_json::to_value(eval_context.runtime)?;
 
-    let map = HashMap::from([("self", context), ("inputs", inputs), ("runtime", runtime)]);
+    let map = HashMap::from([
+        ("self", context.clone()),
+        ("inputs", inputs),
+        ("runtime", runtime),
+    ]);
 
     if expressions.len() == 1 && expressions[0].indices.start == 0 {
-        if ijsr.is_none() {
-            return simple_expression_eval(&expressions[0].expression(), &map);
+        if let Some(ijsr) = eval_context.ijsr {
+            return boa_eval(
+                &expressions[0].expression(),
+                &map,
+                ijsr,
+                eval_context.workdir,
+            );
         } else {
-            return boa_eval(&expressions[0].expression(), &map);
+            return simple_expression_eval(&expressions[0].expression(), &map);
         }
     }
     //string interpolation
-    let v = replace_expressions(expression, expressions, map, ijsr)?;
+    let v = replace_expressions(expression, expressions, map, eval_context.ijsr)?;
     Ok(v)
 }
 
@@ -69,6 +87,8 @@ fn simple_expression_eval(
 fn boa_eval(
     expression: &str,
     map: &HashMap<&str, serde_json::Value>,
+    ijsr: &InlineJavascriptRequirement,
+    workdir: Option<&Path>,
 ) -> anyhow::Result<serde_yaml::Value> {
     let mut context = Context::default();
     for (key, value) in map {
@@ -79,6 +99,26 @@ fn boa_eval(
             .set(key, value, true, &mut context)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
     }
+    //handle expressionlib
+    let workdir = workdir.unwrap_or(Path::new("."));
+    if let Some(lib) = &ijsr.expression_lib {
+        for item in lib {
+            match item {
+                ExpressionLibItem::Include(include) => {
+                    let include = &include.include;
+                    let contents = fs::read_to_string(workdir.join(include))?;
+                    context
+                        .eval(Source::from_bytes(&contents))
+                        .map_err(|e| anyhow::anyhow!("{e}"))?;
+                }
+                ExpressionLibItem::Expression(expr) => {
+                    context
+                        .eval(Source::from_bytes(expr))
+                        .map_err(|e| anyhow::anyhow!("{e}"))?;
+                }
+            };
+        }
+    }
 
     let result = context
         .eval(Source::from_bytes(expression))
@@ -86,7 +126,7 @@ fn boa_eval(
     let mut json = result
         .to_json(&mut context)
         .map_err(|e| anyhow::anyhow!("{e}"))?;
-    
+
     if let Some(value) = &mut json {
         normalize_json_numbers(value);
     }
@@ -217,7 +257,7 @@ mod tests {
     #[test]
     fn test_parse_expressions() {
         let input = "$(runtime.tmpdir)";
-        let result = do_eval(input, None, &HashMap::new(), &Runtime::default(), None).unwrap();
+        let result = do_eval(input, &Default::default()).unwrap();
         let str = serde_yaml::to_string(&result).unwrap();
         assert_eq!(str.trim(), ".");
     }
