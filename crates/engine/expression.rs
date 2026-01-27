@@ -83,11 +83,40 @@ fn boa_eval(
     let result = context
         .eval(Source::from_bytes(expression))
         .map_err(|e| anyhow::anyhow!("{e}"))?;
-    let str = &result
-        .to_string(&mut context)
-        .unwrap()
-        .to_std_string_escaped();
-    Ok(serde_yaml::to_value(str)?)
+    let mut json = result
+        .to_json(&mut context)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    
+    if let Some(value) = &mut json {
+        normalize_json_numbers(value);
+    }
+
+    Ok(serde_yaml::to_value(json)?)
+}
+
+fn normalize_json_numbers(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Number(n) => {
+            if let Some(f) = n.as_f64()
+                && f.is_finite()
+                && f.fract() == 0.0
+                && f.abs() <= i64::MAX as f64
+            {
+                *value = serde_json::Value::Number(serde_json::Number::from(f as i64));
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                normalize_json_numbers(item);
+            }
+        }
+        serde_json::Value::Object(obj) => {
+            for (_, v) in obj {
+                normalize_json_numbers(v);
+            }
+        }
+        _ => {}
+    }
 }
 
 fn replace_expressions(
