@@ -1,7 +1,8 @@
-use crate::expression::{EvaluationContext, do_eval};
+use crate::expression::{EvaluationContext, do_eval, do_eval_to_string};
 use cwl_core::{
     OneOrMany,
-    files::Dirent,
+    files::{Dirent, FileOrDirectory},
+    inputs::DefaultValue,
     requirements::{InitialWorkDirRequirement, ListingItems, WorkDirItems},
 };
 use std::{fs, path::Path};
@@ -42,15 +43,32 @@ fn stage_item(
 
 fn stage_dirent(
     dirent: &Dirent,
-    _workdir: &Path,
+    workdir: &Path,
     stagedir: &Path,
     context: &EvaluationContext,
 ) -> anyhow::Result<()> {
     //evaluate expression if so
     let evaluated_content = do_eval(&dirent.entry, context)?;
-    let string_content = evaluated_content.as_str().unwrap();
-    
+
+    //parse to DefaultValue
+    let dv: DefaultValue = serde_yaml::from_value(evaluated_content)?;
+
+    let string_content = match dv {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+            if let Some(contents) = file.contents {
+                contents.to_string()
+            } else {
+                fs::read_to_string(workdir.join(file.path.unwrap()))?
+            }
+        }
+        DefaultValue::Any(value) => value.as_str().unwrap().to_string(),
+        _ => unimplemented!(),
+    };
+
+    let entryname = dirent.clone().entryname.unwrap();
+    let entryname = do_eval_to_string(&entryname, context);
+
     //create the file
-    fs::write(stagedir.join(dirent.entryname.clone().unwrap()), string_content)?;
+    fs::write(stagedir.join(entryname), string_content)?;
     Ok(())
 }

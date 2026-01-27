@@ -307,8 +307,13 @@ impl TaskBackend for DockerBackend {
             &runtime.outdir,
             &stdout_out_file,
             &stderr_out_file,
-            ijsr,
-            &runtime,
+            &EvaluationContext {
+                ijsr,
+                inputs: Some(&inputs),
+                runtime: Some(&runtime),
+                workdir: Some(&request.working_dir),
+                ..Default::default()
+            },
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");

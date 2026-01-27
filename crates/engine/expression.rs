@@ -6,13 +6,25 @@ use cwl_core::{
 };
 use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct EvaluationContext<'a> {
     pub context: Option<&'a serde_json::Value>,
     pub inputs: Option<&'a HashMap<String, DefaultValue>>,
     pub runtime: Option<&'a Runtime>,
     pub ijsr: Option<&'a InlineJavascriptRequirement>,
     pub workdir: Option<&'a Path>,
+}
+
+impl<'a> EvaluationContext<'a> {
+    pub fn with_context(self, context: &'a serde_json::Value) -> EvaluationContext<'a> {
+        Self {
+            context: Some(context),
+            inputs: self.inputs,
+            runtime: self.runtime,
+            ijsr: self.ijsr,
+            workdir: self.workdir,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -33,6 +45,14 @@ impl Expression {
             ExpressionType::Paren => self.expression.clone(),
             ExpressionType::Bracket => format!("(() => {{{}}})();", self.expression),
         }
+    }
+}
+
+pub fn do_eval_to_string(expression: &str, eval_context: &EvaluationContext) -> String {
+    if let Ok(res) = do_eval(expression, eval_context) {
+        res.as_str().unwrap().to_string()
+    } else {
+        expression.to_string()
     }
 }
 

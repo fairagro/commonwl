@@ -3,7 +3,6 @@ use cwl_core::{
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
     inputs::DefaultValue,
     outputs::{CommandOutputParameter, CommandOutputParameterType, CommandOutputType},
-    requirements::InlineJavascriptRequirement,
     types::CWLType,
 };
 use dircpy::copy_dir;
@@ -11,10 +10,7 @@ use glob::glob;
 use std::{collections::HashMap, fs, path::Path, process::Command};
 use tracing::info;
 
-use crate::{
-    context::Runtime,
-    expression::{EvaluationContext, do_eval},
-};
+use crate::expression::{EvaluationContext, do_eval, do_eval_to_string};
 
 pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
@@ -22,8 +18,7 @@ pub fn collect_command_outputs(
     dest_dir: &Path,
     stdout_file: &Path,
     stderr_file: &Path,
-    ijsr: Option<&InlineJavascriptRequirement>,
-    runtime: &Runtime,
+    context: &EvaluationContext,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
@@ -62,6 +57,7 @@ pub fn collect_command_outputs(
                     && let Some(globs) = &binding.glob
                 {
                     let glob_ = globs.as_one();
+                    let glob_ = do_eval_to_string(glob_, context);
                     let full_glob = format!("{}/{}", source_dir.display(), glob_);
                     let entry = glob(&full_glob)?.next();
                     let Some(Ok(item)) = entry else {
@@ -78,6 +74,7 @@ pub fn collect_command_outputs(
                     && let Some(globs) = &binding.glob
                 {
                     let glob_ = globs.as_one();
+                    let glob_ = do_eval_to_string(glob_, context);
                     let full_glob = format!("{}/{}", source_dir.display(), glob_);
                     let entry = glob(&full_glob)?.next();
                     let Some(Ok(item)) = entry else {
@@ -99,6 +96,7 @@ pub fn collect_command_outputs(
                 if let Some(binding) = &output.output_binding {
                     if let Some(globs) = &binding.glob {
                         let glob_ = globs.as_one();
+                        let glob_ = do_eval_to_string(glob_, context);
                         let full_glob = format!("{}/{}", source_dir.display(), glob_);
 
                         let entry = glob(&full_glob)?.next();
@@ -112,17 +110,9 @@ pub fn collect_command_outputs(
                         if let Some(expression) = &binding.output_eval {
                             let mut file = File::new_from_path(&entry)?;
                             file.contents = Some(contents);
-                            let context = serde_json::to_value(vec![file])?; //could be array also so vec is expected
-                            let value = do_eval(
-                                expression,
-                                &EvaluationContext {
-                                    context: Some(&context),
-                                    runtime: Some(runtime),
-                                    ijsr,
-                                    workdir: Some(source_dir),
-                                    ..Default::default()
-                                },
-                            )?;
+                            let file_value = serde_json::to_value(vec![file])?; //could be array also so vec is expected
+                            let value =
+                                do_eval(expression, &context.clone().with_context(&file_value))?;
                             output_map.insert(output_id, DefaultValue::Any(value));
                         } else {
                             output_map.insert(
@@ -131,16 +121,7 @@ pub fn collect_command_outputs(
                             );
                         }
                     } else if let Some(expression) = &binding.output_eval {
-                        let value = do_eval(
-                            expression,
-                            &EvaluationContext {
-                                context: None,
-                                runtime: Some(runtime),
-                                workdir: Some(source_dir),
-                                ijsr,
-                                ..Default::default()
-                            },
-                        )?;
+                        let value = do_eval(expression, context)?;
                         output_map.insert(output_id, DefaultValue::Any(value));
                     }
                 }
