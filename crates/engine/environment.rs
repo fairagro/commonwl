@@ -1,4 +1,8 @@
-use crate::input::InputObject;
+use crate::{
+    expression::{EvaluationContext, do_eval},
+    input::InputObject,
+};
+use anyhow::Context;
 use cwl_core::requirements::EnvVarRequirement;
 use indexmap::IndexMap;
 
@@ -8,4 +12,31 @@ pub fn build_environment(input_values: &InputObject) -> IndexMap<String, String>
     } else {
         IndexMap::new()
     }
+}
+
+pub fn handle_environment(
+    input_env: IndexMap<String, String>,
+    evr: Option<&EnvVarRequirement>,
+    eval_context: &EvaluationContext,
+) -> anyhow::Result<IndexMap<String, String>> {
+    let mut environment = input_env;
+    for value in &mut environment.values_mut() {
+        *value = eval_as_string(value, eval_context)?;
+    }
+
+    if let Some(evr) = evr {
+        for item in &evr.env_def {
+            let parsed_value = eval_as_string(&item.env_value, eval_context)?;
+            environment.insert(item.env_name.clone(), parsed_value.to_string());
+        }
+    }
+
+    Ok(environment)
+}
+
+fn eval_as_string(value: &str, context: &EvaluationContext) -> anyhow::Result<String> {
+    do_eval(value, context)?
+        .as_str()
+        .context("Expected string value")
+        .map(ToString::to_string)
 }

@@ -3,6 +3,7 @@ use crate::{
     command,
     context::build_runtime,
     docker::build_container,
+    environment::handle_environment,
     expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
     output::collect_command_outputs,
@@ -30,8 +31,8 @@ use cwl_core::{
     documents::CWLDocument,
     files::FileOrDirectory,
     requirements::{
-        DockerRequirement, InitialWorkDirRequirement, InlineJavascriptRequirement,
-        ResourceRequirement,
+        DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
+        InlineJavascriptRequirement, ResourceRequirement,
     },
 };
 use nonempty::{NonEmpty, nonempty};
@@ -96,6 +97,7 @@ impl TaskBackend for DockerBackend {
         let dr = tool.get_requirement_or_hint::<DockerRequirement>();
         let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
         let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
+        let evr = tool.get_requirement::<EnvVarRequirement>();
 
         let mut runtime = build_runtime(rr);
         runtime.outdir = request.out_dir.clone();
@@ -166,6 +168,19 @@ impl TaskBackend for DockerBackend {
             args.push(stdin.to_string());
         }
 
+        //evalute environment expressions
+        let environment = handle_environment(
+            request.environment.clone(),
+            evr,
+            &EvaluationContext {
+                inputs: Some(&inputs),
+                runtime: Some(&runtime),
+                workdir: Some(&request.working_dir),
+                ijsr,
+                ..Default::default()
+            },
+        )?;
+
         info!("Executing: {}", args.join(" "));
 
         //build crankshaft task object
@@ -175,7 +190,7 @@ impl TaskBackend for DockerBackend {
             .executions(nonempty![
                 Execution::builder()
                     .work_dir(CONTAINER_WORKDIR)
-                    .env(request.environment.clone())
+                    .env(environment)
                     .program(&args[0])
                     .args(&args[1..])
                     .image(container)
