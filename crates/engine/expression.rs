@@ -255,9 +255,34 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_expression() {
+        let expression = "$(parseInt(\"161\"))";
+        let result = do_eval(
+            expression,
+            &EvaluationContext {
+                ijsr: Some(&InlineJavascriptRequirement::default()),
+                ..Default::default()
+            },
+        )
+        .unwrap_or_default()
+        .as_u64()
+        .unwrap_or_default();
+
+        assert_eq!(result, 161);
+    }
+
+    #[test]
     fn test_parse_expressions() {
         let input = "$(runtime.tmpdir)";
-        let result = do_eval(input, &Default::default()).unwrap();
+        let runtime = Runtime::default();
+        let result = do_eval(
+            input,
+            &EvaluationContext {
+                runtime: Some(&runtime),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         let str = serde_yaml::to_string(&result).unwrap();
         assert_eq!(str.trim(), ".");
     }
