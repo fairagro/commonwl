@@ -35,8 +35,8 @@ fn stage_item(
     match item {
         ListingItems::Expression(_) => todo!(),
         ListingItems::Dirent(dirent) => stage_dirent(dirent, workdir, stagedir, context),
-        ListingItems::FileOrDirectory(file_or_directory) => todo!(),
-        ListingItems::Vec(items) => todo!(),
+        ListingItems::FileOrDirectory(_file_or_directory) => todo!(),
+        ListingItems::Vec(_items) => todo!(),
     }
 }
 
@@ -46,8 +46,11 @@ fn stage_dirent(
     stagedir: &Path,
     context: &EvaluationContext,
 ) -> anyhow::Result<()> {
+    //evaluate expression if so
     let evaluated_content = do_eval(&dirent.entry, context)?;
     let string_content = evaluated_content.as_str().unwrap();
+    
+    //create the file
     fs::write(stagedir.join(dirent.entryname.clone().unwrap()), string_content)?;
     Ok(())
 }
