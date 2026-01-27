@@ -5,7 +5,9 @@ use crate::{
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
 };
 use anyhow::Ok;
-use cwl_core::{documents::CWLDocument, files::FileOrDirectory, load_cwl_file};
+use cwl_core::{
+    documents::CWLDocument, files::FileOrDirectory, inputs::DefaultValue, load_cwl_file,
+};
 use dircpy::copy_dir;
 use indexmap::IndexMap;
 use nonempty::NonEmpty;
@@ -24,7 +26,15 @@ pub trait TaskBackend {
         &self,
         request: &ExecutionRequest,
         token: CancellationToken,
-    ) -> impl Future<Output = anyhow::Result<NonEmpty<ExitStatus>>> + Send;
+    ) -> impl Future<Output = anyhow::Result<ExecutionResult>> + Send;
+}
+#[derive(Debug, Clone)]
+
+pub struct ExecutionResult {
+    pub exit_status: NonEmpty<ExitStatus>,
+    pub stdout: String,
+    pub stderr: String,
+    pub outputs: HashMap<String, DefaultValue>,
 }
 
 #[derive(Debug, Clone)]

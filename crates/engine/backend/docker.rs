@@ -1,5 +1,5 @@
 use crate::{
-    backend::{ExecutionRequest, TaskBackend, handle_synthetic_directories},
+    backend::{ExecutionRequest, ExecutionResult, TaskBackend, handle_synthetic_directories},
     command,
     context::build_runtime,
     docker::build_container,
@@ -35,11 +35,10 @@ use cwl_core::{
         InlineJavascriptRequirement, ResourceRequirement,
     },
 };
-use nonempty::{NonEmpty, nonempty};
+use nonempty::nonempty;
 use std::{
     fs,
     path::Path,
-    process::ExitStatus,
     sync::{Arc, Mutex},
 };
 use tempfile::tempdir;
@@ -80,7 +79,7 @@ impl TaskBackend for DockerBackend {
         &self,
         request: &ExecutionRequest,
         token: CancellationToken,
-    ) -> anyhow::Result<NonEmpty<ExitStatus>> {
+    ) -> anyhow::Result<ExecutionResult> {
         let inputs = collect_inputs(&request.specification, &request.inputs)?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
@@ -288,7 +287,7 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
-        let status = self.backend.run(task, token)?.await?;
+        let exit_status = self.backend.run(task, token)?.await?;
 
         //evaluate stderr/stdout
         let stdout = fs::read_to_string(&stdout_out_file)?;
@@ -323,7 +322,12 @@ impl TaskBackend for DockerBackend {
 
         //evaluate exitstatus based on tool's expected exit codes
 
-        Ok(status)
+        Ok(ExecutionResult {
+            exit_status,
+            stdout,
+            stderr,
+            outputs,
+        })
     }
 }
 

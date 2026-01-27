@@ -1,7 +1,11 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::backend::{TaskBackend, docker::DockerBackend, load_execution_context};
 use crankshaft::config::backend::docker::Config;
-use std::{env, path::{Path, PathBuf}, process::exit};
+use std::{
+    env,
+    path::{Path, PathBuf},
+    process::exit,
+};
 use tokio_util::sync::CancellationToken;
 
 #[tokio::main]
@@ -23,8 +27,8 @@ async fn main() -> anyhow::Result<()> {
     let backend = DockerBackend::new(config).await?;
     let request = load_execution_context(spec_path, job_path, Some(outdir))?;
     let cancellation_token = CancellationToken::new();
-    let exit_status = backend.run(&request, cancellation_token).await?;
-
+    let result = backend.run(&request, cancellation_token).await?;
+    let exit_status = result.exit_status;
     exit(exit_status.first().code().unwrap())
 }
 
