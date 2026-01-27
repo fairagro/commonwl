@@ -16,6 +16,8 @@ pub enum CWLType {
     File,
     #[serde(rename = "Directory")]
     Directory,
+    #[serde(rename = "Any")]
+    Any
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]

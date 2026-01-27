@@ -78,7 +78,7 @@ pub fn do_eval(
 
     if expressions.len() == 1 && expressions[0].indices.start == 0 {
         if let Some(ijsr) = eval_context.ijsr {
-            return boa_eval(
+            return js_eval(
                 &expressions[0].expression(),
                 &map,
                 ijsr,
@@ -89,7 +89,13 @@ pub fn do_eval(
         }
     }
     //string interpolation
-    let v = replace_expressions(expression, expressions, map, eval_context.ijsr)?;
+    let v = replace_expressions(
+        expression,
+        expressions,
+        map,
+        eval_context.ijsr,
+        eval_context.workdir,
+    )?;
     Ok(v)
 }
 
@@ -97,14 +103,32 @@ fn simple_expression_eval(
     expression: &str,
     map: &HashMap<&str, serde_json::Value>,
 ) -> anyhow::Result<serde_yaml::Value> {
-    //simple engine uses jmespath
-    let expr = jmespath::compile(expression)?;
-    let data = jmespath::Variable::from_serializable(map)?;
-    let result = expr.search(data)?;
-    Ok(serde_yaml::to_value(&result)?)
+    let mut context = Context::default();
+    
+    for (key, value) in map {
+        let value = JsValue::from_json(value, &mut context).map_err(|e| anyhow::anyhow!("{e}"))?;
+        let key = PropertyKey::String(JsString::from_str(key)?);
+        context
+            .global_object()
+            .set(key, value, true, &mut context)
+            .map_err(|e| anyhow::anyhow!("{e}"))?;
+    }
+
+    let result = context
+        .eval(Source::from_bytes(expression))
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    let mut json = result
+        .to_json(&mut context)
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+
+    if let Some(value) = &mut json {
+        normalize_json_numbers(value);
+    }
+
+    Ok(serde_yaml::to_value(json)?)
 }
 
-fn boa_eval(
+fn js_eval(
     expression: &str,
     map: &HashMap<&str, serde_json::Value>,
     ijsr: &InlineJavascriptRequirement,
@@ -184,21 +208,24 @@ fn replace_expressions(
     expressions: Vec<Expression>,
     map: HashMap<&str, serde_json::Value>,
     ijsr: Option<&InlineJavascriptRequirement>,
+    workdir: Option<&Path>,
 ) -> anyhow::Result<serde_yaml::Value> {
-    if ijsr.is_some() {
-        todo!()
-    }
-
     let evaluations = expressions
         .iter()
-        .map(|e| simple_expression_eval(&e.expression(), &map))
+        .map(|e| {
+            if let Some(ijsr) = ijsr {
+                js_eval(&e.expression(), &map, ijsr, workdir)
+            } else {
+                simple_expression_eval(&e.expression(), &map)
+            }
+        })
         .collect::<anyhow::Result<Vec<serde_yaml::Value>>>()?;
 
     let mut result = expr.to_string();
 
     for (i, e) in expressions.iter().enumerate() {
         let expr = &expr[e.indices.clone()];
-        result = result.replace(expr, evaluations[i].as_str().unwrap());
+        result = result.replace(expr, &to_str(&evaluations[i]));
     }
 
     Ok(serde_yaml::to_value(result)?)
@@ -268,6 +295,15 @@ fn split_ranges(s: &str, delim: char) -> Vec<(usize, usize)> {
     }
 
     slices
+}
+
+fn to_str(value: &serde_yaml::Value) -> String {
+    match value {
+        serde_yaml::Value::String(s) => s.to_string(),
+        serde_yaml::Value::Number(n) => n.to_string(),
+        serde_yaml::Value::Bool(b) => b.to_string(),
+        _ => String::new(),
+    }
 }
 
 #[cfg(test)]

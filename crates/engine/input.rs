@@ -300,6 +300,7 @@ fn validate_cwl_type(r#type: CWLType, value: &DefaultValue) -> bool {
             CWLType::Float => value.is_f64(),
             CWLType::Double => value.is_f64(),
             CWLType::String => value.is_string(),
+            CWLType::Any => true,
             _ => false,
         },
     }
