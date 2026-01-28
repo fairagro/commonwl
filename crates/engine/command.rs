@@ -144,6 +144,11 @@ pub fn build_command(
             }
             cmd.extend(arg);
         }
+        //correct paths before joining them
+        if let Some(path_mapper) = path_mapper {
+            cmd = path_mapper.correct_execution_path(cmd);
+        }
+
         let cmdline = cmd.join(" ");
         args.extend(get_shell_command());
         args.push(cmdline);
@@ -158,13 +163,13 @@ pub fn build_command(
         }
     }
 
-    //remove empty args
-    args.retain(|s| !s.is_empty());
-
     //correct paths
     if let Some(path_mapper) = path_mapper {
         args = path_mapper.correct_execution_path(args);
     }
+
+    //remove empty args
+    args.retain(|s| !s.is_empty());
 
     Ok(args)
 }

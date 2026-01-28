@@ -239,18 +239,18 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
         DefaultValue::FileOrDirectory(fod) => {
             flattened.push(fod.clone());
         }
-        DefaultValue::Any(__v__) => match __v__ {
-            serde_yaml::Value::Sequence(__values__) => {
-                for __v__ in __values__ {
-                    if let Ok(__dv__) = serde_yaml::from_value(__v__.clone()) {
-                        flatten_inputs_impl(&__dv__, flattened);
+        DefaultValue::Any(v) => match v {
+            serde_yaml::Value::Sequence(values) => {
+                for v in values {
+                    if let Ok(dv) = serde_yaml::from_value(v.clone()) {
+                        flatten_inputs_impl(&dv, flattened);
                     }
                 }
             }
-            serde_yaml::Value::Mapping(__mapping__) => {
-                for v in __mapping__.values() {
-                    if let Ok(__dv__) = serde_yaml::from_value(v.clone()) {
-                        flatten_inputs_impl(&__dv__, flattened);
+            serde_yaml::Value::Mapping(mapping) => {
+                for v in mapping.values() {
+                    if let Ok(dv) = serde_yaml::from_value(v.clone()) {
+                        flatten_inputs_impl(&dv, flattened);
                     }
                 }
             }
@@ -325,11 +325,17 @@ fn validate_record_schema(schema: &InputRecordSchema, value: &DefaultValue) -> b
             let key = serde_yaml::Value::String(f.name.clone());
             if let Some(field_value) = mapping.get(&key) {
                 match &f.r#type {
-                    OneOrMany::One(item) => {
-                        validate_input_type(item, &DefaultValue::Any(field_value.clone()))
-                    }
+                    OneOrMany::One(item) => validate_input_type(
+                        item,
+                        &serde_yaml::from_value(field_value.clone())
+                            .expect("DefaultValue violates itself"),
+                    ),
                     OneOrMany::Many(items) => items.iter().any(|item| {
-                        validate_input_type(item, &DefaultValue::Any(field_value.clone()))
+                        validate_input_type(
+                            item,
+                            &serde_yaml::from_value(field_value.clone())
+                                .expect("DefaultValue violates itself"),
+                        )
                     }),
                 }
             } else {

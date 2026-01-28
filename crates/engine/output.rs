@@ -113,6 +113,7 @@ pub fn collect_command_outputs(
                 }
             }
             _ => {
+                //todo handle records and stuff
                 if let Some(binding) = &output.output_binding {
                     if let Some(globs) = &binding.glob {
                         let glob_ = globs.as_one();
