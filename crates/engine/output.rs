@@ -158,7 +158,9 @@ fn collect_item(
             CommandOutputSchema::Record(rec) => {
                 collect_record_schema_item(output, rec, source_dir, dest_dir, context, namespaces)
             }
-            CommandOutputSchema::Array(_) => todo!(),
+            CommandOutputSchema::Array(arr) => {
+                collect_array_schema_item(output, arr, source_dir, dest_dir, context, namespaces)
+            }
             CommandOutputSchema::Enum(_) => todo!(),
         },
         CommandOutputType::String(_) => todo!(),
@@ -208,6 +210,39 @@ fn collect_record_schema_item(
     Ok(DefaultValue::Any(serde_yaml::to_value(fields)?))
 }
 
+fn collect_array_schema_item(
+    output: &CommandOutputParameter,
+    array: &CommandOutputArraySchema,
+    source_dir: &Path,
+    dest_dir: &Path,
+    context: &EvaluationContext,
+    namespaces: &HashMap<String, String>,
+) -> anyhow::Result<DefaultValue> {
+    let mut values: Vec<DefaultValue> = vec![];
+    let output_id = output.id.clone().unwrap_or_default();
+    match &array.items {
+        OneOrMany::One(item) => match item {
+            CommandOutputType::CWLType(ty) => match ty {
+                CWLType::File => values.extend(add_file_impl(
+                    &output_id,
+                    output,
+                    &output.output_binding,
+                    source_dir,
+                    dest_dir,
+                    context,
+                    namespaces,
+                )?),
+                CWLType::Directory => todo!(),
+                _ => {}
+            },
+            CommandOutputType::CommandOutputSchema(_) => todo!(),
+            CommandOutputType::String(_) => todo!(),
+        },
+        OneOrMany::Many(_) => todo!(),
+    }
+    Ok(DefaultValue::Any(serde_yaml::to_value(values)?))
+}
+
 fn add_file_impl(
     output_id: &String,
     output: &CommandOutputParameter,
@@ -221,9 +256,7 @@ fn add_file_impl(
     if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
-        let globs = globs.as_many();
-        for glob_ in &globs {
-            let glob_ = do_eval_to_string(glob_, context);
+        for glob_ in &get_globs(globs, context)? {
             let full_glob = format!("{}/{}", source_dir.display(), glob_);
             for entry in glob(&full_glob)? {
                 let Ok(item) = entry else {
@@ -249,9 +282,7 @@ fn add_dir_impl(
     if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
-        let globs = globs.as_many();
-        for glob_ in &globs {
-            let glob_ = do_eval_to_string(glob_, context);
+        for glob_ in &get_globs(globs, context)? {
             let full_glob = format!("{}/{}", source_dir.display(), glob_);
             let entry = glob(&full_glob)?.next();
             let Some(Ok(item)) = entry else {
@@ -296,6 +327,35 @@ fn add_fallback_impl(
         }
     }
     Ok(DefaultValue::Any(serde_yaml::Value::Null))
+}
+
+fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::Result<Vec<String>> {
+    let mut globs = vec![];
+    match glob {
+        OneOrMany::One(glob) => {
+            if let Ok(value) = do_eval(glob, context) {
+                match value {
+                    //we can get a list here also
+                    serde_yaml::Value::Sequence(vec) => {
+                        for item in vec {
+                            globs.push(item.as_str().unwrap().into())
+                        }
+                    }
+                    _ => globs.push(value.as_str().unwrap().into()),
+                }
+            } else {
+                //no expression
+                globs.push(glob.to_string());
+            }
+        }
+        OneOrMany::Many(items) => {
+            for item in items {
+                globs.push(do_eval_to_string(item, context));
+            }
+        }
+    }
+
+    Ok(globs)
 }
 
 fn handle_file(
