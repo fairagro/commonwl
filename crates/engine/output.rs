@@ -12,7 +12,7 @@ use cwl_core::{
 };
 use dircpy::copy_dir;
 use glob::glob;
-use std::{collections::HashMap, fs, path::Path, process::Command};
+use std::{collections::HashMap, fs, path::Path};
 use tracing::info;
 
 pub fn collect_command_outputs(
@@ -385,11 +385,6 @@ fn handle_dir(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result
     let dest_path_as_str = dest_path.to_string_lossy();
 
     copy_dir(path, &dest_path)?;
-    let cmd = Command::new("ls")
-        .arg("-la")
-        .arg(source_dir.to_string_lossy().into_owned())
-        .output()?;
-    println!("{}", String::from_utf8_lossy(&cmd.stdout));
 
     let basename = dest_path
         .file_name()
