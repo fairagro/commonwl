@@ -34,12 +34,22 @@ pub fn collect_command_outputs(
                     f.dry_validation();
                     let path = f.path.clone().unwrap();
                     let path = Path::new(&path);
+                    let path = if path.starts_with(source_dir) {
+                        path
+                    } else {
+                        &source_dir.join(path)
+                    };
                     *value = handle_file(path, source_dir, dest_dir, None)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
                     let path = d.path.clone().unwrap();
                     let path = Path::new(&path);
+                    let path = if path.starts_with(source_dir) {
+                        path
+                    } else {
+                        &source_dir.join(path)
+                    };
                     *value = handle_dir(path, source_dir, dest_dir)?
                 }
                 _ => {}
