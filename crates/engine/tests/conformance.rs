@@ -116,10 +116,13 @@ fn evaluate_result(output: &serde_yaml::Value, result: ExecutionResult) {
 }
 
 fn evaluate_item(value: &serde_yaml::Value, result: &DefaultValue) {
-    assert!(match result {
-        DefaultValue::FileOrDirectory(fod) => compare_file_or_directory(value, fod),
-        DefaultValue::Any(actual) => compare_yaml_values(value, actual),
-    })
+    assert!(
+        match result {
+            DefaultValue::FileOrDirectory(fod) => compare_file_or_directory(value, fod),
+            DefaultValue::Any(actual) => compare_yaml_values(value, actual),
+        },
+        "could not validate {result:?} with {value:?}"
+    )
 }
 
 fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value) -> bool {
@@ -127,13 +130,10 @@ fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
         (serde_yaml::Value::String(s), _) if s == "Any" => true,
 
         (serde_yaml::Value::Mapping(exp_map), serde_yaml::Value::Mapping(act_map)) => {
-            if exp_map.len() != act_map.len() {
-                return false;
-            }
             exp_map.iter().all(|(key, exp_val)| {
                 act_map
                     .get(key)
-                    .map(|act_val| compare_yaml_values(exp_val, act_val))
+                    .map(|act_val| compare_yaml_or_fod(exp_val, act_val))
                     .unwrap_or(false)
             })
         }
@@ -143,7 +143,7 @@ fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
                 && exp_seq
                     .iter()
                     .zip(act_seq.iter())
-                    .all(|(exp, act)| compare_yaml_values(exp, act))
+                    .all(|(exp, act)| compare_yaml_or_fod(exp, act))
         }
 
         (serde_yaml::Value::String(exp), serde_yaml::Value::String(act)) => exp == act,
@@ -155,22 +155,36 @@ fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
     }
 }
 
+fn compare_yaml_or_fod(expected: &serde_yaml::Value, actual: &serde_yaml::Value) -> bool {
+    if let Ok(default_value) = serde_yaml::from_value::<DefaultValue>(actual.clone()) {
+        match default_value {
+            DefaultValue::FileOrDirectory(fod) => compare_file_or_directory(expected, &fod),
+            DefaultValue::Any(yaml_val) => compare_yaml_values(expected, &yaml_val),
+        }
+    } else {
+        compare_yaml_values(expected, actual)
+    }
+}
+
 fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirectory) -> bool {
     match actual {
         FileOrDirectory::File(file) => {
             if let Some(serde_yaml::Value::String(class)) = expected.get("class")
                 && class != "File"
             {
+                eprintln!("Could not validate class for {file:?}");
                 return false;
             }
 
             if let Some(serde_yaml::Value::String(expected_checksum)) = expected.get("checksum") {
                 if let Some(actual_checksum) = &file.checksum {
                     if expected_checksum != actual_checksum {
+                        eprintln!("Could not validate checksum for {file:?}");
                         return false;
                     }
                 } else {
                     //require checksum but not given
+                    eprintln!("Could not validate checksum for {file:?}, not given");
                     return false;
                 }
             }
@@ -178,10 +192,17 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
             if let Some(serde_yaml::Value::Number(expected_size)) = expected.get("size") {
                 if let Some(Integer::Long(actual_size)) = &file.size {
                     if expected_size.as_i64().unwrap() != *actual_size {
+                        eprintln!("Could not validate size for {file:?}");
+                        return false;
+                    }
+                } else if let Some(Integer::Int(actual_size)) = &file.size {
+                    if expected_size.as_i64().unwrap() as i32 != *actual_size {
+                        eprintln!("Could not validate size for {file:?}");
                         return false;
                     }
                 } else {
-                    //require size  but not given
+                    //require size but not given
+                    eprintln!("Could not validate size for {file:?}, not given");
                     return false;
                 }
             }
@@ -189,10 +210,12 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
             if let Some(serde_yaml::Value::String(expected_basename)) = expected.get("basename") {
                 if let Some(actual_basename) = &file.basename {
                     if expected_basename != "Any" && expected_basename != actual_basename {
+                        eprintln!("Could not validate basename for {file:?}");
                         return false;
                     }
                 } else {
-                    //require size  but not given
+                    //require basename  but not given
+                    eprintln!("Could not validate basename for {file:?}, not given");
                     return false;
                 }
             }
@@ -200,10 +223,12 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
             if let Some(serde_yaml::Value::String(expected_format)) = expected.get("format") {
                 if let Some(actual_format) = &file.format {
                     if expected_format != "Any" && expected_format != actual_format {
+                        eprintln!("Could not validate format for {file:?}");
                         return false;
                     }
                 } else {
-                    //require size  but not given
+                    //require format but not given
+                    eprintln!("Could not validate format for {file:?}, not given");
                     return false;
                 }
             }
@@ -214,16 +239,19 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
             if let Some(serde_yaml::Value::String(class)) = expected.get("class")
                 && class != "Directory"
             {
+                eprintln!("Could not validate class for {directory:?}");
                 return false;
             }
 
             if let Some(serde_yaml::Value::String(expected_basename)) = expected.get("basename") {
                 if let Some(actual_basename) = &directory.basename {
                     if expected_basename != "Any" && expected_basename != actual_basename {
+                        eprintln!("Could not validate basename for {directory:?}");
                         return false;
                     }
                 } else {
-                    //require size  but not given
+                    //require basename but not given
+                    eprintln!("Could not validate basename for {directory:?}");
                     return false;
                 }
             }
@@ -236,6 +264,7 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
                     );
                 } else {
                     //require listing but not given
+                    eprintln!("Could not validate listing for {directory:?}");
                     return false;
                 }
             }
