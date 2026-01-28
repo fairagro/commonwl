@@ -37,6 +37,7 @@ use cwl_core::{
 };
 use nonempty::nonempty;
 use std::{
+    collections::HashMap,
     fs,
     path::Path,
     sync::{Arc, Mutex},
@@ -303,6 +304,23 @@ impl TaskBackend for DockerBackend {
         if !&runtime.outdir.exists() {
             fs::create_dir_all(&runtime.outdir)?;
         }
+
+        let namespaces = tool
+            .extension_fields
+            .get("$namespaces")
+            .and_then(|v| v.as_mapping())
+            .map(|mapping| {
+                mapping
+                    .iter()
+                    .filter_map(|(k, v)| {
+                        let key = k.as_str()?.to_string();
+                        let value = v.as_str()?.to_string();
+                        Some((key, value))
+                    })
+                    .collect::<HashMap<_, _>>()
+            })
+            .unwrap_or_default();
+
         let outputs = collect_command_outputs(
             &tool.outputs,
             outdir.path(),
@@ -316,6 +334,7 @@ impl TaskBackend for DockerBackend {
                 workdir: Some(&request.working_dir),
                 ..Default::default()
             },
+            &namespaces,
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");

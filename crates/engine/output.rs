@@ -1,3 +1,4 @@
+use crate::expression::{EvaluationContext, do_eval, do_eval_to_string};
 use cwl_core::{
     OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
@@ -10,8 +11,6 @@ use glob::glob;
 use std::{collections::HashMap, fs, path::Path, process::Command};
 use tracing::info;
 
-use crate::expression::{EvaluationContext, do_eval, do_eval_to_string};
-
 pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
     source_dir: &Path,
@@ -19,6 +18,7 @@ pub fn collect_command_outputs(
     stdout_file: &Path,
     stderr_file: &Path,
     context: &EvaluationContext,
+    namespaces: &HashMap<String, String>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
@@ -31,7 +31,7 @@ pub fn collect_command_outputs(
                     f.dry_validation();
                     let path = f.path.clone().unwrap();
                     let path = Path::new(&path);
-                    *value = handle_file(path, source_dir, dest_dir)?
+                    *value = handle_file(path, source_dir, dest_dir, None)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
@@ -64,7 +64,21 @@ pub fn collect_command_outputs(
                         info!("Output glob {full_glob} did not match any files for {output_id}");
                         continue;
                     };
-                    output_map.insert(output_id, handle_file(&item, source_dir, dest_dir)?);
+                    let mut format = output
+                        .format
+                        .as_ref()
+                        .map(|format| format.as_one().to_string());
+                    if let Some(t_format) = &format
+                        && let Some((namespace, value)) = t_format.split_once(":")
+                        && let Some(resolved) = namespaces.get(namespace)
+                    {
+                        format = Some(format!("{resolved}{value}"));
+                    }
+
+                    output_map.insert(
+                        output_id,
+                        handle_file(&item, source_dir, dest_dir, format.as_ref())?,
+                    );
                 }
             }
             CommandOutputParameterType::CommandOutputType(OneOrMany::One(
@@ -87,10 +101,16 @@ pub fn collect_command_outputs(
                 }
             }
             CommandOutputParameterType::Stdout => {
-                output_map.insert(output_id, handle_file(stdout_file, source_dir, dest_dir)?);
+                output_map.insert(
+                    output_id,
+                    handle_file(stdout_file, source_dir, dest_dir, None)?,
+                );
             }
             CommandOutputParameterType::Stderr => {
-                output_map.insert(output_id, handle_file(stderr_file, source_dir, dest_dir)?);
+                output_map.insert(
+                    output_id,
+                    handle_file(stderr_file, source_dir, dest_dir, None)?,
+                );
             }
             _ => {
                 if let Some(binding) = &output.output_binding {
@@ -132,7 +152,12 @@ pub fn collect_command_outputs(
     Ok(output_map)
 }
 
-fn handle_file(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result<DefaultValue> {
+fn handle_file(
+    path: &Path,
+    source_dir: &Path,
+    dest_dir: &Path,
+    format: Option<&String>,
+) -> anyhow::Result<DefaultValue> {
     let relative_path = if let Ok(relative_path) = path.strip_prefix(source_dir) {
         relative_path
     } else {
@@ -143,7 +168,8 @@ fn handle_file(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Resul
     let dest_path = dest_dir.join(&relative_path);
 
     fs::copy(path, &dest_path)?;
-    let file = File::new_from_path(&dest_path)?;
+    let mut file = File::new_from_path(&dest_path)?;
+    file.format = format.cloned();
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::File(file)))
 }
 

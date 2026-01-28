@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::ExtractFromEnum;
 use crate::OneOrMany;
 use crate::deserialize::FromShortHand;
@@ -198,6 +200,10 @@ pub struct CommandLineTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub permanent_fail_codes: Option<Vec<i32>>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten)]
+    #[builder(default, into)]
+    pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
@@ -236,6 +242,10 @@ pub struct ExpressionTool {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten)]
+    #[builder(default, into)]
+    pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
@@ -272,6 +282,10 @@ pub struct Operation {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten)]
+    #[builder(default, into)]
+    pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default)]
@@ -311,6 +325,10 @@ pub struct Workflow {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    #[serde(flatten)]
+    #[builder(default, into)]
+    pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
