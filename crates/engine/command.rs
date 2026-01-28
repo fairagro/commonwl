@@ -12,6 +12,7 @@ use cwl_core::{
         DefaultValue,
     },
     requirements::{InlineJavascriptRequirement, ShellCommandRequirement},
+    types::CWLType,
     value_as_string,
 };
 use std::{borrow::Cow, collections::HashMap};
@@ -190,7 +191,6 @@ fn collect_input_bindings(
     } else {
         schema
     };
-
     if let CommandInputParameterType::CommandInputType(OneOrMany::One(
         CommandInputType::CommandInputSchema(schema),
     )) = schema
@@ -317,7 +317,14 @@ fn collect_input_bindings(
     }
 
     //add root binding
-    if let Some(binding) = &binding {
+    if let Some(binding) = &binding
+        && !matches!(
+            schema,
+            CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::CWLType(
+                CWLType::Null
+            )))
+        )
+    {
         let binding = binding.clone();
         let mut sort_key = base_sort_key.to_owned();
         sort_key.push(SortKey::Int(
@@ -838,7 +845,9 @@ stdout: output.txt"#;
                     for inner_v in vec {
                         //re-serde
                         let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
-                        res.extend(generate_arg(inner_b, v, &Runtime::default(), None, None).unwrap());
+                        res.extend(
+                            generate_arg(inner_b, v, &Runtime::default(), None, None).unwrap(),
+                        );
                     }
                 }
             } else {
