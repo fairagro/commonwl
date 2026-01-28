@@ -144,7 +144,7 @@ impl<'a, const N: usize> From<&'a [&'a str; N]> for OneOrMany<String> {
     }
 }
 
-impl<T> OneOrMany<T> {
+impl<T: Clone> OneOrMany<T> {
     pub fn map<U, F>(self, mut f: F) -> OneOrMany<U>
     where
         F: FnMut(T) -> U,
@@ -159,6 +159,13 @@ impl<T> OneOrMany<T> {
         match self {
             OneOrMany::One(t) => t,
             OneOrMany::Many(v) => v.first().expect("Called as_one on an empty Many"),
+        }
+    }
+
+    pub fn as_many(&self) -> Vec<T> {
+        match self {
+            OneOrMany::One(t) => vec![t.clone()],
+            OneOrMany::Many(v) => v.to_vec(),
         }
     }
 }

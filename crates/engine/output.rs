@@ -4,8 +4,9 @@ use cwl_core::{
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
     inputs::DefaultValue,
     outputs::{
-        CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
-        CommandOutputRecordSchema, CommandOutputSchema, CommandOutputType,
+        CommandOutputArraySchema, CommandOutputBinding, CommandOutputParameter,
+        CommandOutputParameterType, CommandOutputRecordSchema, CommandOutputSchema,
+        CommandOutputType,
     },
     types::CWLType,
 };
@@ -128,21 +129,28 @@ fn collect_item(
     let output_id = output.id.clone().unwrap_or_default();
     match item {
         CommandOutputType::CWLType(ty) => match ty {
-            CWLType::File => Ok(add_file_impl(
-                &output_id,
-                output,
-                output_binding,
-                source_dir,
-                dest_dir,
-                context,
-                namespaces,
-            )?
-            .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))),
+            CWLType::File => {
+                let matches = add_file_impl(
+                    &output_id,
+                    output,
+                    output_binding,
+                    source_dir,
+                    dest_dir,
+                    context,
+                    namespaces,
+                )?;
+                Ok(matches
+                    .first()
+                    .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null))
+                    .clone())
+            }
             CWLType::Directory => {
-                Ok(
-                    add_dir_impl(&output_id, output_binding, source_dir, dest_dir, context)?
-                        .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
-                )
+                let matches =
+                    add_dir_impl(&output_id, output_binding, source_dir, dest_dir, context)?;
+                Ok(matches
+                    .first()
+                    .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null))
+                    .clone())
             }
             _ => add_fallback_impl(&output_id, output, source_dir, context),
         },
@@ -150,8 +158,8 @@ fn collect_item(
             CommandOutputSchema::Record(rec) => {
                 collect_record_schema_item(output, rec, source_dir, dest_dir, context, namespaces)
             }
-            CommandOutputSchema::Enum(_) => todo!(),
             CommandOutputSchema::Array(_) => todo!(),
+            CommandOutputSchema::Enum(_) => todo!(),
         },
         CommandOutputType::String(_) => todo!(),
     }
@@ -208,29 +216,26 @@ fn add_file_impl(
     dest_dir: &Path,
     context: &EvaluationContext,
     namespaces: &HashMap<String, String>,
-) -> anyhow::Result<Option<DefaultValue>> {
+) -> anyhow::Result<Vec<DefaultValue>> {
+    let mut files = vec![];
     if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
-        let glob_ = globs.as_one();
-        let glob_ = do_eval_to_string(glob_, context);
-        let full_glob = format!("{}/{}", source_dir.display(), glob_);
-        let entry = glob(&full_glob)?.next();
-        let Some(Ok(item)) = entry else {
-            info!("Output glob {full_glob} did not match any files for {output_id}");
-            return Ok(None);
-        };
-
-        let format = handle_format(output, namespaces, context);
-
-        return Ok(Some(handle_file(
-            &item,
-            source_dir,
-            dest_dir,
-            format.as_ref(),
-        )?));
+        let globs = globs.as_many();
+        for glob_ in &globs {
+            let glob_ = do_eval_to_string(glob_, context);
+            let full_glob = format!("{}/{}", source_dir.display(), glob_);
+            for entry in glob(&full_glob)? {
+                let Ok(item) = entry else {
+                    info!("Output glob {full_glob} did not match any files for {output_id}");
+                    continue;
+                };
+                let format = handle_format(output, namespaces, context);
+                files.push(handle_file(&item, source_dir, dest_dir, format.as_ref())?);
+            }
+        }
     }
-    Ok(None)
+    Ok(files)
 }
 
 fn add_dir_impl(
@@ -239,21 +244,24 @@ fn add_dir_impl(
     source_dir: &Path,
     dest_dir: &Path,
     context: &EvaluationContext,
-) -> anyhow::Result<Option<DefaultValue>> {
+) -> anyhow::Result<Vec<DefaultValue>> {
+    let mut dirs = vec![];
     if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
-        let glob_ = globs.as_one();
-        let glob_ = do_eval_to_string(glob_, context);
-        let full_glob = format!("{}/{}", source_dir.display(), glob_);
-        let entry = glob(&full_glob)?.next();
-        let Some(Ok(item)) = entry else {
-            info!("Output glob {full_glob} did not match any directories for {output_id}");
-            return Ok(None);
-        };
-        return Ok(Some(handle_dir(&item, source_dir, dest_dir)?));
+        let globs = globs.as_many();
+        for glob_ in &globs {
+            let glob_ = do_eval_to_string(glob_, context);
+            let full_glob = format!("{}/{}", source_dir.display(), glob_);
+            let entry = glob(&full_glob)?.next();
+            let Some(Ok(item)) = entry else {
+                info!("Output glob {full_glob} did not match any directories for {output_id}");
+                continue;
+            };
+            dirs.push(handle_dir(&item, source_dir, dest_dir)?);
+        }
     }
-    Ok(None)
+    Ok(dirs)
 }
 
 fn add_fallback_impl(
