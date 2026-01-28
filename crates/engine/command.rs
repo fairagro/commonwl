@@ -1,12 +1,12 @@
 use crate::{
     context::Runtime,
     expression::{self, EvaluationContext},
-    input::{collect_inputs, validate_command_input},
+    input::validate_command_input,
     pathmapper::PathMapper,
 };
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
-    documents::{Argument, CWLDocument, CommandLineTool},
+    documents::{Argument, CommandLineTool},
     inputs::{
         CommandInputParameterType, CommandInputSchema, CommandInputType, CommandLineBinding,
         DefaultValue,
@@ -32,7 +32,7 @@ enum SortKey {
 
 pub fn build_command(
     tool: &CommandLineTool,
-    inputs: &HashMap<String, serde_yaml::Value>,
+    inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
     path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
@@ -98,16 +98,13 @@ pub fn build_command(
         }
     }
 
-    //handle inputs
-    let values = collect_inputs(&CWLDocument::CommandLineTool(tool.clone()), inputs)?; //can we avoid that clone?
-
     for input in &tool.inputs {
         //check input id is present (should always be the case!)
         let Some(input_id) = &input.id else {
             anyhow::bail!("No input id");
         };
         //check for value given
-        let value = values
+        let value = inputs
             .get(input_id)
             .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null));
 
@@ -134,7 +131,7 @@ pub fn build_command(
         let mut cmd = vec![];
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, &values, runtime, ijsr, path_mapper)?
+                use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
             } else {
                 generate_arg(&bound.binding, bound.value, runtime, ijsr, path_mapper)?
             };
@@ -155,7 +152,7 @@ pub fn build_command(
     } else {
         for bound in bindings {
             let arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, &values, runtime, ijsr, path_mapper)?
+                use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
             } else {
                 generate_arg(&bound.binding, bound.value, runtime, ijsr, path_mapper)?
             };
@@ -523,8 +520,11 @@ fn apply_shell_quote(arg: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::input::collect_inputs;
+
     use super::*;
     use cwl_core::{
+        documents::CWLDocument,
         inputs::{CommandInputArraySchema, CommandInputParameter},
         load_cwl_file,
         types::CWLType,
@@ -546,17 +546,22 @@ outputs:
     outputBinding: {glob: output.txt}
 baseCommand: cat
 stdout: output.txt";
-        let tool = &serde_yaml::from_str(yaml).unwrap();
-
         let inputs = r#"{
     "file1": {
         "class": "File",
         "path": "hello.txt"
     }
 }"#;
+        let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         let cmdline = cmd.join(" ");
         assert_eq!(cmdline, "cat hello.txt");
     }
@@ -583,10 +588,15 @@ stdout: output.txt"#;
         let inputs = r"indir:
   class: Directory
   location: testdir";
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+        let cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
 
         let shell_cmd = get_shell_command();
 
@@ -598,16 +608,23 @@ stdout: output.txt"#;
 
     #[test]
     fn test_build_command_difficult() {
-        let yaml = include_str!("../../testdata/cwl/tests/bwa-mem-tool.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/bwa-mem-tool.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
         let runtime = Runtime {
             cores: 69,
             ..Default::default()
         };
-        let mut cmd = build_command(tool, &input_values, &runtime, None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &runtime, None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -630,12 +647,19 @@ stdout: output.txt"#;
 
     #[test]
     fn test_build_command_difficult_2() {
-        let yaml = include_str!("../../testdata/cwl/tests/binding-test.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/binding-test.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -658,14 +682,16 @@ stdout: output.txt"#;
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/tmap-tool.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
+
+        let inputs = include_str!("../../testdata/cwl/tests/tmap-job.json");
+        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let inputs = include_str!("../../testdata/cwl/tests/tmap-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
-
-        let mut cmd = build_command(&tool, &input_values, &Runtime::default(), None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -701,12 +727,19 @@ stdout: output.txt"#;
 
     #[test]
     fn test_build_command_with_record_bindings() {
-        let yaml = include_str!("../../testdata/cwl/tests/record-order.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/record-order.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -717,12 +750,19 @@ stdout: output.txt"#;
 
     #[test]
     fn test_build_command_with_empty_array() {
-        let yaml = include_str!("../../testdata/cwl/tests/empty-array-input.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/empty-array-input.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -730,12 +770,19 @@ stdout: output.txt"#;
 
     #[test]
     fn test_build_command_with_optional_missing() {
-        let yaml = include_str!("../../testdata/cwl/tests/cat1-testcli.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/cat1-testcli.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, vec!["cat", "hello.txt"]);
@@ -743,12 +790,19 @@ stdout: output.txt"#;
 
     #[test]
     fn test_build_command_with_empty_binding() {
-        let yaml = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding.cwl");
-        let tool = &serde_yaml::from_str(yaml).unwrap();
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
+        let tool_path = base_dir.join("tests/bool-empty-inputbinding.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let mut cmd = build_command(tool, &input_values, &Runtime::default(), None).unwrap();
+        let inputs = collect_inputs(&doc, &input_values).unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());

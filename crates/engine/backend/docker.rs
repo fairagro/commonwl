@@ -112,7 +112,7 @@ impl TaskBackend for DockerBackend {
         )?;
 
         //collect command string and correct args for staged paths
-        let mut args = command::build_command(tool, &request.inputs, &runtime, Some(&path_mapper))?;
+        let mut args = command::build_command(tool, &inputs, &runtime, Some(&path_mapper))?;
 
         //handle docker requirement
         let mut container = "alpine".to_string();
@@ -181,7 +181,10 @@ impl TaskBackend for DockerBackend {
             },
         )?;
         environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
-        environment.insert("TMPDIR".to_string(), runtime.tmpdir.to_string_lossy().into());
+        environment.insert(
+            "TMPDIR".to_string(),
+            runtime.tmpdir.to_string_lossy().into(),
+        );
 
         info!("Executing: {}", args.join(" "));
 
