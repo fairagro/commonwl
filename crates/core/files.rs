@@ -93,6 +93,11 @@ impl File {
         if let Some(location) = &self.location
             && self.path.is_none()
         {
+            let location = if let Some((_, location)) = location.split_once("://") {
+                location
+            } else {
+                location
+            };
             self.path = Some(location.to_string());
         }
     }

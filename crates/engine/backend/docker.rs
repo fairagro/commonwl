@@ -100,7 +100,7 @@ impl TaskBackend for DockerBackend {
         let evr = tool.get_requirement::<EnvVarRequirement>();
 
         let mut runtime = build_runtime(rr);
-        runtime.outdir = request.out_dir.clone();
+        runtime.outdir = outdir.path().to_path_buf();
 
         //handle synthethic directories
         let mut flattened_inputs = flatten_inputs(inputs.values());
@@ -169,7 +169,7 @@ impl TaskBackend for DockerBackend {
         }
 
         //evalute environment expressions
-        let environment = handle_environment(
+        let mut environment = handle_environment(
             request.environment.clone(),
             evr,
             &EvaluationContext {
@@ -180,6 +180,8 @@ impl TaskBackend for DockerBackend {
                 ..Default::default()
             },
         )?;
+        environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
+        environment.insert("TMPDIR".to_string(), runtime.tmpdir.to_string_lossy().into());
 
         info!("Executing: {}", args.join(" "));
 
@@ -301,8 +303,8 @@ impl TaskBackend for DockerBackend {
         }
 
         // need to collect outputs
-        if !&runtime.outdir.exists() {
-            fs::create_dir_all(&runtime.outdir)?;
+        if !&request.out_dir.exists() {
+            fs::create_dir_all(&request.out_dir)?;
         }
 
         let namespaces = tool
@@ -324,7 +326,7 @@ impl TaskBackend for DockerBackend {
         let outputs = collect_command_outputs(
             &tool.outputs,
             outdir.path(),
-            &runtime.outdir,
+            &request.out_dir,
             &stdout_out_file,
             &stderr_out_file,
             &EvaluationContext {
