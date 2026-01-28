@@ -1,4 +1,9 @@
 use serde::{Deserialize, Serialize};
+use serde_yaml::Value;
+use sha1::Digest;
+use sha1::Sha1;
+use std::fs;
+use std::path::Path;
 
 pub mod deserialize;
 pub mod documents;
@@ -11,7 +16,6 @@ pub mod types;
 mod load;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
-use serde_yaml::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
@@ -190,4 +194,49 @@ pub fn docstring(doc: OneOrMany<String>) -> String {
         OneOrMany::One(s) => s,
         OneOrMany::Many(vec) => vec.join("\n"),
     }
+}
+
+#[derive(Debug)]
+pub struct FilePathMetaData {
+    pub basename: Option<String>,
+    pub nameroot: Option<String>,
+    pub nameext: Option<String>,
+    pub dirname: Option<String>,
+}
+
+pub fn get_path_metadata(path: &Path) -> FilePathMetaData {
+    let basename = path.file_name().map(|f| f.to_string_lossy().into_owned());
+    let nameroot = path.file_stem().map(|s| s.to_string_lossy().into_owned());
+    let nameext = path
+        .extension()
+        .map(|e| format!(".{}", e.to_string_lossy()));
+    let dirname = path.parent().map(|p| p.to_string_lossy().into_owned());
+    FilePathMetaData {
+        basename,
+        nameroot,
+        nameext,
+        dirname,
+    }
+}
+
+#[derive(Debug)]
+pub struct FileMetaData {
+    pub size: u64,
+    pub checksum: Option<String>,
+}
+
+pub fn get_file_metadata(path: &Path) -> anyhow::Result<FileMetaData> {
+    let metadata = fs::metadata(path)?;
+    let size = metadata.len();
+
+    let mut hasher = Sha1::new();
+    let hash = fs::read(path).ok().map(|f| {
+        hasher.update(&f);
+        let hash = hasher.finalize();
+        format!("sha1${hash:x}")
+    });
+    Ok(FileMetaData {
+        size,
+        checksum: hash,
+    })
 }

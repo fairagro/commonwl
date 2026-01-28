@@ -1,9 +1,7 @@
-use std::{fs, path::Path};
-
-use crate::Integer;
+use crate::{FileMetaData, FilePathMetaData, Integer, get_file_metadata, get_path_metadata};
 use bon::Builder;
 use serde::{Deserialize, Serialize};
-use sha1::{Digest, Sha1};
+use std::{fs, path::Path};
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -104,22 +102,14 @@ impl File {
 
     pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
         let path_as_str = path.to_string_lossy();
-        let basename = path.file_name().map(|f| f.to_string_lossy().into_owned());
-        let nameroot = path.file_stem().map(|s| s.to_string_lossy().into_owned());
-        let nameext = path
-            .extension()
-            .map(|e| format!(".{}", e.to_string_lossy()));
-        let dirname = path.parent().map(|p| p.to_string_lossy().into_owned());
-        let metadata = fs::metadata(path)?;
+        let FilePathMetaData {
+            basename,
+            nameroot,
+            nameext,
+            dirname,
+        } = get_path_metadata(path);
 
-        let size = metadata.len();
-
-        let mut hasher = Sha1::new();
-        let hash = fs::read(path).ok().map(|f| {
-            hasher.update(&f);
-            let hash = hasher.finalize();
-            format!("sha1${hash:x}")
-        });
+        let FileMetaData { size, checksum } = get_file_metadata(path)?;
 
         let file = File::builder()
             .location(format!("file://{}", &path_as_str))
@@ -129,7 +119,7 @@ impl File {
             .maybe_nameext(nameext)
             .maybe_dirname(dirname)
             .size(size)
-            .maybe_checksum(hash)
+            .maybe_checksum(checksum)
             .build();
         Ok(file)
     }

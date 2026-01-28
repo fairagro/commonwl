@@ -169,8 +169,13 @@ impl PathMapper {
         let Some(filename) = host_path.file_name() else {
             anyhow::bail!("File is missing a path")
         };
-        let staged_path = stage_dir.join(filename);
 
+        let staged_path = if let Some(basename) = file.basename {
+            stage_dir.join(basename)
+        } else {
+            stage_dir.join(filename)
+        };
+        
         mappings.insert(host_path, staged_path);
 
         if let Some(secondary) = file.secondary_files {
@@ -210,9 +215,12 @@ impl PathMapper {
         let Some(filename) = host_path.file_name() else {
             anyhow::bail!("Directory is missing a path")
         };
-        let staged_path = stage_dir.join(filename);
 
-        //add directory itself
+        let staged_path = if let Some(basename) = dir.basename {
+            stage_dir.join(basename)
+        } else {
+            stage_dir.join(filename)
+        };
 
         //recursively walk dir with new roots
         for entry in fs::read_dir(&host_path)? {
@@ -231,6 +239,7 @@ impl PathMapper {
             Self::collect_files(&value, &host_path, &staged_path, mappings)?
         }
 
+        //add directory itself
         mappings.insert(host_path, staged_path);
 
         Ok(())
