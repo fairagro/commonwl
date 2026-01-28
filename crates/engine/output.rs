@@ -3,7 +3,10 @@ use cwl_core::{
     OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
     inputs::DefaultValue,
-    outputs::{CommandOutputParameter, CommandOutputParameterType, CommandOutputType},
+    outputs::{
+        CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
+        CommandOutputRecordSchema, CommandOutputSchema, CommandOutputType,
+    },
     types::CWLType,
 };
 use dircpy::copy_dir;
@@ -48,120 +51,155 @@ pub fn collect_command_outputs(
     //we start with simple cases for now: Files and Directories with glob patterns
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
-        //File, Dir, etc. with binding
-        match &output.r#type {
-            CommandOutputParameterType::CommandOutputType(OneOrMany::One(
-                CommandOutputType::CWLType(CWLType::File),
-            )) => {
-                let value = add_file_impl(
-                    &output_id, output, source_dir, dest_dir, context, namespaces,
-                )?;
-                output_map.insert(
-                    output_id,
-                    value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
-                );
-            }
-
-            CommandOutputParameterType::CommandOutputType(OneOrMany::One(
-                CommandOutputType::CWLType(CWLType::Directory),
-            )) => {
-                let value = add_dir_impl(&output_id, output, source_dir, dest_dir, context)?;
-                output_map.insert(
-                    output_id,
-                    value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
-                );
-            }
-            CommandOutputParameterType::Stdout => {
-                output_map.insert(
-                    output_id,
-                    handle_file(stdout_file, source_dir, dest_dir, None)?,
-                );
-            }
-            CommandOutputParameterType::Stderr => {
-                output_map.insert(
-                    output_id,
-                    handle_file(stderr_file, source_dir, dest_dir, None)?,
-                );
-            }
-            CommandOutputParameterType::CommandOutputType(OneOrMany::Many(many))
-                if many.len() == 2 && many.contains(&CommandOutputType::CWLType(CWLType::Null)) =>
-            {
-                //we found an optional type
-                let actual_type = many
-                    .iter()
-                    .find(|t| !matches!(t, CommandOutputType::CWLType(CWLType::Null)))
-                    .unwrap();
-                match &actual_type {
-                    CommandOutputType::CWLType(CWLType::File) => {
-                        let value = add_file_impl(
-                            &output_id, output, source_dir, dest_dir, context, namespaces,
-                        )?;
-                        output_map.insert(
-                            output_id,
-                            value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
-                        );
-                    }
-                    CommandOutputType::CWLType(CWLType::Directory) => {
-                        let value =
-                            add_dir_impl(&output_id, output, source_dir, dest_dir, context)?;
-                        output_map.insert(
-                            output_id,
-                            value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
-                        );
-                    }
-                    _ => {} //TODO: other cases
-                }
-            }
-            _ => {
-                //todo handle records and stuff
-                if let Some(binding) = &output.output_binding {
-                    if let Some(globs) = &binding.glob {
-                        let glob_ = globs.as_one();
-                        let glob_ = do_eval_to_string(glob_, context);
-                        let full_glob = format!("{}/{}", source_dir.display(), glob_);
-
-                        let entry = glob(&full_glob)?.next();
-                        let Some(Ok(entry)) = entry else {
-                            info!(
-                                "Output glob {full_glob} did not match any directories for {output_id}"
-                            );
-                            continue;
-                        };
-                        let contents = fs::read_to_string(&entry)?;
-                        if let Some(expression) = &binding.output_eval {
-                            let mut file = File::new_from_path(&entry)?;
-                            file.contents = Some(contents);
-                            let file_value = serde_json::to_value(vec![file])?; //could be array also so vec is expected
-                            let value =
-                                do_eval(expression, &context.clone().with_context(&file_value))?;
-                            output_map.insert(output_id, DefaultValue::Any(value));
-                        } else {
-                            output_map.insert(
-                                output_id,
-                                DefaultValue::Any(serde_yaml::Value::String(contents)),
-                            );
-                        }
-                    } else if let Some(expression) = &binding.output_eval {
-                        let value = do_eval(expression, context)?;
-                        output_map.insert(output_id, DefaultValue::Any(value));
-                    }
-                }
-            }
-        }
+        let value = collect_output_item(
+            output,
+            source_dir,
+            dest_dir,
+            stdout_file,
+            stderr_file,
+            context,
+            namespaces,
+        )?;
+        output_map.insert(output_id, value);
     }
 
     Ok(output_map)
+}
+fn collect_output_item(
+    output: &CommandOutputParameter,
+    source_dir: &Path,
+    dest_dir: &Path,
+    stdout_file: &Path,
+    stderr_file: &Path,
+    context: &EvaluationContext,
+    namespaces: &HashMap<String, String>,
+) -> anyhow::Result<DefaultValue> {
+    match &output.r#type {
+        CommandOutputParameterType::Stdout => handle_file(stdout_file, source_dir, dest_dir, None),
+        CommandOutputParameterType::Stderr => handle_file(stderr_file, source_dir, dest_dir, None),
+        CommandOutputParameterType::CommandOutputType(one_or_many) => match one_or_many {
+            OneOrMany::One(item) => collect_item(
+                output,
+                &output.output_binding,
+                item,
+                source_dir,
+                dest_dir,
+                context,
+                namespaces,
+            ),
+            OneOrMany::Many(items) => Ok(items
+                .iter()
+                .find_map(|item| {
+                    collect_item(
+                        output,
+                        &output.output_binding,
+                        item,
+                        source_dir,
+                        dest_dir,
+                        context,
+                        namespaces,
+                    )
+                    .ok()
+                })
+                .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))),
+        },
+    }
+}
+
+fn collect_item(
+    output: &CommandOutputParameter,
+    output_binding: &Option<CommandOutputBinding>,
+    item: &CommandOutputType,
+    source_dir: &Path,
+    dest_dir: &Path,
+    context: &EvaluationContext,
+    namespaces: &HashMap<String, String>,
+) -> anyhow::Result<DefaultValue> {
+    let output_id = output.id.clone().unwrap_or_default();
+    match item {
+        CommandOutputType::CWLType(ty) => match ty {
+            CWLType::File => Ok(add_file_impl(
+                &output_id,
+                output,
+                output_binding,
+                source_dir,
+                dest_dir,
+                context,
+                namespaces,
+            )?
+            .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))),
+            CWLType::Directory => {
+                Ok(
+                    add_dir_impl(&output_id, output_binding, source_dir, dest_dir, context)?
+                        .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
+                )
+            }
+            _ => add_fallback_impl(&output_id, output, source_dir, context),
+        },
+        CommandOutputType::CommandOutputSchema(schema) => match &**schema {
+            CommandOutputSchema::Record(rec) => {
+                collect_record_schema_item(output, rec, source_dir, dest_dir, context, namespaces)
+            }
+            CommandOutputSchema::Enum(_) => todo!(),
+            CommandOutputSchema::Array(_) => todo!(),
+        },
+        CommandOutputType::String(_) => todo!(),
+    }
+}
+
+fn collect_record_schema_item(
+    output: &CommandOutputParameter,
+    record: &CommandOutputRecordSchema,
+    source_dir: &Path,
+    dest_dir: &Path,
+    context: &EvaluationContext,
+    namespaces: &HashMap<String, String>,
+) -> anyhow::Result<DefaultValue> {
+    let mut fields = HashMap::new();
+    if let Some(record_fields) = &record.fields {
+        for field in record_fields {
+            let field_value = match &field.r#type {
+                OneOrMany::One(item) => collect_item(
+                    output,
+                    &field.output_binding,
+                    item,
+                    source_dir,
+                    dest_dir,
+                    context,
+                    namespaces,
+                )?,
+                OneOrMany::Many(items) => items
+                    .iter()
+                    .find_map(|item| {
+                        collect_item(
+                            output,
+                            &field.output_binding,
+                            item,
+                            source_dir,
+                            dest_dir,
+                            context,
+                            namespaces,
+                        )
+                        .ok()
+                    })
+                    .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
+            };
+            fields.insert(field.name.clone(), field_value);
+        }
+    }
+    Ok(DefaultValue::Any(serde_yaml::to_value(fields)?))
 }
 
 fn add_file_impl(
     output_id: &String,
     output: &CommandOutputParameter,
+    output_binding: &Option<CommandOutputBinding>,
     source_dir: &Path,
     dest_dir: &Path,
     context: &EvaluationContext,
     namespaces: &HashMap<String, String>,
 ) -> anyhow::Result<Option<DefaultValue>> {
-    if let Some(binding) = &output.output_binding
+    if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
         let glob_ = globs.as_one();
@@ -187,12 +225,12 @@ fn add_file_impl(
 
 fn add_dir_impl(
     output_id: &String,
-    output: &CommandOutputParameter,
+    output_binding: &Option<CommandOutputBinding>,
     source_dir: &Path,
     dest_dir: &Path,
     context: &EvaluationContext,
 ) -> anyhow::Result<Option<DefaultValue>> {
-    if let Some(binding) = &output.output_binding
+    if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
         let glob_ = globs.as_one();
@@ -206,6 +244,40 @@ fn add_dir_impl(
         return Ok(Some(handle_dir(&item, source_dir, dest_dir)?));
     }
     Ok(None)
+}
+
+fn add_fallback_impl(
+    output_id: &String,
+    output: &CommandOutputParameter,
+    source_dir: &Path,
+    context: &EvaluationContext,
+) -> anyhow::Result<DefaultValue> {
+    if let Some(binding) = &output.output_binding {
+        if let Some(globs) = &binding.glob {
+            let glob_ = globs.as_one();
+            let glob_ = do_eval_to_string(glob_, context);
+            let full_glob = format!("{}/{}", source_dir.display(), glob_);
+
+            let entry = glob(&full_glob)?.next();
+            let Some(Ok(entry)) = entry else {
+                info!("Output glob {full_glob} did not match any directories for {output_id}");
+                return Ok(DefaultValue::Any(serde_yaml::Value::Null));
+            };
+            let contents = fs::read_to_string(&entry)?;
+            if let Some(expression) = &binding.output_eval {
+                let mut file = File::new_from_path(&entry)?;
+                file.contents = Some(contents);
+                let file_value = serde_json::to_value(vec![file])?; //could be array also so vec is expected
+                let value = do_eval(expression, &context.clone().with_context(&file_value))?;
+                return Ok(DefaultValue::Any(value));
+            } else {
+                return Ok(DefaultValue::Any(serde_yaml::Value::String(contents)));
+            }
+        } else if let Some(expression) = &binding.output_eval {
+            return Ok(DefaultValue::Any(do_eval(expression, context)?));
+        }
+    }
+    Ok(DefaultValue::Any(serde_yaml::Value::Null))
 }
 
 fn handle_file(
