@@ -64,17 +64,8 @@ pub fn collect_command_outputs(
                         info!("Output glob {full_glob} did not match any files for {output_id}");
                         continue;
                     };
-                    let mut format = output
-                        .format
-                        .as_ref()
-                        .map(|format| format.as_one().to_string());
-                    if let Some(t_format) = &format
-                        && let Some((namespace, value)) = t_format.split_once(":")
-                        && let Some(resolved) = namespaces.get(namespace)
-                    {
-                        format = Some(format!("{resolved}{value}"));
-                    }
 
+                    let format = handle_format(output, namespaces, context);
                     output_map.insert(
                         output_id,
                         handle_file(&item, source_dir, dest_dir, format.as_ref())?,
@@ -200,4 +191,29 @@ fn handle_dir(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(
         dir,
     )))
+}
+
+fn handle_format(
+    output: &CommandOutputParameter,
+    namespaces: &HashMap<String, String>,
+    context: &EvaluationContext,
+) -> Option<String> {
+    let mut format = output
+        .format
+        .as_ref()
+        .map(|format| format.as_one().to_string());
+
+    //format accepts expression
+    if let Some(t_format) = &mut format {
+        if let Ok(value) = do_eval(t_format, context) {
+            *t_format = value.as_str().unwrap().to_string();
+        }
+
+        if let Some((namespace, value)) = t_format.split_once(":")
+            && let Some(resolved) = namespaces.get(namespace)
+        {
+            format = Some(format!("{resolved}{value}"));
+        }
+    }
+    format
 }

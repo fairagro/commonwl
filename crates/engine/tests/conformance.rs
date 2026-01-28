@@ -63,14 +63,15 @@ fn load_test_file(file: &Path) -> anyhow::Result<Vec<ConformanceTest>> {
 #[tokio::test]
 async fn test_command_line_tools_docker_backend() {
     //implementation limit
-    let limit = 26;
+    let limit = 29;
     let tests = load_conformance_tests().unwrap();
     let selected_tests = tests
         .iter()
         .filter(|t| t.tags.contains(&"command_line_tool".to_string()))
         .collect::<Vec<_>>();
 
-    for test in selected_tests.iter().take(limit) {
+    //cwl starts counting its tests at 1
+    for test in selected_tests.iter().take(limit - 1) {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl")
             .canonicalize()
