@@ -49,47 +49,27 @@ pub fn collect_command_outputs(
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
         //File, Dir, etc. with binding
-        match output.r#type {
+        match &output.r#type {
             CommandOutputParameterType::CommandOutputType(OneOrMany::One(
                 CommandOutputType::CWLType(CWLType::File),
             )) => {
-                if let Some(binding) = &output.output_binding
-                    && let Some(globs) = &binding.glob
-                {
-                    let glob_ = globs.as_one();
-                    let glob_ = do_eval_to_string(glob_, context);
-                    let full_glob = format!("{}/{}", source_dir.display(), glob_);
-                    let entry = glob(&full_glob)?.next();
-                    let Some(Ok(item)) = entry else {
-                        info!("Output glob {full_glob} did not match any files for {output_id}");
-                        continue;
-                    };
-
-                    let format = handle_format(output, namespaces, context);
-                    output_map.insert(
-                        output_id,
-                        handle_file(&item, source_dir, dest_dir, format.as_ref())?,
-                    );
-                }
+                let value = add_file_impl(
+                    &output_id, output, source_dir, dest_dir, context, namespaces,
+                )?;
+                output_map.insert(
+                    output_id,
+                    value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
+                );
             }
+
             CommandOutputParameterType::CommandOutputType(OneOrMany::One(
                 CommandOutputType::CWLType(CWLType::Directory),
             )) => {
-                if let Some(binding) = &output.output_binding
-                    && let Some(globs) = &binding.glob
-                {
-                    let glob_ = globs.as_one();
-                    let glob_ = do_eval_to_string(glob_, context);
-                    let full_glob = format!("{}/{}", source_dir.display(), glob_);
-                    let entry = glob(&full_glob)?.next();
-                    let Some(Ok(item)) = entry else {
-                        info!(
-                            "Output glob {full_glob} did not match any directories for {output_id}"
-                        );
-                        continue;
-                    };
-                    output_map.insert(output_id, handle_dir(&item, source_dir, dest_dir)?);
-                }
+                let value = add_dir_impl(&output_id, output, source_dir, dest_dir, context)?;
+                output_map.insert(
+                    output_id,
+                    value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
+                );
             }
             CommandOutputParameterType::Stdout => {
                 output_map.insert(
@@ -102,6 +82,35 @@ pub fn collect_command_outputs(
                     output_id,
                     handle_file(stderr_file, source_dir, dest_dir, None)?,
                 );
+            }
+            CommandOutputParameterType::CommandOutputType(OneOrMany::Many(many))
+                if many.len() == 2 && many.contains(&CommandOutputType::CWLType(CWLType::Null)) =>
+            {
+                //we found an optional type
+                let actual_type = many
+                    .iter()
+                    .find(|t| !matches!(t, CommandOutputType::CWLType(CWLType::Null)))
+                    .unwrap();
+                match &actual_type {
+                    CommandOutputType::CWLType(CWLType::File) => {
+                        let value = add_file_impl(
+                            &output_id, output, source_dir, dest_dir, context, namespaces,
+                        )?;
+                        output_map.insert(
+                            output_id,
+                            value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
+                        );
+                    }
+                    CommandOutputType::CWLType(CWLType::Directory) => {
+                        let value =
+                            add_dir_impl(&output_id, output, source_dir, dest_dir, context)?;
+                        output_map.insert(
+                            output_id,
+                            value.unwrap_or(DefaultValue::Any(serde_yaml::Value::Null)),
+                        );
+                    }
+                    _ => {} //TODO: other cases
+                }
             }
             _ => {
                 if let Some(binding) = &output.output_binding {
@@ -141,6 +150,61 @@ pub fn collect_command_outputs(
     }
 
     Ok(output_map)
+}
+
+fn add_file_impl(
+    output_id: &String,
+    output: &CommandOutputParameter,
+    source_dir: &Path,
+    dest_dir: &Path,
+    context: &EvaluationContext,
+    namespaces: &HashMap<String, String>,
+) -> anyhow::Result<Option<DefaultValue>> {
+    if let Some(binding) = &output.output_binding
+        && let Some(globs) = &binding.glob
+    {
+        let glob_ = globs.as_one();
+        let glob_ = do_eval_to_string(glob_, context);
+        let full_glob = format!("{}/{}", source_dir.display(), glob_);
+        let entry = glob(&full_glob)?.next();
+        let Some(Ok(item)) = entry else {
+            info!("Output glob {full_glob} did not match any files for {output_id}");
+            return Ok(None);
+        };
+
+        let format = handle_format(output, namespaces, context);
+
+        return Ok(Some(handle_file(
+            &item,
+            source_dir,
+            dest_dir,
+            format.as_ref(),
+        )?));
+    }
+    Ok(None)
+}
+
+fn add_dir_impl(
+    output_id: &String,
+    output: &CommandOutputParameter,
+    source_dir: &Path,
+    dest_dir: &Path,
+    context: &EvaluationContext,
+) -> anyhow::Result<Option<DefaultValue>> {
+    if let Some(binding) = &output.output_binding
+        && let Some(globs) = &binding.glob
+    {
+        let glob_ = globs.as_one();
+        let glob_ = do_eval_to_string(glob_, context);
+        let full_glob = format!("{}/{}", source_dir.display(), glob_);
+        let entry = glob(&full_glob)?.next();
+        let Some(Ok(item)) = entry else {
+            info!("Output glob {full_glob} did not match any directories for {output_id}");
+            return Ok(None);
+        };
+        return Ok(Some(handle_dir(&item, source_dir, dest_dir)?));
+    }
+    Ok(None)
 }
 
 fn handle_file(

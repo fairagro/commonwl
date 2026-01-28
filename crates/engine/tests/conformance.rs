@@ -70,8 +70,7 @@ async fn test_command_line_tools_docker_backend() {
         .filter(|t| t.tags.contains(&"command_line_tool".to_string()))
         .collect::<Vec<_>>();
 
-    //cwl starts counting its tests at 1
-    for test in selected_tests.iter().take(limit - 1) {
+    for test in selected_tests.iter().take(limit) {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl")
             .canonicalize()
