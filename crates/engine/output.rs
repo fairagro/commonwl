@@ -1,4 +1,7 @@
-use crate::expression::{EvaluationContext, do_eval, do_eval_to_string};
+use crate::{
+    expression::{EvaluationContext, do_eval, do_eval_to_string},
+    secondary_files::handle_secondary_file_schema,
+};
 use cwl_core::{
     BoolOrExpression, OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
@@ -42,7 +45,7 @@ pub fn collect_command_outputs(
                         &source_dir.join(path)
                     };
                     //can file have secondary files here?
-                    *value = handle_file(path, source_dir, dest_dir, None, None)?
+                    *value = handle_file(path, source_dir, dest_dir, None, None, context)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
@@ -91,10 +94,10 @@ fn collect_output_item(
 ) -> anyhow::Result<DefaultValue> {
     match &output.r#type {
         CommandOutputParameterType::Stdout => {
-            handle_file(stdout_file, source_dir, dest_dir, None, None)
+            handle_file(stdout_file, source_dir, dest_dir, None, None, context)
         }
         CommandOutputParameterType::Stderr => {
-            handle_file(stderr_file, source_dir, dest_dir, None, None)
+            handle_file(stderr_file, source_dir, dest_dir, None, None, context)
         }
         CommandOutputParameterType::CommandOutputType(one_or_many) => match one_or_many {
             OneOrMany::One(item) => collect_item(
@@ -278,6 +281,7 @@ fn add_file_impl(
                     dest_dir,
                     format.as_ref(),
                     output.secondary_files.as_ref(),
+                    context,
                 )?);
             }
         }
@@ -379,6 +383,7 @@ fn handle_file(
     dest_dir: &Path,
     format: Option<&String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
+    context: &EvaluationContext,
 ) -> anyhow::Result<DefaultValue> {
     let relative_path = if let Ok(relative_path) = path.strip_prefix(source_dir) {
         relative_path
@@ -395,7 +400,7 @@ fn handle_file(
 
     //handle secondaries
     if let Some(secondary_files) = secondary_files {
-        let secondary_files = copy_secondary_files(path, &dest_path, secondary_files)?;
+        let secondary_files = copy_secondary_files(path, &dest_path, secondary_files, context)?;
         file.secondary_files = Some(secondary_files);
     }
 
@@ -406,44 +411,29 @@ fn copy_secondary_files(
     from_path: &Path,
     to_path: &Path,
     secondary_files: &OneOrMany<SecondaryFileSchema>,
+    context: &EvaluationContext,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     let mut secondaries = vec![];
-    match secondary_files {
-        OneOrMany::One(item) => secondaries.push(copy_secondary_file(from_path, to_path, item)?),
-        OneOrMany::Many(items) => {
-            for item in items {
-                secondaries.push(copy_secondary_file(from_path, to_path, item)?);
-            }
-        }
-    }
-    fn copy_secondary_file(
-        path: &Path,
-        to_path: &Path,
-        item: &SecondaryFileSchema,
-    ) -> anyhow::Result<Option<FileOrDirectory>> {
+
+    for item in &secondary_files.as_many() {
         //todo: check caret symbol (^) splitting at dot and remove for each caret
         //todo: handle expression
-        let mut secondary_path_str = path.as_os_str().to_owned();
-        secondary_path_str.push(&item.pattern);
-        let secondary_path = Path::new(&secondary_path_str);
-
-        let mut copy_to_path_str = to_path.as_os_str().to_owned();
-        copy_to_path_str.push(&item.pattern);
-        let copy_to_path = Path::new(&copy_to_path_str);
+        let secondary_path = handle_secondary_file_schema(from_path, item, context);
+        let copy_to_path = handle_secondary_file_schema(to_path, item, context);
 
         //exit if it is not required and does not exist. The other branch will error
         let is_not_required = matches!(&item.required, None | Some(BoolOrExpression::Bool(false)));
         if is_not_required && !secondary_path.exists() {
-            return Ok(None);
+            continue;
         }
 
-        fs::copy(secondary_path, copy_to_path)?;
-        let file = File::new_from_path(copy_to_path)?;
-        Ok(Some(FileOrDirectory::File(file)))
+        fs::copy(secondary_path, &copy_to_path)?;
+        let file = File::new_from_path(&copy_to_path)?;
+        secondaries.push(FileOrDirectory::File(file));
     }
 
     //remove none values
-    Ok(secondaries.into_iter().flatten().collect::<Vec<_>>())
+    Ok(secondaries)
 }
 
 //returns a directory created in the output directory

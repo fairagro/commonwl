@@ -1,8 +1,10 @@
 use crate::{
     checksum,
     command::to_str,
+    expression::EvaluationContext,
     pathmapper::PathMapper,
     requirements::{ProcessHints, ProcessRequirements},
+    secondary_files::handle_secondary_file_schema,
 };
 use cwl_core::{
     ExtractFromEnum, FileMetaData, FilePathMetaData, Integer, OneOrMany,
@@ -13,7 +15,7 @@ use cwl_core::{
         CommandInputParameterType, DefaultValue, InputArraySchema, InputEnumSchema,
         InputRecordSchema, InputSchema, InputType, OperationInputParameter,
     },
-    types::CWLType,
+    types::{CWLType, SecondaryFileSchema},
 };
 use serde::Deserialize;
 use std::{
@@ -151,7 +153,8 @@ pub fn collect_inputs(
     inputs: &HashMap<String, serde_yaml::Value>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut values = HashMap::new();
-    for input in &doc.get_inputs() {
+    let input_params = &doc.get_inputs();
+    for input in input_params {
         // collect the actual value
         let mut value = get_input_value(input, inputs)?;
 
@@ -190,6 +193,58 @@ pub fn collect_inputs(
 
         values.insert(input.id.clone().unwrap_or_default(), value);
     }
+
+    //we can now handle the secondary files which are dependend on inputs...
+    for input in input_params {
+        if let Some(secondary_files) = &input.secondary_files {
+            let input_id = input.id.as_ref().unwrap();
+            let value = values.get_mut(input_id).unwrap();
+            handle_value(value, secondary_files)?;
+
+            fn handle_value(
+                value: &mut DefaultValue,
+                secondary_files: &OneOrMany<SecondaryFileSchema>,
+            ) -> anyhow::Result<()> {
+                //we need to check all types that may contain files...
+                match value {
+                    DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+                        file.dry_validation();
+                        if let Some(path) = &file.path {
+                            for item in secondary_files.as_many() {
+                                //todo: actually do something
+                                handle_secondary_file_schema(
+                                    path,
+                                    &item,
+                                    &EvaluationContext::default(),
+                                );
+                            }
+                        }
+                    }
+                    DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+                        for item in arr {
+                            if let Ok(mut dv) = serde_yaml::from_value::<DefaultValue>(item.clone())
+                            {
+                                handle_value(&mut dv, secondary_files)?;
+                                *item = serde_yaml::to_value(&dv)?;
+                            }
+                        }
+                    }
+                    DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+                        for item in map.values_mut() {
+                            if let Ok(mut dv) = serde_yaml::from_value::<DefaultValue>(item.clone())
+                            {
+                                handle_value(&mut dv, secondary_files)?;
+                                *item = serde_yaml::to_value(&dv)?;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+                Ok(())
+            }
+        }
+    }
+
     Ok(values)
 }
 
