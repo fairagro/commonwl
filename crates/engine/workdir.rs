@@ -43,7 +43,12 @@ fn stage_item(
     context: &EvaluationContext,
 ) -> anyhow::Result<()> {
     match item {
-        ListingItems::Expression(_) => todo!(),
+        ListingItems::Expression(expression) => {
+            let evaluated = do_eval(expression, context)?;
+            let items = &serde_yaml::from_value(evaluated)?;
+            stage_item(items, workdir, stagedir, context)?;
+            Ok(())
+        }
         ListingItems::Dirent(dirent) => stage_dirent(dirent, workdir, stagedir, context),
         ListingItems::FileOrDirectory(fod) => stage_files(fod, stagedir),
         ListingItems::Vec(items) => {
