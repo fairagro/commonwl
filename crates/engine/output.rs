@@ -1,6 +1,6 @@
 use crate::expression::{EvaluationContext, do_eval, do_eval_to_string};
 use cwl_core::{
-    OneOrMany,
+    BoolOrExpression, OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
     inputs::DefaultValue,
     outputs::{
@@ -8,13 +8,14 @@ use cwl_core::{
         CommandOutputParameterType, CommandOutputRecordSchema, CommandOutputSchema,
         CommandOutputType,
     },
-    types::CWLType,
+    types::{CWLType, SecondaryFileSchema},
 };
 use dircpy::copy_dir;
 use glob::glob;
 use std::{collections::HashMap, fs, path::Path};
 use tracing::info;
 
+/// handles collection of command outputs after execution
 pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
     source_dir: &Path,
@@ -40,7 +41,8 @@ pub fn collect_command_outputs(
                     } else {
                         &source_dir.join(path)
                     };
-                    *value = handle_file(path, source_dir, dest_dir, None)?
+                    //can file have secondary files here?
+                    *value = handle_file(path, source_dir, dest_dir, None, None)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
@@ -76,6 +78,8 @@ pub fn collect_command_outputs(
 
     Ok(output_map)
 }
+
+///collects a single output item af
 fn collect_output_item(
     output: &CommandOutputParameter,
     source_dir: &Path,
@@ -86,8 +90,12 @@ fn collect_output_item(
     namespaces: &HashMap<String, String>,
 ) -> anyhow::Result<DefaultValue> {
     match &output.r#type {
-        CommandOutputParameterType::Stdout => handle_file(stdout_file, source_dir, dest_dir, None),
-        CommandOutputParameterType::Stderr => handle_file(stderr_file, source_dir, dest_dir, None),
+        CommandOutputParameterType::Stdout => {
+            handle_file(stdout_file, source_dir, dest_dir, None, None)
+        }
+        CommandOutputParameterType::Stderr => {
+            handle_file(stderr_file, source_dir, dest_dir, None, None)
+        }
         CommandOutputParameterType::CommandOutputType(one_or_many) => match one_or_many {
             OneOrMany::One(item) => collect_item(
                 output,
@@ -264,7 +272,13 @@ fn add_file_impl(
                     continue;
                 };
                 let format = handle_format(output, namespaces, context);
-                files.push(handle_file(&item, source_dir, dest_dir, format.as_ref())?);
+                files.push(handle_file(
+                    &item,
+                    source_dir,
+                    dest_dir,
+                    format.as_ref(),
+                    output.secondary_files.as_ref(),
+                )?);
             }
         }
     }
@@ -358,11 +372,13 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::R
     Ok(globs)
 }
 
+//returns a file created in the output directory
 fn handle_file(
     path: &Path,
     source_dir: &Path,
     dest_dir: &Path,
     format: Option<&String>,
+    secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
 ) -> anyhow::Result<DefaultValue> {
     let relative_path = if let Ok(relative_path) = path.strip_prefix(source_dir) {
         relative_path
@@ -376,9 +392,61 @@ fn handle_file(
     fs::copy(path, &dest_path)?;
     let mut file = File::new_from_path(&dest_path)?;
     file.format = format.cloned();
+
+    //handle secondaries
+    if let Some(secondary_files) = secondary_files {
+        let secondary_files = copy_secondary_files(path, &dest_path, secondary_files)?;
+        file.secondary_files = Some(secondary_files);
+    }
+
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::File(file)))
 }
 
+fn copy_secondary_files(
+    from_path: &Path,
+    to_path: &Path,
+    secondary_files: &OneOrMany<SecondaryFileSchema>,
+) -> anyhow::Result<Vec<FileOrDirectory>> {
+    let mut secondaries = vec![];
+    match secondary_files {
+        OneOrMany::One(item) => secondaries.push(copy_secondary_file(from_path, to_path, item)?),
+        OneOrMany::Many(items) => {
+            for item in items {
+                secondaries.push(copy_secondary_file(from_path, to_path, item)?);
+            }
+        }
+    }
+    fn copy_secondary_file(
+        path: &Path,
+        to_path: &Path,
+        item: &SecondaryFileSchema,
+    ) -> anyhow::Result<Option<FileOrDirectory>> {
+        //todo: check caret symbol (^) splitting at dot and remove for each caret
+        //todo: handle expression
+        let mut secondary_path_str = path.as_os_str().to_owned();
+        secondary_path_str.push(&item.pattern);
+        let secondary_path = Path::new(&secondary_path_str);
+
+        let mut copy_to_path_str = to_path.as_os_str().to_owned();
+        copy_to_path_str.push(&item.pattern);
+        let copy_to_path = Path::new(&copy_to_path_str);
+
+        //exit if it is not required and does not exist. The other branch will error
+        let is_not_required = matches!(&item.required, None | Some(BoolOrExpression::Bool(false)));
+        if is_not_required && !secondary_path.exists() {
+            return Ok(None);
+        }
+
+        fs::copy(secondary_path, copy_to_path)?;
+        let file = File::new_from_path(copy_to_path)?;
+        Ok(Some(FileOrDirectory::File(file)))
+    }
+
+    //remove none values
+    Ok(secondaries.into_iter().flatten().collect::<Vec<_>>())
+}
+
+//returns a directory created in the output directory
 fn handle_dir(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result<DefaultValue> {
     let relative_path = path.strip_prefix(source_dir)?.to_path_buf();
     let dest_path = dest_dir.join(&relative_path);

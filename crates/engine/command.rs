@@ -300,19 +300,17 @@ fn collect_input_bindings(
 
                         let schema = array.items.clone();
 
-                        let binding = array
-                            .input_binding
-                            .clone()
-                            .unwrap_or(binding.clone().unwrap());
-
-                        collect_input_bindings(
-                            &CommandInputParameterType::CommandInputType(schema),
-                            &Some(binding),
-                            &item,
-                            name,
-                            &sort_key,
-                            bindings,
-                        )?;
+                        let binding = array.input_binding.clone().or_else(|| binding.clone());
+                        if let Some(binding) = binding {
+                            collect_input_bindings(
+                                &CommandInputParameterType::CommandInputType(schema),
+                                &Some(binding),
+                                &item,
+                                name,
+                                &sort_key,
+                                bindings,
+                            )?;
+                        }
                     }
                 }
             }
