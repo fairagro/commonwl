@@ -1,9 +1,6 @@
-use std::collections::HashMap;
-
 use crate::ExtractFromEnum;
 use crate::OneOrMany;
 use crate::deserialize::FromShortHand;
-use crate::inputs::InputDataProvider;
 use crate::inputs::{
     CommandInputParameter, CommandLineBinding, OperationInputParameter, WorkflowInputParameter,
     WorkflowStepInput,
@@ -19,6 +16,7 @@ use crate::{
 };
 use bon::Builder;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "class")]
@@ -30,28 +28,12 @@ pub enum CWLDocument {
 }
 
 impl CWLDocument {
-    pub fn get_input_data_providers(&self) -> Vec<&dyn InputDataProvider> {
+    pub fn get_inputs(&self) -> Vec<OperationInputParameter> {
         match self {
-            Self::CommandLineTool(clt) => clt
-                .inputs
-                .iter()
-                .map(|i| i as &dyn InputDataProvider)
-                .collect(),
-            Self::ExpressionTool(et) => et
-                .inputs
-                .iter()
-                .map(|i| i as &dyn InputDataProvider)
-                .collect(),
-            Self::Operation(o) => o
-                .inputs
-                .iter()
-                .map(|i| i as &dyn InputDataProvider)
-                .collect(),
-            Self::Workflow(wf) => wf
-                .inputs
-                .iter()
-                .map(|i| i as &dyn InputDataProvider)
-                .collect(),
+            Self::Operation(o) => o.inputs.clone(),
+            Self::CommandLineTool(clt) => clt.inputs.iter().map(|i| i.clone().into()).collect(),
+            Self::ExpressionTool(et) => et.inputs.iter().map(|i| i.clone().into()).collect(),
+            Self::Workflow(wf) => wf.inputs.iter().map(|i| i.clone().into()).collect(),
         }
     }
 }

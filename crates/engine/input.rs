@@ -10,8 +10,8 @@ use cwl_core::{
     files::{File, FileOrDirectory},
     get_file_metadata, get_path_metadata,
     inputs::{
-        CommandInputParameterType, DefaultValue, InputArraySchema, InputDataProvider,
-        InputEnumSchema, InputRecordSchema, InputSchema, InputType,
+        CommandInputParameterType, DefaultValue, InputArraySchema, InputEnumSchema,
+        InputRecordSchema, InputSchema, InputType, OperationInputParameter,
     },
     types::CWLType,
 };
@@ -151,7 +151,7 @@ pub fn collect_inputs(
     inputs: &HashMap<String, serde_yaml::Value>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut values = HashMap::new();
-    for input in doc.get_input_data_providers() {
+    for input in &doc.get_inputs() {
         // collect the actual value
         let mut value = get_input_value(input, inputs)?;
 
@@ -164,16 +164,16 @@ pub fn collect_inputs(
         let valid = match doc {
             CWLDocument::CommandLineTool(clt) => {
                 //can have stdin...
-                let Some(command_input) = clt.inputs.iter().find(|i| &i.id == input.id()) else {
+                let Some(command_input) = clt.inputs.iter().find(|i| i.id == input.id) else {
                     anyhow::bail!(
                         "Could not find input `{}`",
-                        input.id().clone().unwrap_or_default()
+                        input.id.clone().unwrap_or_default()
                     )
                 };
                 validate_command_input(&command_input.r#type, &value)
             }
-            //we are allowed to unwrap here, read the trait comment
-            _ => match input.r#type().unwrap() {
+
+            _ => match &input.r#type {
                 OneOrMany::One(item) => validate_input_type(&item.clone(), &value),
                 OneOrMany::Many(items) => items
                     .iter()
@@ -184,26 +184,26 @@ pub fn collect_inputs(
         if !valid {
             anyhow::bail!(
                 "Value {value:?} is not valid for `{}`",
-                input.id().clone().unwrap_or_default()
+                input.id.clone().unwrap_or_default()
             )
         }
 
-        values.insert(input.id().clone().unwrap_or_default(), value);
+        values.insert(input.id.clone().unwrap_or_default(), value);
     }
     Ok(values)
 }
 
 pub(crate) fn get_input_value(
-    input: &dyn InputDataProvider,
+    input: &OperationInputParameter,
     inputs: &HashMap<String, serde_yaml::Value>,
 ) -> anyhow::Result<DefaultValue> {
-    let value = inputs.get(&input.id().clone().unwrap_or_default());
+    let value = inputs.get(&input.id.clone().unwrap_or_default());
     Ok(
         if let Some(value) = value
             && !value.is_null()
         {
             serde_yaml::from_value::<DefaultValue>(value.clone())?
-        } else if let Some(default) = input.default() {
+        } else if let Some(default) = &input.default {
             default.clone()
         } else {
             DefaultValue::Any(serde_yaml::Value::Null)
@@ -273,14 +273,14 @@ pub fn fill_input_metadata(
     path_mapper: &PathMapper,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut map = HashMap::new();
-    let providers = doc.get_input_data_providers();
+    let providers = doc.get_inputs();
 
     for (key, value) in inputs {
-        let provider = *providers
+        let input = providers
             .iter()
-            .find(|i| *i.id() == Some(key.to_string()))
+            .find(|i| i.id == Some(key.to_string()))
             .unwrap();
-        let value = create_metadata_for_input(value, provider, path_mapper)?;
+        let value = create_metadata_for_input(value, input, path_mapper)?;
         map.insert(key.clone(), value);
     }
 
@@ -288,11 +288,11 @@ pub fn fill_input_metadata(
 }
 
 fn create_metadata_for_input(
-    input: &DefaultValue,
-    provider: &dyn InputDataProvider,
+    value: &DefaultValue,
+    input: &OperationInputParameter,
     path_mapper: &PathMapper,
 ) -> anyhow::Result<DefaultValue> {
-    match input {
+    match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) if f.path.is_some() => {
             let path = f.path.clone().unwrap();
             let path = Path::new(&path);
@@ -326,8 +326,8 @@ fn create_metadata_for_input(
             let host_path = path_mapper.get_host(guest_path).unwrap();
             let mut d = d.clone();
             d.path = Some(host_path.to_string_lossy().to_string());
-            if let Some(load_listing) = provider.load_listing() {
-                d.load_listing(*load_listing)?;
+            if let Some(load_listing) = input.load_listing {
+                d.load_listing(load_listing)?;
             }
 
             Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)))

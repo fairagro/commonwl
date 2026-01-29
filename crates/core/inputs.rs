@@ -132,15 +132,6 @@ impl DefaultValue {
     }
 }
 
-//trait to easily retrieve default data for all input types
-pub trait InputDataProvider {
-    fn load_listing(&self) -> &Option<LoadListingEnum>;
-    fn id(&self) -> &Option<String>;
-    fn default(&self) -> &Option<DefaultValue>;
-    //type returns None for CommandLineTool (try different approach) and Some for other Docs
-    fn r#type(&self) -> Option<&OneOrMany<InputType>>;
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
@@ -182,23 +173,6 @@ pub struct CommandInputParameter {
 }
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
-impl InputDataProvider for CommandInputParameter {
-    fn id(&self) -> &Option<String> {
-        &self.id
-    }
-
-    fn default(&self) -> &Option<DefaultValue> {
-        &self.default
-    }
-
-    fn r#type(&self) -> Option<&OneOrMany<InputType>> {
-        None
-    }
-
-    fn load_listing(&self) -> &Option<LoadListingEnum> {
-        &self.load_listing
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
@@ -242,24 +216,6 @@ pub struct WorkflowInputParameter {
 }
 
 make_shorthand_impl!(WorkflowInputParameter, "id", "type");
-
-impl InputDataProvider for WorkflowInputParameter {
-    fn id(&self) -> &Option<String> {
-        &self.id
-    }
-
-    fn default(&self) -> &Option<DefaultValue> {
-        &self.default
-    }
-
-    fn r#type(&self) -> Option<&OneOrMany<InputType>> {
-        Some(&self.r#type)
-    }
-
-    fn load_listing(&self) -> &Option<LoadListingEnum> {
-        &self.load_listing
-    }
-}
 
 impl Default for OneOrMany<InputType> {
     fn default() -> Self {
@@ -306,21 +262,41 @@ pub struct OperationInputParameter {
 
 make_shorthand_impl!(OperationInputParameter, "id", "type");
 
-impl InputDataProvider for OperationInputParameter {
-    fn id(&self) -> &Option<String> {
-        &self.id
+impl From<WorkflowInputParameter> for OperationInputParameter {
+    fn from(value: WorkflowInputParameter) -> Self {
+        Self {
+            r#type: value.r#type,
+            label: value.label,
+            secondary_files: value.secondary_files,
+            streamable: value.streamable,
+            doc: value.doc,
+            id: value.id,
+            format: value.format,
+            load_contents: value.load_contents,
+            load_listing: value.load_listing,
+            default: value.default,
+        }
     }
+}
 
-    fn default(&self) -> &Option<DefaultValue> {
-        &self.default
-    }
-
-    fn r#type(&self) -> Option<&OneOrMany<InputType>> {
-        Some(&self.r#type)
-    }
-
-    fn load_listing(&self) -> &Option<LoadListingEnum> {
-        &self.load_listing
+impl From<CommandInputParameter> for OperationInputParameter {
+    fn from(value: CommandInputParameter) -> Self {
+        let ty = match value.r#type {
+            CommandInputParameterType::Stdin => todo!(),
+            CommandInputParameterType::CommandInputType(types) => types.map(|t| t.into()),
+        };
+        Self {
+            r#type: ty,
+            label: value.label,
+            secondary_files: value.secondary_files,
+            streamable: value.streamable,
+            doc: value.doc,
+            id: value.id,
+            format: value.format,
+            load_contents: value.load_contents,
+            load_listing: value.load_listing,
+            default: value.default,
+        }
     }
 }
 
