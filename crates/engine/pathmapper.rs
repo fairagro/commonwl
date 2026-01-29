@@ -48,6 +48,10 @@ impl PathMapper {
         &self.base_dir
     }
 
+    pub fn stage_dir(&self) -> &Path {
+        &self.stage_dir
+    }
+
     pub fn correct_execution_path(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
             let mut pb = PathBuf::from(arg.clone());
@@ -57,12 +61,19 @@ impl PathMapper {
                 //metadata contains host data which can get here by evaluating expressions and needs to be converted here
                 pb = self.stage_dir.join(relative).to_path_buf();
             }
-            *arg = self
-                .get_guest(&pb)
-                .unwrap_or(&pb)
-                .to_string_lossy()
-                .into_owned();
+
+            //literals are handled by their checksum
+            if arg.starts_with("sha1$") {
+                *arg = self.stage_dir.join(arg.split_off(5)).to_string_lossy().into_owned();
+            } else {
+                *arg = self
+                    .get_guest(&pb)
+                    .unwrap_or(&pb)
+                    .to_string_lossy()
+                    .into_owned();
+            }
         }
+
         args
     }
 
@@ -167,8 +178,10 @@ impl PathMapper {
         //ensure path is filled
         let mut file = file.to_owned();
         file.dry_validation();
+
         let Some(path) = file.path else {
-            anyhow::bail!("File is missing a path")
+            //file literal!
+            return Ok(());
         };
 
         let host_path = Self::resolve_location(&path, base_dir)?;

@@ -1,11 +1,11 @@
 use crate::{
     backend::{ExecutionRequest, ExecutionResult, TaskBackend, handle_synthetic_directories},
-    command,
+    checksum, command,
     context::build_runtime,
     docker::build_container,
     environment::handle_environment,
     expression::{EvaluationContext, do_eval},
-    input::{collect_inputs, flatten_inputs, get_stdin, fill_input_metadata},
+    input::{collect_inputs, fill_input_metadata, flatten_inputs, get_stdin},
     output::collect_command_outputs,
     pathmapper::PathMapper,
     workdir::stage_work_dir,
@@ -229,6 +229,18 @@ impl TaskBackend for DockerBackend {
                     Input::builder()
                         .contents(Contents::Path(host_path.to_path_buf()))
                         .path(guest_path.to_string_lossy())
+                        .ty(ty)
+                        .build(),
+                );
+            } else if let FileOrDirectory::File(file) = input
+                && let Some(contents) = &file.contents
+            {
+                //make content checksum
+                let path = path_mapper.stage_dir().join(checksum(contents).split_off(5));
+                task.add_input(
+                    Input::builder()
+                        .contents(Contents::Literal(contents.as_bytes().to_vec()))
+                        .path(path.to_string_lossy())
                         .ty(ty)
                         .build(),
                 );

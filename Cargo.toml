@@ -1,5 +1,10 @@
 [workspace]
-members = ["crates/commonwl", "crates/conformance", "crates/core", "crates/engine"]
+members = [
+    "crates/commonwl",
+    "crates/conformance",
+    "crates/core",
+    "crates/engine",
+]
 
 resolver = "3"
 
@@ -15,6 +20,7 @@ cwl_core = { path = "crates/core" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.143"
 serde_yaml = "0.9.34"
+sha1 = "0.10.6"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 tokio = { version = "1.49.0", features = ["full"] }

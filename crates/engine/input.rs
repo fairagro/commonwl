@@ -1,4 +1,5 @@
 use crate::{
+    checksum,
     command::to_str,
     pathmapper::PathMapper,
     requirements::{ProcessHints, ProcessRequirements},
@@ -330,6 +331,12 @@ fn create_metadata_for_input(
             }
 
             Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)))
+        }
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) if file.contents.is_some() => {
+            let contents = file.contents.clone().unwrap();
+            let mut f = file.clone();
+            f.checksum = Some(checksum(&contents));
+            Ok(DefaultValue::FileOrDirectory(FileOrDirectory::File(f)))
         }
         default => Ok(default.clone()),
     }

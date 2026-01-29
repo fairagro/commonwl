@@ -7,6 +7,7 @@ use crate::{
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
     documents::{Argument, CommandLineTool},
+    files::FileOrDirectory,
     inputs::{
         CommandInputParameterType, CommandInputSchema, CommandInputType, CommandLineBinding,
         DefaultValue,
@@ -476,7 +477,15 @@ pub(crate) fn to_str(val: &DefaultValue) -> String {
     match val {
         DefaultValue::FileOrDirectory(fd) => match fd.path() {
             Some(path) => path.to_string(),
-            None => "\"no path given\"".to_owned(),
+            None => {
+                if let FileOrDirectory::File(file) = fd
+                    && let Some(checksum) = &file.checksum
+                {
+                    checksum.to_string()
+                } else {
+                    "\"No path given\"".to_string()
+                }
+            }
         },
         DefaultValue::Any(value) => match value {
             serde_yaml::Value::String(s) => s.to_string(),
