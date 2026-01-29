@@ -26,6 +26,13 @@ impl FileOrDirectory {
         }
     }
 
+    pub fn basename(&self) -> Option<&String> {
+        match self {
+            Self::File(f) => f.basename.as_ref(),
+            Self::Directory(d) => d.basename.as_ref(),
+        }
+    }
+
     pub fn dry_validation(&mut self) {
         match self {
             Self::File(f) => f.dry_validation(),

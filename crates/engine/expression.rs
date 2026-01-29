@@ -76,7 +76,10 @@ pub fn do_eval(
         ("runtime", runtime),
     ]);
 
-    if expressions.len() == 1 && expressions[0].indices.start == 0 {
+    if expressions.len() == 1
+        && expressions[0].indices.start == 0
+        && expressions[0].indices.end == expression.trim().len()
+    {
         if let Some(ijsr) = eval_context.ijsr {
             return js_eval(
                 &expressions[0].expression(),

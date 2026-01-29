@@ -50,7 +50,13 @@ impl PathMapper {
 
     pub fn correct_execution_path(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
-            let pb = PathBuf::from(arg.clone());
+            let mut pb = PathBuf::from(arg.clone());
+
+            //remove local dirs
+            if let Ok(relative) = pb.strip_prefix(&self.base_dir) {
+                //metadata contains host data which can get here by evaluating expressions and needs to be converted here
+                pb = self.stage_dir.join(relative).to_path_buf();
+            }
             *arg = self
                 .get_guest(&pb)
                 .unwrap_or(&pb)
@@ -175,7 +181,7 @@ impl PathMapper {
         } else {
             stage_dir.join(filename)
         };
-        
+
         mappings.insert(host_path, staged_path);
 
         if let Some(secondary) = file.secondary_files {

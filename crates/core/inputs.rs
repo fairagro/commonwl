@@ -24,7 +24,8 @@ pub enum CommandInputParameterType {
 impl<'de> Deserialize<'de> for CommandInputParameterType {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serde::Deserializer<'de> {
+        D: serde::Deserializer<'de>,
+    {
         let value = serde_yaml::Value::deserialize(deserializer)?;
 
         if value == Value::String("stdin".to_string()) {
@@ -133,6 +134,7 @@ impl DefaultValue {
 
 //trait to easily retrieve default data for all input types
 pub trait InputDataProvider {
+    fn load_listing(&self) -> &Option<LoadListingEnum>;
     fn id(&self) -> &Option<String>;
     fn default(&self) -> &Option<DefaultValue>;
     //type returns None for CommandLineTool (try different approach) and Some for other Docs
@@ -192,6 +194,10 @@ impl InputDataProvider for CommandInputParameter {
     fn r#type(&self) -> Option<&OneOrMany<InputType>> {
         None
     }
+
+    fn load_listing(&self) -> &Option<LoadListingEnum> {
+        &self.load_listing
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
@@ -248,6 +254,10 @@ impl InputDataProvider for WorkflowInputParameter {
 
     fn r#type(&self) -> Option<&OneOrMany<InputType>> {
         Some(&self.r#type)
+    }
+
+    fn load_listing(&self) -> &Option<LoadListingEnum> {
+        &self.load_listing
     }
 }
 
@@ -307,6 +317,10 @@ impl InputDataProvider for OperationInputParameter {
 
     fn r#type(&self) -> Option<&OneOrMany<InputType>> {
         Some(&self.r#type)
+    }
+
+    fn load_listing(&self) -> &Option<LoadListingEnum> {
+        &self.load_listing
     }
 }
 

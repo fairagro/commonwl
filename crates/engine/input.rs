@@ -1,11 +1,13 @@
 use crate::{
     command::to_str,
+    pathmapper::PathMapper,
     requirements::{ProcessHints, ProcessRequirements},
 };
 use cwl_core::{
-    ExtractFromEnum, OneOrMany,
+    ExtractFromEnum, FileMetaData, FilePathMetaData, Integer, OneOrMany,
     documents::{CWLDocument, CommandLineTool},
-    files::FileOrDirectory,
+    files::{File, FileOrDirectory},
+    get_file_metadata, get_path_metadata,
     inputs::{
         CommandInputParameterType, DefaultValue, InputArraySchema, InputDataProvider,
         InputEnumSchema, InputRecordSchema, InputSchema, InputType,
@@ -238,6 +240,11 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
     match dv {
         DefaultValue::FileOrDirectory(fod) => {
             flattened.push(fod.clone());
+            if let FileOrDirectory::File(f) = fod
+                && let Some(secondary_files) = &f.secondary_files
+            {
+                flattened.extend(secondary_files.clone());
+            }
         }
         DefaultValue::Any(v) => match v {
             serde_yaml::Value::Sequence(values) => {
@@ -256,6 +263,75 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
             }
             _ => {}
         },
+    }
+}
+
+pub fn fill_input_metadata(
+    inputs: &HashMap<String, DefaultValue>,
+    doc: &CWLDocument,
+    path_mapper: &PathMapper,
+) -> anyhow::Result<HashMap<String, DefaultValue>> {
+    let mut map = HashMap::new();
+    let providers = doc.get_input_data_providers();
+
+    for (key, value) in inputs {
+        let provider = *providers
+            .iter()
+            .find(|i| *i.id() == Some(key.to_string()))
+            .unwrap();
+        let value = create_metadata_for_input(value, provider, path_mapper)?;
+        map.insert(key.clone(), value);
+    }
+
+    Ok(map)
+}
+
+fn create_metadata_for_input(
+    input: &DefaultValue,
+    provider: &dyn InputDataProvider,
+    path_mapper: &PathMapper,
+) -> anyhow::Result<DefaultValue> {
+    match input {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) if f.path.is_some() => {
+            let path = f.path.clone().unwrap();
+            let path = Path::new(&path);
+            let guest_path = path_mapper.get_guest(path).unwrap();
+            let host_path = path_mapper.get_host(guest_path).unwrap();
+            let FilePathMetaData {
+                basename,
+                nameroot,
+                nameext,
+                dirname,
+            } = get_path_metadata(host_path);
+            let FileMetaData { size, checksum } = get_file_metadata(host_path)?;
+
+            Ok(DefaultValue::FileOrDirectory(FileOrDirectory::File(
+                File::builder()
+                    .path(host_path.to_string_lossy())
+                    .maybe_basename(basename)
+                    .maybe_nameroot(nameroot)
+                    .maybe_nameext(nameext)
+                    .maybe_dirname(dirname)
+                    .maybe_checksum(checksum)
+                    .size(Integer::Long(size as i64))
+                    .maybe_format(f.format.clone())
+                    .build(),
+            )))
+        }
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) if d.path.is_some() => {
+            let path = d.path.clone().unwrap();
+            let path = Path::new(&path);
+            let guest_path = path_mapper.get_guest(path).unwrap();
+            let host_path = path_mapper.get_host(guest_path).unwrap();
+            let mut d = d.clone();
+            d.path = Some(host_path.to_string_lossy().to_string());
+            if let Some(load_listing) = provider.load_listing() {
+                d.load_listing(*load_listing)?;
+            }
+
+            Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)))
+        }
+        default => Ok(default.clone()),
     }
 }
 

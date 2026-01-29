@@ -5,7 +5,7 @@ use crate::{
     docker::build_container,
     environment::handle_environment,
     expression::{EvaluationContext, do_eval},
-    input::{collect_inputs, flatten_inputs, get_stdin},
+    input::{collect_inputs, flatten_inputs, get_stdin, fill_input_metadata},
     output::collect_command_outputs,
     pathmapper::PathMapper,
     workdir::stage_work_dir,
@@ -111,8 +111,18 @@ impl TaskBackend for DockerBackend {
             tmpdir.path(),
         )?;
 
+        // fill input metadata for file or directory and change paths to staged paths, this is useful for the evaluation context
+        let staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
+        let eval_context = &EvaluationContext {
+            inputs: Some(&staged_inputs),
+            runtime: Some(&runtime),
+            workdir: Some(&request.working_dir),
+            ijsr,
+            ..Default::default()
+        };
+
         //collect command string and correct args for staged paths
-        let mut args = command::build_command(tool, &inputs, &runtime, Some(&path_mapper))?;
+        let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
 
         //handle docker requirement
         let mut container = "alpine".to_string();
@@ -169,17 +179,7 @@ impl TaskBackend for DockerBackend {
         }
 
         //evalute environment expressions
-        let mut environment = handle_environment(
-            request.environment.clone(),
-            evr,
-            &EvaluationContext {
-                inputs: Some(&inputs),
-                runtime: Some(&runtime),
-                workdir: Some(&request.working_dir),
-                ijsr,
-                ..Default::default()
-            },
-        )?;
+        let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
         environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
         environment.insert(
             "TMPDIR".to_string(),
@@ -222,7 +222,6 @@ impl TaskBackend for DockerBackend {
                 FileOrDirectory::File(_) => input::Type::File,
                 FileOrDirectory::Directory(_) => input::Type::Directory,
             };
-
             if let Some(path) = path {
                 let guest_path = path_mapper.get_guest(path).unwrap();
                 let host_path = path_mapper.get_host(guest_path).unwrap();
@@ -238,20 +237,8 @@ impl TaskBackend for DockerBackend {
 
         // handle iwdr copy/link to outdir
         if let Some(iwdr) = iwdr {
-            stage_work_dir(
-                iwdr,
-                &request.working_dir,
-                outdir.path(),
-                &EvaluationContext {
-                    runtime: Some(&runtime),
-                    inputs: Some(&inputs),
-                    ijsr,
-                    workdir: Some(&request.working_dir),
-                    ..Default::default()
-                },
-            )?;
+            stage_work_dir(iwdr, &request.working_dir, outdir.path(), eval_context)?;
         }
-
         //add outdir mount
         task.add_input(
             Input::builder()
@@ -332,13 +319,7 @@ impl TaskBackend for DockerBackend {
             &request.out_dir,
             &stdout_out_file,
             &stderr_out_file,
-            &EvaluationContext {
-                ijsr,
-                inputs: Some(&inputs),
-                runtime: Some(&runtime),
-                workdir: Some(&request.working_dir),
-                ..Default::default()
-            },
+            eval_context,
             &namespaces,
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;
