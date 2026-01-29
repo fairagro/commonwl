@@ -26,6 +26,13 @@ impl FileOrDirectory {
         }
     }
 
+    pub fn set_path(&mut self, path: Option<String>) {
+        match self {
+            Self::File(f) => f.path = path,
+            Self::Directory(d) => d.path = path,
+        }
+    }
+
     pub fn basename(&self) -> Option<&String> {
         match self {
             Self::File(f) => f.basename.as_ref(),

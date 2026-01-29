@@ -52,7 +52,7 @@ impl PathMapper {
         &self.stage_dir
     }
 
-    pub fn correct_execution_path(&self, mut args: Vec<String>) -> Vec<String> {
+    pub fn correct_execution_paths(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
             let mut pb = PathBuf::from(arg.clone());
 
@@ -64,10 +64,16 @@ impl PathMapper {
 
             //literals are handled by their checksum
             if arg.starts_with("sha1$") {
-                *arg = self.stage_dir.join(arg.split_off(5)).to_string_lossy().into_owned();
-            } else {
                 *arg = self
-                    .get_guest(&pb)
+                    .stage_dir
+                    .join(arg.split_off(5))
+                    .to_string_lossy()
+                    .into_owned();
+            } else {
+                //change absolute paths only!
+                *arg = self
+                    .mappings
+                    .get(&pb)
                     .unwrap_or(&pb)
                     .to_string_lossy()
                     .into_owned();

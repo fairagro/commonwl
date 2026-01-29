@@ -144,7 +144,7 @@ pub fn build_command(
         }
         //correct paths before joining them
         if let Some(path_mapper) = path_mapper {
-            cmd = path_mapper.correct_execution_path(cmd);
+            cmd = path_mapper.correct_execution_paths(cmd);
         }
 
         let cmdline = cmd.join(" ");
@@ -163,7 +163,7 @@ pub fn build_command(
 
     //correct paths
     if let Some(path_mapper) = path_mapper {
-        args = path_mapper.correct_execution_path(args);
+        args = path_mapper.correct_execution_paths(args);
     }
 
     //remove empty args
@@ -410,6 +410,17 @@ pub(crate) fn generate_arg(
         DefaultValue::FileOrDirectory(fd) => {
             let mut fd = fd.clone();
             fd.dry_validation();
+            //get mapped path
+            if let Some(path_mapper) = path_mapper
+                && let Some(path) = fd.path()
+            {
+                fd.set_path(
+                    path_mapper
+                        .get_guest(path)
+                        .map(|p| p.to_string_lossy().into_owned()),
+                );
+            }
+
             argl = vec![DefaultValue::FileOrDirectory(fd)]
         }
     }
