@@ -211,6 +211,7 @@ pub fn get_path_metadata(path: &Path) -> FilePathMetaData {
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()));
     let dirname = path.parent().map(|p| p.to_string_lossy().into_owned());
+    
     FilePathMetaData {
         basename,
         nameroot,

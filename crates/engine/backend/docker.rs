@@ -4,7 +4,7 @@ use crate::{
     context::build_runtime,
     docker::build_container,
     environment::handle_environment,
-    expression::{EvaluationContext, do_eval},
+    expression::{EvaluationContext, do_eval, do_eval_to_string},
     input::{collect_inputs, fill_input_metadata, flatten_inputs, get_stdin},
     output::collect_command_outputs,
     pathmapper::PathMapper,
@@ -236,7 +236,9 @@ impl TaskBackend for DockerBackend {
                 && let Some(contents) = &file.contents
             {
                 //make content checksum
-                let path = path_mapper.stage_dir().join(checksum(contents).split_off(5));
+                let path = path_mapper
+                    .stage_dir()
+                    .join(checksum(contents).split_off(5));
                 task.add_input(
                     Input::builder()
                         .contents(Contents::Literal(contents.as_bytes().to_vec()))
@@ -264,6 +266,7 @@ impl TaskBackend for DockerBackend {
 
         //handle stderr output
         let stderr_out_file = if let Some(stderr) = &tool.stderr {
+            let stderr = do_eval_to_string(stderr, eval_context);
             outdir.path().join(stderr)
         } else {
             tmpdir.path().join("stderr")
@@ -279,6 +282,7 @@ impl TaskBackend for DockerBackend {
 
         //handle stdout output
         let stdout_out_file = if let Some(stdout) = &tool.stdout {
+            let stdout = do_eval_to_string(stdout, eval_context);
             outdir.path().join(stdout)
         } else {
             tmpdir.path().join("stdout")
