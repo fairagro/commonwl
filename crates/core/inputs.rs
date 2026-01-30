@@ -282,7 +282,7 @@ impl From<WorkflowInputParameter> for OperationInputParameter {
 impl From<CommandInputParameter> for OperationInputParameter {
     fn from(value: CommandInputParameter) -> Self {
         let ty = match value.r#type {
-            CommandInputParameterType::Stdin => todo!(),
+            CommandInputParameterType::Stdin => OneOrMany::One(InputType::String("stdin".to_string())),
             CommandInputParameterType::CommandInputType(types) => types.map(|t| t.into()),
         };
         Self {

@@ -54,13 +54,13 @@ impl PathMapper {
 
     pub fn correct_execution_paths(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
-            let mut pb = PathBuf::from(arg.clone());
-
             //remove local dirs
-            if let Ok(relative) = pb.strip_prefix(&self.base_dir) {
-                //metadata contains host data which can get here by evaluating expressions and needs to be converted here
-                pb = self.stage_dir.join(relative).to_path_buf();
-            }
+            *arg = arg.replace(
+                &self.base_dir.to_string_lossy().to_string(),
+                &self.stage_dir.to_string_lossy(),
+            );
+
+            let pb = PathBuf::from(arg.clone());
 
             //literals are handled by their checksum
             if arg.starts_with("sha1$") {

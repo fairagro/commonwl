@@ -8,6 +8,7 @@ use crate::{
     input::{collect_inputs, fill_input_metadata, flatten_inputs, get_stdin},
     output::collect_command_outputs,
     pathmapper::PathMapper,
+    secondary_files::collect_secondary_files_for_inputs,
     workdir::stage_work_dir,
 };
 use crankshaft::{
@@ -81,7 +82,7 @@ impl TaskBackend for DockerBackend {
         request: &ExecutionRequest,
         token: CancellationToken,
     ) -> anyhow::Result<ExecutionResult> {
-        let inputs = collect_inputs(&request.specification, &request.inputs)?;
+        let mut inputs = collect_inputs(&request.specification, &request.inputs)?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
         let outdir = tempdir()?;
@@ -102,6 +103,23 @@ impl TaskBackend for DockerBackend {
         let mut runtime = build_runtime(rr);
         runtime.outdir = outdir.path().to_path_buf();
 
+        // fill input metadata for file or directory and change paths to staged paths, this is useful for the evaluation context
+        let staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
+
+        let eval_context = &EvaluationContext {
+            inputs: Some(&staged_inputs),
+            runtime: Some(&runtime),
+            workdir: Some(&request.working_dir),
+            ijsr,
+            ..Default::default()
+        };
+        collect_secondary_files_for_inputs(
+            &request.specification,
+            &mut inputs,
+            eval_context,
+            &mut path_mapper,
+        )?;
+
         //handle synthethic directories
         let mut flattened_inputs = flatten_inputs(inputs.values());
         handle_synthetic_directories(
@@ -110,16 +128,6 @@ impl TaskBackend for DockerBackend {
             &request.working_dir,
             tmpdir.path(),
         )?;
-
-        // fill input metadata for file or directory and change paths to staged paths, this is useful for the evaluation context
-        let staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
-        let eval_context = &EvaluationContext {
-            inputs: Some(&staged_inputs),
-            runtime: Some(&runtime),
-            workdir: Some(&request.working_dir),
-            ijsr,
-            ..Default::default()
-        };
 
         //collect command string and correct args for staged paths
         let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
