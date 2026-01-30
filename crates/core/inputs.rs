@@ -130,6 +130,13 @@ impl DefaultValue {
             Self::Any(value) => Some(value),
         }
     }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Self::Any(serde_yaml::Value::String(s)) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
@@ -282,7 +289,9 @@ impl From<WorkflowInputParameter> for OperationInputParameter {
 impl From<CommandInputParameter> for OperationInputParameter {
     fn from(value: CommandInputParameter) -> Self {
         let ty = match value.r#type {
-            CommandInputParameterType::Stdin => OneOrMany::One(InputType::String("stdin".to_string())),
+            CommandInputParameterType::Stdin => {
+                OneOrMany::One(InputType::String("stdin".to_string()))
+            }
             CommandInputParameterType::CommandInputType(types) => types.map(|t| t.into()),
         };
         Self {

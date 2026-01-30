@@ -116,6 +116,11 @@ pub fn build_command(
             anyhow::bail!("No input for `{}` given!", input.id.as_ref().unwrap());
         }
 
+        //do not flags if false
+        if matches!(value, DefaultValue::Any(serde_yaml::Value::Bool(false))) {
+            continue;
+        }
+
         collect_input_bindings(
             &input.r#type,
             &input.input_binding,
@@ -355,6 +360,7 @@ pub(crate) fn generate_arg(
     if binding.prefix.is_none() && !sep {
         anyhow::bail!("if `separate` is false a prefix is mandatory.")
     }
+
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
         let result = expression::do_eval(
@@ -369,6 +375,7 @@ pub(crate) fn generate_arg(
         )?;
         value = serde_yaml::from_value(result)?;
     }
+
     let mut argl = vec![];
 
     match value {
@@ -454,11 +461,13 @@ fn use_value_from(
     path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     //evaluate first
-    let mut value = binding.value_from.clone().unwrap_or_default();
+    let mut value = DefaultValue::Any(serde_yaml::Value::String(
+        binding.value_from.clone().unwrap_or_default(),
+    ));
 
     //try to evaluate expression
     if let Ok(result) = expression::do_eval(
-        &value,
+        value.as_str().unwrap(), //works per definition
         &EvaluationContext {
             inputs: Some(inputs),
             runtime: Some(runtime),
@@ -468,15 +477,27 @@ fn use_value_from(
         },
     ) {
         let dv: DefaultValue = serde_yaml::from_value(result)?;
-        value = to_str(&dv);
+        //do not add boolenas if false
+        if matches!(dv, DefaultValue::Any(serde_yaml::Value::Bool(false))) {
+            return Ok(vec![]);
+        }
+        value = dv
     }
+
+    let values = match value {
+        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => vec
+            .iter()
+            .map(|i| to_str(&DefaultValue::Any(i.clone())))
+            .collect::<Vec<_>>(),
+        default => vec![to_str(&default)],
+    };
 
     if let Some(p) = &binding.prefix
         && binding.value_from.is_some()
     {
-        Ok(vec![p.clone(), value])
+        Ok([vec![p.clone()], values].concat())
     } else if binding.value_from.is_some() {
-        Ok(vec![value])
+        Ok(values)
     } else {
         Ok(vec![])
     }

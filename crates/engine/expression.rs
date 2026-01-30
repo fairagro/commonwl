@@ -91,6 +91,7 @@ pub fn do_eval(
             return simple_expression_eval(&expressions[0].expression(), &map);
         }
     }
+
     //string interpolation
     let v = replace_expressions(
         expression,

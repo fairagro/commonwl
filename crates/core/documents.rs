@@ -84,12 +84,9 @@ macro_rules! impl_document_defaults {
 
             pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
             where
-                T: ExtractFromEnum<$req_enum>,
+                T: ExtractFromEnum<$req_enum> 
             {
-                let maybe_req = self
-                    .requirements
-                    .as_ref()
-                    .and_then(|reqs| reqs.iter().find_map(|req| T::get(req)));
+                let maybe_req = self.get_requirement::<T>();
                 let maybe_hint = self.hints.as_ref().and_then(|hints| {
                     hints.iter().find_map(|hint| {
                         if let $hint_enum::Requirement(inner) = hint {
