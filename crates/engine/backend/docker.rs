@@ -98,8 +98,8 @@ impl TaskBackend for DockerBackend {
         let dr = tool.get_requirement_or_hint::<DockerRequirement>();
         let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
         let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
-        let evr = tool.get_requirement::<EnvVarRequirement>();
-
+        let evr = tool.get_requirement_or_hint::<EnvVarRequirement>();
+        
         //create runtime struct
         let mut runtime = build_runtime(rr);
         runtime.outdir = outdir.path().to_path_buf();
