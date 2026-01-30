@@ -3,7 +3,7 @@ use crate::{
     pathmapper::PathMapper,
 };
 use cwl_core::{
-    OneOrMany,
+    BoolOrExpression, OneOrMany,
     documents::CWLDocument,
     files::{File, FileOrDirectory},
     inputs::DefaultValue,
@@ -18,7 +18,7 @@ pub fn handle_secondary_file_schema(
     path: impl AsRef<Path>,
     item: &SecondaryFileSchema,
     context: &EvaluationContext,
-) -> Option<PathBuf> {
+) -> anyhow::Result<Option<PathBuf>> {
     let pattern_value = if let Ok(pattern_value) = do_eval(&item.pattern, context) {
         pattern_value
     } else {
@@ -26,19 +26,27 @@ pub fn handle_secondary_file_schema(
     };
     let pattern = match pattern_value {
         serde_yaml::Value::String(s) => s,
-        _ => return None,
+        _ => return Ok(None),
     };
 
     let mut secondary_path_str = path.as_ref().as_os_str().to_owned();
     secondary_path_str.push(&pattern);
 
     //check required and existent
+    let is_required = if let Some(BoolOrExpression::Expression(req_exp)) = &item.required {
+        do_eval(req_exp, context)?.as_bool().unwrap_or(false)
+    } else {
+        matches!(&item.required, Some(BoolOrExpression::Bool(true)))
+    };
     let secondary_path = Path::new(&secondary_path_str);
     if !secondary_path.exists() && !context.workdir.unwrap().join(secondary_path).exists() {
-        return None;
+        if is_required {
+            anyhow::bail!("required secondary file not found {pattern}");
+        }
+        return Ok(None);
     }
-    
-    Some(PathBuf::from(secondary_path_str))
+
+    Ok(Some(PathBuf::from(secondary_path_str)))
 }
 
 pub fn collect_secondary_files_for_inputs(
@@ -68,7 +76,7 @@ pub fn collect_secondary_files_for_inputs(
                             let mut secondaries = vec![];
                             for item in secondary_files.as_many() {
                                 if let Some(result) =
-                                    handle_secondary_file_schema(path, &item, context)
+                                    handle_secondary_file_schema(path, &item, context)?
                                 {
                                     let file =
                                         File::builder().path(result.to_string_lossy()).build();

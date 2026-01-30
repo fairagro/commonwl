@@ -3,7 +3,7 @@ use crate::{
     secondary_files::handle_secondary_file_schema,
 };
 use cwl_core::{
-    BoolOrExpression, OneOrMany,
+    OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
     inputs::DefaultValue,
     outputs::{
@@ -416,19 +416,13 @@ fn copy_secondary_files(
     let mut secondaries = vec![];
 
     for item in &secondary_files.as_many() {
-        let Some(secondary_path) = handle_secondary_file_schema(from_path, item, context) else {
+        let Some(secondary_path) = handle_secondary_file_schema(from_path, item, context)? else {
             continue;
         };
-        
+
         let copy_to_path = secondary_path
             .strip_prefix(from_path.parent().unwrap())
             .map(|relative| Path::new(&to_path.parent().unwrap()).join(relative))?;
-
-        //exit if it is not required and does not exist. The other branch will error
-        let is_not_required = matches!(&item.required, None | Some(BoolOrExpression::Bool(false)));
-        if is_not_required && !secondary_path.exists() {
-            continue;
-        }
 
         fs::copy(secondary_path, &copy_to_path)?;
         let file = File::new_from_path(&copy_to_path)?;
