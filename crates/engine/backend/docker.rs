@@ -100,6 +100,7 @@ impl TaskBackend for DockerBackend {
         let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
         let evr = tool.get_requirement::<EnvVarRequirement>();
 
+        //create runtime struct
         let mut runtime = build_runtime(rr);
         runtime.outdir = outdir.path().to_path_buf();
 
@@ -196,13 +197,21 @@ impl TaskBackend for DockerBackend {
 
         info!("Executing: {}", args.join(" "));
 
+        //handle docker output dir
+        let workdir = if let Some(dr) = dr
+            && let Some(dr_outdir) = &dr.docker_output_directory
+        {
+            dr_outdir
+        } else {
+            CONTAINER_WORKDIR
+        };
         //build crankshaft task object
         let mut task = Task::builder()
             .maybe_name(tool.label.clone())
             .maybe_description(tool.doc.as_ref().map(|d| docstring(d.clone())))
             .executions(nonempty![
                 Execution::builder()
-                    .work_dir(CONTAINER_WORKDIR)
+                    .work_dir(workdir)
                     .env(environment)
                     .program(&args[0])
                     .args(&args[1..])
@@ -266,7 +275,7 @@ impl TaskBackend for DockerBackend {
             Input::builder()
                 .name("outdir")
                 .contents(Contents::Path(outdir.path().to_path_buf()))
-                .path(CONTAINER_WORKDIR)
+                .path(workdir)
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
