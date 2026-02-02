@@ -248,8 +248,21 @@ impl PathMapper {
         stage_dir: &Path,
         mappings: &mut HashMap<PathBuf, PathBuf>,
     ) -> anyhow::Result<()> {
-        if dir.path.is_none() && dir.basename.is_some() && dir.listing.is_some() {
-            //ignore synthetic dir
+        if dir.path.is_none()
+            && let Some(basename) = &dir.basename
+            && let Some(listing) = &dir.listing
+        {
+            //ignore synthetic dir but add files to basename
+            for item in listing {
+                match item {
+                    FileOrDirectory::File(file) => {
+                        Self::handle_file(file, base_dir, &stage_dir.join(basename), mappings)?
+                    }
+                    FileOrDirectory::Directory(dir) => {
+                        Self::handle_directory(dir, base_dir, &stage_dir.join(basename), mappings)?
+                    }
+                }
+            }
             return Ok(());
         }
 

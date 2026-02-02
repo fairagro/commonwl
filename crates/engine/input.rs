@@ -356,6 +356,35 @@ fn create_metadata_for_input(
                 d.load_listing(load_listing)?;
             }
 
+            if let Some(listing) = &mut d.listing {
+                for item in listing {
+                    item.dry_validation();
+                    if let DefaultValue::FileOrDirectory(fod) = create_metadata_for_input(
+                        &DefaultValue::FileOrDirectory(item.clone()),
+                        input,
+                        path_mapper,
+                    )? {
+                        *item = fod;
+                    }
+                }
+            }
+
+            Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)))
+        }
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) if d.listing.is_some() => {
+            let mut d = d.clone();
+            if let Some(listing) = &mut d.listing {
+                for item in listing {
+                    item.dry_validation();
+                    if let DefaultValue::FileOrDirectory(fod) = create_metadata_for_input(
+                        &DefaultValue::FileOrDirectory(item.clone()),
+                        input,
+                        path_mapper,
+                    )? {
+                        *item = fod;
+                    }
+                }
+            }
             Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)))
         }
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) if file.contents.is_some() => {

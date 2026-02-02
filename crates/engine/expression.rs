@@ -69,7 +69,6 @@ pub fn do_eval(
     }
 
     let context = eval_context.context.unwrap_or_default();
-
     let inputs = serde_json::to_value(eval_context.inputs)?;
     let runtime = serde_json::to_value(eval_context.runtime)?;
 
