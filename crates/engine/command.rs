@@ -419,7 +419,6 @@ pub(crate) fn generate_arg(
         },
         DefaultValue::FileOrDirectory(fd) => {
             let mut fd = fd.clone();
-            fd.dry_validation();
             //get mapped path
             if let Some(path_mapper) = path_mapper
                 && let Some(path) = fd.path()

@@ -210,21 +210,17 @@ impl PathMapper {
         stage_dir: &Path,
         mappings: &mut HashMap<PathBuf, PathBuf>,
     ) -> anyhow::Result<()> {
-        //ensure path is filled
-        let mut file = file.to_owned();
-        file.dry_validation();
-
-        let Some(path) = file.path else {
+        let Some(path) = &file.path else {
             //file literal!
             return Ok(());
         };
 
-        let host_path = Self::resolve_location(&path, base_dir)?;
+        let host_path = Self::resolve_location(path, base_dir)?;
         let Some(filename) = host_path.file_name() else {
             anyhow::bail!("File is missing a path")
         };
 
-        let staged_path = if let Some(basename) = file.basename {
+        let staged_path = if let Some(basename) = &file.basename {
             stage_dir.join(basename)
         } else {
             stage_dir.join(filename)
@@ -232,10 +228,10 @@ impl PathMapper {
 
         mappings.insert(host_path, staged_path);
 
-        if let Some(secondary) = file.secondary_files {
+        if let Some(secondary) = &file.secondary_files {
             for item in secondary {
                 Self::collect_files(
-                    &DefaultValue::FileOrDirectory(item),
+                    &DefaultValue::FileOrDirectory(item.clone()),
                     base_dir,
                     stage_dir,
                     mappings,
@@ -252,25 +248,21 @@ impl PathMapper {
         stage_dir: &Path,
         mappings: &mut HashMap<PathBuf, PathBuf>,
     ) -> anyhow::Result<()> {
-        //ensure path is filled
-        let mut dir = dir.to_owned();
-        dir.dry_validation();
-
         if dir.path.is_none() && dir.basename.is_some() && dir.listing.is_some() {
             //ignore synthetic dir
             return Ok(());
         }
 
-        let Some(path) = dir.path else {
+        let Some(path) = &dir.path else {
             anyhow::bail!("No path for directory given!")
         };
 
-        let host_path = Self::resolve_location(&path, base_dir)?;
+        let host_path = Self::resolve_location(path, base_dir)?;
         let Some(filename) = host_path.file_name() else {
             anyhow::bail!("Directory is missing a path")
         };
 
-        let staged_path = if let Some(basename) = dir.basename {
+        let staged_path = if let Some(basename) = &dir.basename {
             stage_dir.join(basename)
         } else {
             stage_dir.join(filename)
