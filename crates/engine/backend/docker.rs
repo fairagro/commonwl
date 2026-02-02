@@ -109,20 +109,21 @@ impl TaskBackend for DockerBackend {
             CONTAINER_WORKDIR
         };
 
-        //create runtime struct
-        let mut runtime = build_runtime(rr);
-        runtime.outdir = PathBuf::from(workdir);
-
         // fill input metadata for file or directory and change paths to staged paths, this is useful for the evaluation context
         let staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
 
-        let eval_context = &EvaluationContext {
+        let eval_context = &mut EvaluationContext {
             inputs: Some(&staged_inputs),
-            runtime: Some(&runtime),
             workdir: Some(&request.working_dir),
             ijsr,
             ..Default::default()
         };
+
+        //create runtime struct
+        let mut runtime = build_runtime(rr, eval_context);
+        runtime.outdir = PathBuf::from(workdir);
+
+        eval_context.runtime = Some(&runtime);
 
         collect_secondary_files_for_inputs(
             &request.specification,
@@ -184,7 +185,7 @@ impl TaskBackend for DockerBackend {
                 &mut path_mapper,
             )?;
         }
-        
+
         //collect command string and correct args for staged paths
         let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
 

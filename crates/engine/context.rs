@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::{path::PathBuf, sync::LazyLock};
 use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, System};
 
+use crate::expression::{EvaluationContext, do_eval};
+
 // Runtime Environment like described in CWL Spec
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -28,27 +30,35 @@ impl Default for Runtime {
     }
 }
 
-pub fn build_runtime(req: Option<&ResourceRequirement>) -> Runtime {
+pub fn build_runtime(req: Option<&ResourceRequirement>, context: &EvaluationContext) -> Runtime {
     let mut runtime = Runtime::default();
     if let Some(req) = req {
         runtime.cores = resolve_min_max(
             req.cores_min.as_ref(),
             req.cores_max.as_ref(),
             runtime.cores,
+            context,
         );
 
-        runtime.ram = resolve_min_max(req.ram_min.as_ref(), req.ram_max.as_ref(), runtime.ram);
+        runtime.ram = resolve_min_max(
+            req.ram_min.as_ref(),
+            req.ram_max.as_ref(),
+            runtime.ram,
+            context,
+        );
 
         runtime.tmpdir_size = resolve_min_max(
             req.tmpdir_min.as_ref(),
             req.tmpdir_max.as_ref(),
             runtime.tmpdir_size,
+            context,
         );
 
         runtime.outdir_size = resolve_min_max(
             req.outdir_min.as_ref(),
             req.outdir_max.as_ref(),
             runtime.outdir_size,
+            context,
         );
     }
     runtime
@@ -58,20 +68,30 @@ fn resolve_min_max(
     min: Option<&NumberOrExpression>,
     max: Option<&NumberOrExpression>,
     default: u64,
+    context: &EvaluationContext,
 ) -> u64 {
-    match (min.map(handle_value), max.map(handle_value)) {
+    match (
+        min.map(|v| handle_value(v, context)),
+        max.map(|v| handle_value(v, context)),
+    ) {
         (Some(min), Some(max)) => min.max(max),
         (Some(v), None) | (None, Some(v)) => v,
         (None, None) => default,
     }
 }
 
-fn handle_value(val: &NumberOrExpression) -> u64 {
+fn handle_value(val: &NumberOrExpression, context: &EvaluationContext) -> u64 {
     match val {
         NumberOrExpression::Int(i) => *i as u64,
         NumberOrExpression::Long(l) => *l as u64,
         NumberOrExpression::Float(f) => f32::ceil(*f) as u64,
-        NumberOrExpression::Expression(_) => todo!(),
+        NumberOrExpression::Expression(expression) => {
+            if let Ok(result) = do_eval(expression, context) {
+                handle_value(&serde_yaml::from_value(result).unwrap(), context)
+            } else {
+                0
+            }
+        }
     }
 }
 
