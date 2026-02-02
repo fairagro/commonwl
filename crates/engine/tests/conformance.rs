@@ -63,7 +63,7 @@ fn load_test_file(file: &Path) -> anyhow::Result<Vec<ConformanceTest>> {
 #[tokio::test]
 async fn test_command_line_tools_docker_backend() {
     //implementation limit
-    let limit = 60;
+    let limit = 62;
     let tests = load_conformance_tests().unwrap();
     let selected_tests = tests
         .iter()

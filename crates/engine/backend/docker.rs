@@ -175,9 +175,16 @@ impl TaskBackend for DockerBackend {
 
         // handle iwdr copy/link to outdir
         if let Some(iwdr) = iwdr {
-            stage_work_dir(iwdr, &request.working_dir, outdir.path(), eval_context)?;
+            stage_work_dir(
+                iwdr,
+                &request.working_dir,
+                outdir.path(),
+                eval_context,
+                workdir,
+                &mut path_mapper,
+            )?;
         }
-
+        
         //collect command string and correct args for staged paths
         let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
 
@@ -248,6 +255,12 @@ impl TaskBackend for DockerBackend {
             };
             if let Some(path) = path {
                 let guest_path = path_mapper.get_guest(path).unwrap();
+
+                //do not restage iwdr inputs
+                if guest_path.starts_with(workdir) {
+                    continue;
+                }
+
                 let host_path = path_mapper.get_host(guest_path).unwrap();
                 task.add_input(
                     Input::builder()

@@ -2,10 +2,11 @@ use cwl_core::{
     files::{Directory, File, FileOrDirectory},
     inputs::DefaultValue,
 };
+use regex::Regex;
 use std::{
     collections::HashMap,
     fs,
-    path::{Path, PathBuf},
+    path::{MAIN_SEPARATOR_STR, Path, PathBuf},
 };
 
 #[derive(Debug)]
@@ -55,10 +56,7 @@ impl PathMapper {
     pub fn correct_execution_paths(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
             //remove local dirs
-            *arg = arg.replace(
-                &self.base_dir.to_string_lossy().to_string(),
-                &self.stage_dir.to_string_lossy(),
-            );
+            *arg = self.replace_basepath(arg);
 
             let pb = PathBuf::from(arg.clone());
 
@@ -81,6 +79,37 @@ impl PathMapper {
         }
 
         args
+    }
+
+    fn replace_basepath(&self, arg: &String) -> String {
+        let re = Regex::new(&format!(
+            "({}(?:{}[A-Za-z0-9._-]+)*)",
+            self.base_dir.display(),
+            MAIN_SEPARATOR_STR
+        ))
+        .unwrap();
+
+        let Some(caps) = re.captures(arg) else {
+            return arg.to_string();
+        };
+
+        //try to get based on mappings
+        let mut new_arg = arg.to_string();
+        for cap in caps.iter() {
+            let path_str = cap.unwrap().as_str();
+            let path = Path::new(path_str);
+            let relative = path.strip_prefix(&self.base_dir).unwrap(); //this is what we matched, so we are safe
+            let Some(new) = self.local_mappings.get(relative) else {
+                continue;
+            };
+            new_arg = new_arg.replace(path_str, &new.to_string_lossy())
+        }
+
+        //fallback
+        new_arg.replace(
+            &self.base_dir.to_string_lossy().to_string(),
+            &self.stage_dir.to_string_lossy(),
+        )
     }
 
     pub fn get_guest(&self, host_path: impl AsRef<Path>) -> Option<&PathBuf> {

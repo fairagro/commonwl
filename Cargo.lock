@@ -817,6 +817,7 @@ dependencies = [
  "indexmap 2.13.0",
  "nonempty",
  "pathdiff",
+ "regex",
  "serde",
  "serde_json",
  "serde_yaml",
