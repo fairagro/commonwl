@@ -16,7 +16,7 @@ use cwl_core::{
     types::CWLType,
     value_as_string,
 };
-use std::{borrow::Cow, collections::HashMap};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 struct BoundBinding {
@@ -134,7 +134,7 @@ pub fn build_command(
     bindings.sort_by(|a, b| a.sort_key.cmp(&b.sort_key));
 
     if tool.has_requirement_or_hint::<ShellCommandRequirement>() {
-        let mut cmd = vec![];
+        let mut cmd = args.clone();
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
                 use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
@@ -153,7 +153,7 @@ pub fn build_command(
         }
 
         let cmdline = cmd.join(" ");
-        args.extend(get_shell_command());
+        args = get_shell_command();
         args.push(cmdline);
     } else {
         for bound in bindings {
@@ -552,9 +552,7 @@ fn get_shell_command() -> Vec<String> {
 }
 
 fn apply_shell_quote(arg: Vec<String>) -> Vec<String> {
-    arg.iter()
-        .map(|a| shlex::try_quote(a).unwrap_or(Cow::Borrowed(a)).to_string())
-        .collect()
+    arg.iter().map(|a| format!("'{a}'")).collect()
 }
 
 #[cfg(test)]
