@@ -363,7 +363,7 @@ pub(crate) fn generate_arg(
 
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
-        let result = expression::do_eval(
+        let result = if let Ok(result) = expression::do_eval(
             value_from,
             &EvaluationContext {
                 context: Some(&json_value),
@@ -372,7 +372,12 @@ pub(crate) fn generate_arg(
                 workdir: path_mapper.map(|m| m.base_dir()),
                 ..Default::default()
             },
-        )?;
+        ) {
+            result
+        } else {
+            //default to value_from unevaluated
+            serde_yaml::Value::String(value_from.to_string())
+        };
         value = serde_yaml::from_value(result)?;
     }
 
@@ -639,7 +644,11 @@ stdout: output.txt"#;
 
         assert_eq!(
             cmd,
-            vec![&shell_cmd[0], &shell_cmd[1], "'cd' 'testdir' && 'find' '.' | 'sort'"]
+            vec![
+                &shell_cmd[0],
+                &shell_cmd[1],
+                "'cd' 'testdir' && 'find' '.' | 'sort'"
+            ]
         );
     }
 

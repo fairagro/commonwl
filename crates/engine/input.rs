@@ -155,11 +155,6 @@ pub fn collect_inputs(
         // collect the actual value
         let mut value = get_input_value(input, inputs)?;
 
-        //update file path field
-        if let DefaultValue::FileOrDirectory(fod) = &mut value {
-            fod.dry_validation();
-        }
-
         //do some validation
         let valid = match doc {
             CWLDocument::CommandLineTool(clt) => {
@@ -187,11 +182,40 @@ pub fn collect_inputs(
                 input.id.clone().unwrap_or_default()
             )
         }
-
+        sanitize_paths(&mut value)?;
         values.insert(input.id.clone().unwrap_or_default(), value);
     }
 
     Ok(values)
+}
+
+fn sanitize_paths(value: &mut DefaultValue) -> anyhow::Result<()> {
+    match value {
+        DefaultValue::FileOrDirectory(fod) => {
+            fod.dry_validation();
+            if let Some(path) = fod.path()
+                && path.starts_with("./")
+            {
+                fod.set_path(Some(path.strip_prefix("./").unwrap_or(path).into()));
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+            for item in vec {
+                let mut dv = serde_yaml::from_value(item.clone())?;
+                sanitize_paths(&mut dv)?;
+                *item = serde_yaml::to_value(&dv)?;
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            for item in map.values_mut() {
+                let mut dv = serde_yaml::from_value(item.clone())?;
+                sanitize_paths(&mut dv)?;
+                *item = serde_yaml::to_value(&dv)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 pub(crate) fn get_input_value(
@@ -296,6 +320,7 @@ fn create_metadata_for_input(
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) if f.path.is_some() => {
             let path = f.path.clone().unwrap();
+
             let path = Path::new(&path);
             let guest_path = path_mapper.get_guest(path).unwrap();
             let host_path = path_mapper.get_host(guest_path).unwrap();
