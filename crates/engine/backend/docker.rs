@@ -331,7 +331,13 @@ impl TaskBackend for DockerBackend {
         );
 
         let exit_status = self.backend.run(task, token)?.await?;
-        
+        let first_code = exit_status.first().code().unwrap_or(1);
+
+        //update runtime
+        let mut runtime = runtime.clone();
+        runtime.exit_code = Some(first_code);
+        let eval_context = eval_context.clone().with_runtime(&runtime);
+
         //evaluate stderr/stdout
         let stdout = fs::read_to_string(&stdout_out_file)?;
         if !stdout.is_empty() {
@@ -369,7 +375,7 @@ impl TaskBackend for DockerBackend {
             &request.out_dir,
             &stdout_out_file,
             &stderr_out_file,
-            eval_context,
+            &eval_context,
             &namespaces,
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;

@@ -15,6 +15,7 @@ pub struct Runtime {
     pub ram: u64,
     pub outdir_size: u64,
     pub tmpdir_size: u64,
+    pub exit_code: Option<i32>,
 }
 
 impl Default for Runtime {
@@ -26,6 +27,7 @@ impl Default for Runtime {
             tmpdir_size: get_available_disk_space(),
             outdir: PathBuf::from("."),
             tmpdir: PathBuf::from("."),
+            exit_code: None,
         }
     }
 }

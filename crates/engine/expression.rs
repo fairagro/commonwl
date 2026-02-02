@@ -16,13 +16,16 @@ pub struct EvaluationContext<'a> {
 }
 
 impl<'a> EvaluationContext<'a> {
-    pub fn with_context(self, context: &'a serde_json::Value) -> EvaluationContext<'a> {
+    pub fn with_context(self, context: &'a serde_json::Value) -> Self {
         Self {
             context: Some(context),
-            inputs: self.inputs,
-            runtime: self.runtime,
-            ijsr: self.ijsr,
-            workdir: self.workdir,
+            ..self
+        }
+    }
+    pub fn with_runtime(self, runtime: &'a Runtime) -> Self {
+        Self {
+            runtime: Some(runtime),
+            ..self
         }
     }
 }
@@ -169,7 +172,7 @@ fn js_eval(
     }
 
     //auto wrap expressions if object notation
-     let expression = if expression.trim().starts_with('{') {
+    let expression = if expression.trim().starts_with('{') {
         format!("({})", expression)
     } else {
         expression.to_string()
