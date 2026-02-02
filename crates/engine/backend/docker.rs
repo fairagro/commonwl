@@ -40,7 +40,7 @@ use nonempty::nonempty;
 use std::{
     collections::HashMap,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 use tempfile::tempdir;
@@ -99,10 +99,19 @@ impl TaskBackend for DockerBackend {
         let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
         let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
         let evr = tool.get_requirement_or_hint::<EnvVarRequirement>();
-        
+
+        //handle docker output dir
+        let workdir = if let Some(dr) = dr
+            && let Some(dr_outdir) = &dr.docker_output_directory
+        {
+            dr_outdir
+        } else {
+            CONTAINER_WORKDIR
+        };
+
         //create runtime struct
         let mut runtime = build_runtime(rr);
-        runtime.outdir = outdir.path().to_path_buf();
+        runtime.outdir = PathBuf::from(workdir);
 
         // fill input metadata for file or directory and change paths to staged paths, this is useful for the evaluation context
         let staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
@@ -114,6 +123,7 @@ impl TaskBackend for DockerBackend {
             ijsr,
             ..Default::default()
         };
+
         collect_secondary_files_for_inputs(
             &request.specification,
             &mut inputs,
@@ -130,8 +140,13 @@ impl TaskBackend for DockerBackend {
             tmpdir.path(),
         )?;
 
-        //collect command string and correct args for staged paths
-        let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
+        //evalute environment expressions
+        let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
+        environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
+        environment.insert(
+            "TMPDIR".to_string(),
+            runtime.tmpdir.to_string_lossy().into(),
+        );
 
         //handle docker requirement
         let mut container = "alpine".to_string();
@@ -157,6 +172,14 @@ impl TaskBackend for DockerBackend {
         } else {
             CONTAINER_STDERR_FILE
         };
+
+        // handle iwdr copy/link to outdir
+        if let Some(iwdr) = iwdr {
+            stage_work_dir(iwdr, &request.working_dir, outdir.path(), eval_context)?;
+        }
+
+        //collect command string and correct args for staged paths
+        let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
 
         //correct and add the stdin value
         let mut stdin = get_stdin(tool, &inputs);
@@ -187,24 +210,8 @@ impl TaskBackend for DockerBackend {
             args.push(stdin.to_string());
         }
 
-        //evalute environment expressions
-        let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
-        environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
-        environment.insert(
-            "TMPDIR".to_string(),
-            runtime.tmpdir.to_string_lossy().into(),
-        );
-
         info!("Executing: {}", args.join(" "));
 
-        //handle docker output dir
-        let workdir = if let Some(dr) = dr
-            && let Some(dr_outdir) = &dr.docker_output_directory
-        {
-            dr_outdir
-        } else {
-            CONTAINER_WORKDIR
-        };
         //build crankshaft task object
         let mut task = Task::builder()
             .maybe_name(tool.label.clone())
@@ -266,10 +273,6 @@ impl TaskBackend for DockerBackend {
             }
         }
 
-        // handle iwdr copy/link to outdir
-        if let Some(iwdr) = iwdr {
-            stage_work_dir(iwdr, &request.working_dir, outdir.path(), eval_context)?;
-        }
         //add outdir mount
         task.add_input(
             Input::builder()

@@ -13,6 +13,7 @@ use std::{
     process::exit,
 };
 use tokio_util::sync::CancellationToken;
+use tracing::Level;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,6 +29,14 @@ async fn main() -> anyhow::Result<()> {
     let job_path = input_job.map(|job| base_dir.join(job));
 
     let outdir = matches.get_one::<PathBuf>("outdir").unwrap();
+
+    let quiet = matches.get_one::<bool>("quiet").unwrap_or(&false);
+
+    if !quiet {
+        tracing_subscriber::fmt()
+            .with_max_level(Level::INFO)
+            .init();
+    }
 
     let config = Config::default();
     let backend = DockerBackend::new(config).await?;

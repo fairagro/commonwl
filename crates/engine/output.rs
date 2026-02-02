@@ -1,4 +1,5 @@
 use crate::{
+    context::Runtime,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     secondary_files::handle_secondary_file_schema,
 };
@@ -15,7 +16,11 @@ use cwl_core::{
 };
 use dircpy::copy_dir;
 use glob::glob;
-use std::{collections::HashMap, fs, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    path::{Path, PathBuf},
+};
 use tracing::info;
 
 /// handles collection of command outputs after execution
@@ -38,25 +43,15 @@ pub fn collect_command_outputs(
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                     f.dry_validation();
                     let path = f.path.clone().unwrap();
-                    let path = Path::new(&path);
-                    let path = if path.starts_with(source_dir) {
-                        path
-                    } else {
-                        &source_dir.join(path)
-                    };
+                    let path = correct_output_path(Path::new(&path), source_dir, context.runtime);
                     //can file have secondary files here?
-                    *value = handle_file(path, source_dir, dest_dir, None, None, context)?
+                    *value = handle_file(&path, source_dir, dest_dir, None, None, context)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
                     let path = d.path.clone().unwrap();
-                    let path = Path::new(&path);
-                    let path = if path.starts_with(source_dir) {
-                        path
-                    } else {
-                        &source_dir.join(path)
-                    };
-                    *value = handle_dir(path, source_dir, dest_dir)?
+                    let path = correct_output_path(Path::new(&path), source_dir, context.runtime);
+                    *value = handle_dir(&path, source_dir, dest_dir)?
                 }
                 _ => {}
             }
@@ -80,6 +75,18 @@ pub fn collect_command_outputs(
     }
 
     Ok(output_map)
+}
+
+fn correct_output_path(path: &Path, source_dir: &Path, runtime: Option<&Runtime>) -> PathBuf {
+    if path.starts_with(source_dir) {
+        path.to_path_buf()
+    } else if let Some(runtime) = runtime
+        && let Ok(stripped) = path.strip_prefix(runtime.outdir.clone())
+    {
+        source_dir.join(stripped)
+    } else {
+        source_dir.join(path)
+    }
 }
 
 ///collects a single output item af
