@@ -210,7 +210,9 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
             if let Some(serde_yaml::Value::String(expected_basename)) = expected.get("basename") {
                 if let Some(actual_basename) = &file.basename {
                     if expected_basename != "Any" && expected_basename != actual_basename {
-                        eprintln!("Could not validate basename for {file:?}");
+                        eprintln!(
+                            "Could not validate basename for {file:?}, {actual_basename}!={expected_basename}"
+                        );
                         return false;
                     }
                 } else {

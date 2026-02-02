@@ -207,6 +207,7 @@ impl Directory {
                 entries.push(FileOrDirectory::File(File::new_from_path(&path_buf)?));
             }
         }
+        entries.sort_by_key(|e| e.basename().cloned());
 
         Ok(entries)
     }
