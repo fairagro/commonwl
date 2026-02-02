@@ -168,9 +168,16 @@ fn js_eval(
         }
     }
 
+    //auto wrap expressions if object notation
+     let expression = if expression.trim().starts_with('{') {
+        format!("({})", expression)
+    } else {
+        expression.to_string()
+    };
+
     let result = context
-        .eval(Source::from_bytes(expression))
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        .eval(Source::from_bytes(&expression))
+        .map_err(|e| anyhow::anyhow!("Could not evaluate expression: {expression}: {e}"))?;
     let mut json = result
         .to_json(&mut context)
         .map_err(|e| anyhow::anyhow!("{e}"))?;

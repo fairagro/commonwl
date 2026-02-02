@@ -161,23 +161,29 @@ fn stage_files(
     guest_workdir: &str,
     path_mapper: &mut PathMapper,
 ) -> anyhow::Result<()> {
-    let path = item.path().unwrap();
-    let path = PathBuf::from(path);
     let staged_path = if let Some(entryname) = &entryname {
         stagedir.join(entryname)
     } else if let Some(basename) = item.basename() {
         stagedir.join(basename)
     } else {
+        let path = item.path().unwrap();
+        let path = PathBuf::from(path);
         stagedir.join(path.file_name().unwrap())
     };
 
     let parent = staged_path.parent().unwrap();
     fs::create_dir_all(parent)?;
 
-    if item.is_file() {
-        fs::copy(&path, staged_path)?;
+    if let Some(path) = item.path() {
+        if item.is_file() {
+            fs::copy(path, staged_path)?;
+        } else if item.is_dir() {
+            copy_dir(path, staged_path)?;
+        }
     } else if item.is_dir() {
-        copy_dir(&path, staged_path)?;
+        fs::create_dir_all(staged_path)?;
+
+        //handle listing??
     }
 
     update_pathmap(guest_workdir, path_mapper, item, workdir, None)?;
