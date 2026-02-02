@@ -50,10 +50,10 @@ fn stage_item(
             Ok(())
         }
         ListingItems::Dirent(dirent) => stage_dirent(dirent, workdir, stagedir, context),
-        ListingItems::FileOrDirectory(fod) => stage_files(fod, stagedir),
+        ListingItems::FileOrDirectory(fod) => stage_files(fod, stagedir, None),
         ListingItems::Vec(items) => {
             for item in items {
-                stage_files(item, stagedir)?;
+                stage_files(item, stagedir, None)?;
             }
             Ok(())
         }
@@ -85,8 +85,15 @@ fn stage_dirent(
                 }
             }
         }
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
+            stage_files(
+                &FileOrDirectory::Directory(dir),
+                stagedir,
+                dirent.entryname.as_ref(),
+            )?;
+            return Ok(());
+        }
         DefaultValue::Any(value) => value.as_str().unwrap().to_string(),
-        _ => unimplemented!(),
     };
 
     let entryname = dirent.clone().entryname.unwrap();
@@ -101,17 +108,28 @@ fn stage_dirent(
     Ok(())
 }
 
-fn stage_files(item: &FileOrDirectory, stagedir: &Path) -> anyhow::Result<()> {
+fn stage_files(
+    item: &FileOrDirectory,
+    stagedir: &Path,
+    entryname: Option<&String>,
+) -> anyhow::Result<()> {
     let path = item.path().unwrap();
     let path = PathBuf::from(path);
-    let staged_path = stagedir.join(item.basename().unwrap());
+    let staged_path = if let Some(entryname) = &entryname {
+        stagedir.join(entryname)
+    } else if let Some(basename) = item.basename() {
+        stagedir.join(basename)
+    } else {
+        stagedir.join(path.file_name().unwrap())
+    };
+    
     let parent = staged_path.parent().unwrap();
     fs::create_dir_all(parent)?;
 
     if item.is_file() {
-        fs::copy(&path, &staged_path)?;
+        fs::copy(&path, staged_path)?;
     } else if item.is_dir() {
-        copy_dir(&path, &staged_path)?;
+        copy_dir(&path, staged_path)?;
     }
 
     Ok(())
