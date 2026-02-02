@@ -438,6 +438,7 @@ fn validate_cwl_type(r#type: CWLType, value: &DefaultValue) -> bool {
         DefaultValue::FileOrDirectory(fod) => match r#type {
             CWLType::File => fod.is_file(),
             CWLType::Directory => fod.is_dir(),
+            CWLType::Any => true,
             _ => false,
         },
         DefaultValue::Any(value) => match r#type {
