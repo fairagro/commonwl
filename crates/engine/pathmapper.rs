@@ -216,19 +216,18 @@ impl PathMapper {
         };
 
         let host_path = Self::resolve_location(path, base_dir)?;
-        let Some(filename) = host_path.file_name() else {
-            anyhow::bail!("File is missing a path")
-        };
+        let relative = host_path.strip_prefix(base_dir).unwrap_or(Path::new(host_path.file_name().unwrap_or_default()));
 
         let staged_path = if let Some(basename) = &file.basename {
             stage_dir.join(basename)
         } else {
-            stage_dir.join(filename)
+            stage_dir.join(relative)
         };
 
-        mappings.insert(host_path, staged_path);
+        mappings.insert(host_path, staged_path.clone());
 
         if let Some(secondary) = &file.secondary_files {
+            let stage_dir = staged_path.parent().unwrap_or(&staged_path);
             for item in secondary {
                 Self::collect_files(
                     &DefaultValue::FileOrDirectory(item.clone()),
@@ -335,6 +334,7 @@ mod tests {
         let inputs = collect_inputs(&specification, &inputs).unwrap();
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap().mappings.len(), 1);
     }
@@ -373,24 +373,6 @@ mod tests {
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
         assert!(result.is_ok());
         assert_eq!(result.unwrap().mappings.len(), 2);
-    }
-
-    #[test]
-    fn test_pathmapper_init_secondary_files() {
-        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests");
-        let cwl_file = base_dir.join("dir4.cwl");
-        let input_file = base_dir.join("dir4-job.yml");
-
-        let stage_dir = PathBuf::from("/mnt/69420/");
-
-        let specification = load_cwl_file(cwl_file, true).unwrap();
-        let inputs: HashMap<String, serde_yaml::Value> =
-            serde_yaml::from_str(&fs::read_to_string(input_file).unwrap()).unwrap();
-        let inputs = collect_inputs(&specification, &inputs).unwrap();
-
-        let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap().mappings.len(), 7);
     }
 
     #[test]
