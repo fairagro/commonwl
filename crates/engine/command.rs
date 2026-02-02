@@ -639,7 +639,7 @@ stdout: output.txt"#;
 
         assert_eq!(
             cmd,
-            vec![&shell_cmd[0], &shell_cmd[1], "cd testdir && find . | sort"]
+            vec![&shell_cmd[0], &shell_cmd[1], "'cd' 'testdir' && 'find' '.' | 'sort'"]
         );
     }
 
