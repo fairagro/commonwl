@@ -152,6 +152,33 @@ pub(crate) fn handle_synthetic_directories(
     Ok(())
 }
 
+pub enum EngineStatus {
+    Success(i32),
+    Failure(i32),
+    Undefined(i32),
+}
+
+pub fn evaluate_exitcodes(exit_codes: NonEmpty<ExitStatus>, doc: &CWLDocument) -> EngineStatus {
+    //currently we only look at first code
+    let actual_code = exit_codes.first();
+    let code = actual_code.code().unwrap();
+    if let CWLDocument::CommandLineTool(tool) = doc {
+        let success_codes = tool.success_codes.clone().unwrap_or(vec![0]);
+        let failure_codes = tool.permanent_fail_codes.clone().unwrap_or(vec![1]);
+        if success_codes.contains(&code) {
+            EngineStatus::Success(code)
+        } else if failure_codes.contains(&code) {
+            EngineStatus::Failure(code)
+        } else {
+            EngineStatus::Undefined(code)
+        }
+    } else if code != 0 {
+        EngineStatus::Failure(code)
+    } else {
+        EngineStatus::Success(code)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -331,7 +331,7 @@ impl TaskBackend for DockerBackend {
         );
 
         let exit_status = self.backend.run(task, token)?.await?;
-
+        
         //evaluate stderr/stdout
         let stdout = fs::read_to_string(&stdout_out_file)?;
         if !stdout.is_empty() {

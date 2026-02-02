@@ -1,8 +1,8 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
     backend::{
-        TaskBackend, docker::DockerBackend, load_execution_context,
-        load_execution_context_with_inputs,
+        EngineStatus, TaskBackend, docker::DockerBackend, evaluate_exitcodes,
+        load_execution_context, load_execution_context_with_inputs,
     },
     input::InputObject,
 };
@@ -33,9 +33,7 @@ async fn main() -> anyhow::Result<()> {
     let quiet = matches.get_one::<bool>("quiet").unwrap_or(&false);
 
     if !quiet {
-        tracing_subscriber::fmt()
-            .with_max_level(Level::INFO)
-            .init();
+        tracing_subscriber::fmt().with_max_level(Level::INFO).init();
     }
 
     let config = Config::default();
@@ -49,7 +47,14 @@ async fn main() -> anyhow::Result<()> {
     let cancellation_token = CancellationToken::new();
     let result = backend.run(&request, cancellation_token).await?;
     let exit_status = result.exit_status;
-    exit(exit_status.first().code().unwrap())
+
+    let evaluated_code = evaluate_exitcodes(exit_status, &request.specification);
+
+    if let EngineStatus::Success(_) = evaluated_code {
+        exit(0)
+    } else {
+        exit(1)
+    }
 }
 
 fn cli() -> ArgMatches {
