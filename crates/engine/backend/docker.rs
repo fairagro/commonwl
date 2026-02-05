@@ -1,14 +1,17 @@
 use crate::{
-    backend::{ExecutionRequest, ExecutionResult, TaskBackend, handle_synthetic_directories},
+    backend::{ExecutionRequest, ExecutionResult, TaskBackend},
     checksum, command,
     context::build_runtime,
     docker::build_container,
     environment::handle_environment,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
-    input::{collect_inputs, fill_input_metadata, flatten_inputs, get_stdin},
+    input::{
+        collect_inputs,
+        file_system::{create_flattened_inputs, fill_input_metadata},
+        get_stdin,
+    },
     output::collect_command_outputs,
     pathmapper::PathMapper,
-    secondary_files::collect_secondary_files_for_inputs,
     workdir::stage_work_dir,
 };
 use crankshaft::{
@@ -122,20 +125,12 @@ impl TaskBackend for DockerBackend {
         //create runtime struct
         let mut runtime = build_runtime(rr, eval_context);
         runtime.outdir = PathBuf::from(workdir);
-
         eval_context.runtime = Some(&runtime);
 
-        collect_secondary_files_for_inputs(
-            &request.specification,
+        let flattened_inputs = create_flattened_inputs(
             &mut inputs,
+            &request.specification,
             eval_context,
-            &mut path_mapper,
-        )?;
-
-        //handle synthethic directories
-        let mut flattened_inputs = flatten_inputs(inputs.values());
-        handle_synthetic_directories(
-            &mut flattened_inputs,
             &mut path_mapper,
             &request.working_dir,
             tmpdir.path(),
@@ -193,16 +188,7 @@ impl TaskBackend for DockerBackend {
         let mut stdin = get_stdin(tool, &inputs);
         if let Some(stdin) = &mut stdin {
             //evaluate expression
-            *stdin = if let Ok(value) = do_eval(
-                stdin,
-                &EvaluationContext {
-                    runtime: Some(&runtime),
-                    inputs: Some(&inputs),
-                    ijsr,
-                    workdir: Some(&request.working_dir),
-                    ..Default::default()
-                },
-            ) {
+            *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
                 serde_yaml::to_string(&value)?.trim().to_owned()
             } else {
                 stdin.to_string()
@@ -216,6 +202,7 @@ impl TaskBackend for DockerBackend {
                 .unwrap() //allowed as we just added it!
                 .to_string_lossy()
                 .into_owned();
+
             args.push(stdin.to_string());
         }
 

@@ -1,7 +1,7 @@
 use crate::{
     context::Runtime,
     expression::{self, EvaluationContext},
-    input::validate_command_input,
+    input::validation::validate_command_input,
     pathmapper::PathMapper,
 };
 use cwl_core::{
