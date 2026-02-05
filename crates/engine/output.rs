@@ -23,35 +23,47 @@ use std::{
 };
 use tracing::info;
 
+pub struct OutputCollectionContext<'a> {
+    pub source_dir: &'a Path,
+    pub dest_dir: &'a Path,
+    pub eval_context: &'a EvaluationContext<'a>,
+    pub namespaces: &'a HashMap<String, String>,
+}
+
 /// handles collection of command outputs after execution
 pub fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
-    source_dir: &Path,
-    dest_dir: &Path,
     stdout_file: &Path,
     stderr_file: &Path,
-    context: &EvaluationContext,
-    namespaces: &HashMap<String, String>,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map: HashMap<String, DefaultValue> = HashMap::new();
 
-    if source_dir.join("cwl.output.json").exists() {
-        let contents = fs::read_to_string(source_dir.join("cwl.output.json"))?;
+    if context.source_dir.join("cwl.output.json").exists() {
+        let contents = fs::read_to_string(context.source_dir.join("cwl.output.json"))?;
         let mut values: HashMap<String, DefaultValue> = serde_json::from_str(&contents)?;
         for value in values.values_mut() {
             match value {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                     f.dry_validation();
                     let path = f.path.clone().unwrap();
-                    let path = correct_output_path(Path::new(&path), source_dir, context.runtime);
+                    let path = correct_output_path(
+                        Path::new(&path),
+                        context.source_dir,
+                        context.eval_context.runtime,
+                    );
                     //can file have secondary files here?
-                    *value = handle_file(&path, source_dir, dest_dir, None, None, context)?
+                    *value = handle_file(&path, None, None, context)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
                     let path = d.path.clone().unwrap();
-                    let path = correct_output_path(Path::new(&path), source_dir, context.runtime);
-                    *value = handle_dir(&path, source_dir, dest_dir)?
+                    let path = correct_output_path(
+                        Path::new(&path),
+                        context.source_dir,
+                        context.eval_context.runtime,
+                    );
+                    *value = handle_dir(&path, context)?
                 }
                 _ => {}
             }
@@ -62,15 +74,7 @@ pub fn collect_command_outputs(
     //we start with simple cases for now: Files and Directories with glob patterns
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
-        let value = collect_output_item(
-            output,
-            source_dir,
-            dest_dir,
-            stdout_file,
-            stderr_file,
-            context,
-            namespaces,
-        )?;
+        let value = collect_output_item(output, stdout_file, stderr_file, context)?;
         output_map.insert(output_id, value);
     }
 
@@ -92,29 +96,20 @@ fn correct_output_path(path: &Path, source_dir: &Path, runtime: Option<&Runtime>
 ///collects a single output item af
 fn collect_output_item(
     output: &CommandOutputParameter,
-    source_dir: &Path,
-    dest_dir: &Path,
     stdout_file: &Path,
     stderr_file: &Path,
-    context: &EvaluationContext,
-    namespaces: &HashMap<String, String>,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     match &output.r#type {
-        CommandOutputParameterType::Stdout => {
-            handle_file(stdout_file, source_dir, dest_dir, None, None, context)
-        }
-        CommandOutputParameterType::Stderr => {
-            handle_file(stderr_file, source_dir, dest_dir, None, None, context)
-        }
+        CommandOutputParameterType::Stdout => handle_file(stdout_file, None, None, context),
+        CommandOutputParameterType::Stderr => handle_file(stderr_file, None, None, context),
         CommandOutputParameterType::CommandOutputType(one_or_many) => match one_or_many {
             OneOrMany::One(item) => collect_item(
                 output,
                 &output.output_binding,
                 item,
-                source_dir,
-                dest_dir,
+                output.secondary_files.as_ref(),
                 context,
-                namespaces,
             ),
             OneOrMany::Many(items) => Ok(items
                 .iter()
@@ -123,10 +118,8 @@ fn collect_output_item(
                         output,
                         &output.output_binding,
                         item,
-                        source_dir,
-                        dest_dir,
+                        output.secondary_files.as_ref(),
                         context,
-                        namespaces,
                     )
                     .ok()
                 })
@@ -139,52 +132,34 @@ fn collect_item(
     output: &CommandOutputParameter,
     output_binding: &Option<CommandOutputBinding>,
     item: &CommandOutputType,
-    source_dir: &Path,
-    dest_dir: &Path,
-    context: &EvaluationContext,
-    namespaces: &HashMap<String, String>,
+    secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     let output_id = output.id.clone().unwrap_or_default();
     match item {
         CommandOutputType::CWLType(ty) => match ty {
             CWLType::File => {
-                let matches = add_file_impl(
-                    &output_id,
-                    output,
-                    output_binding,
-                    source_dir,
-                    dest_dir,
-                    context,
-                    namespaces,
-                )?;
+                let matches =
+                    add_file_impl(&output_id, output, output_binding, secondary_files, context)?;
                 Ok(matches
                     .first()
                     .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null))
                     .clone())
             }
             CWLType::Directory => {
-                let matches =
-                    add_dir_impl(&output_id, output_binding, source_dir, dest_dir, context)?;
+                let matches = add_dir_impl(&output_id, output_binding, context)?;
                 Ok(matches
                     .first()
                     .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null))
                     .clone())
             }
-            _ => add_fallback_impl(&output_id, output, source_dir, context),
+            _ => add_fallback_impl(&output_id, output, context),
         },
         CommandOutputType::CommandOutputSchema(schema) => match &**schema {
-            CommandOutputSchema::Record(rec) => {
-                collect_record_schema_item(output, rec, source_dir, dest_dir, context, namespaces)
+            CommandOutputSchema::Record(rec) => collect_record_schema_item(output, rec, context),
+            CommandOutputSchema::Array(arr) => {
+                collect_array_schema_item(output, arr, output_binding, secondary_files, context)
             }
-            CommandOutputSchema::Array(arr) => collect_array_schema_item(
-                output,
-                arr,
-                output_binding,
-                source_dir,
-                dest_dir,
-                context,
-                namespaces,
-            ),
             CommandOutputSchema::Enum(_) => todo!(),
         },
         CommandOutputType::String(_) => todo!(),
@@ -194,10 +169,7 @@ fn collect_item(
 fn collect_record_schema_item(
     output: &CommandOutputParameter,
     record: &CommandOutputRecordSchema,
-    source_dir: &Path,
-    dest_dir: &Path,
-    context: &EvaluationContext,
-    namespaces: &HashMap<String, String>,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     let mut fields = HashMap::new();
     if let Some(record_fields) = &record.fields {
@@ -207,10 +179,8 @@ fn collect_record_schema_item(
                     output,
                     &field.output_binding,
                     item,
-                    source_dir,
-                    dest_dir,
+                    field.secondary_files.as_ref(),
                     context,
-                    namespaces,
                 )?,
                 OneOrMany::Many(items) => items
                     .iter()
@@ -219,10 +189,8 @@ fn collect_record_schema_item(
                             output,
                             &field.output_binding,
                             item,
-                            source_dir,
-                            dest_dir,
+                            field.secondary_files.as_ref(),
                             context,
-                            namespaces,
                         )
                         .ok()
                     })
@@ -238,10 +206,8 @@ fn collect_array_schema_item(
     output: &CommandOutputParameter,
     array: &CommandOutputArraySchema,
     output_binding: &Option<CommandOutputBinding>,
-    source_dir: &Path,
-    dest_dir: &Path,
-    context: &EvaluationContext,
-    namespaces: &HashMap<String, String>,
+    secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     let mut values: Vec<DefaultValue> = vec![];
     let output_id = output.id.clone().unwrap_or_default();
@@ -252,10 +218,8 @@ fn collect_array_schema_item(
                     &output_id,
                     output,
                     output_binding,
-                    source_dir,
-                    dest_dir,
+                    secondary_files,
                     context,
-                    namespaces,
                 )?),
                 CWLType::Directory => todo!(),
                 _ => {}
@@ -272,29 +236,25 @@ fn add_file_impl(
     output_id: &String,
     output: &CommandOutputParameter,
     output_binding: &Option<CommandOutputBinding>,
-    source_dir: &Path,
-    dest_dir: &Path,
-    context: &EvaluationContext,
-    namespaces: &HashMap<String, String>,
+    secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
     let mut files = vec![];
     if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
-        for glob_ in &get_globs(globs, context)? {
-            let full_glob = format!("{}/{}", source_dir.display(), glob_);
+        for glob_ in &get_globs(globs, context.eval_context)? {
+            let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
             for entry in glob(&full_glob)? {
                 let Ok(item) = entry else {
                     info!("Output glob {full_glob} did not match any files for {output_id}");
                     continue;
                 };
-                let format = handle_format(output, namespaces, context);
+                let format = handle_format(output, context.namespaces, context.eval_context);
                 files.push(handle_file(
                     &item,
-                    source_dir,
-                    dest_dir,
                     format.as_ref(),
-                    output.secondary_files.as_ref(),
+                    secondary_files,
                     context,
                 )?);
             }
@@ -306,22 +266,20 @@ fn add_file_impl(
 fn add_dir_impl(
     output_id: &String,
     output_binding: &Option<CommandOutputBinding>,
-    source_dir: &Path,
-    dest_dir: &Path,
-    context: &EvaluationContext,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
     let mut dirs = vec![];
     if let Some(binding) = output_binding
         && let Some(globs) = &binding.glob
     {
-        for glob_ in &get_globs(globs, context)? {
-            let full_glob = format!("{}/{}", source_dir.display(), glob_);
+        for glob_ in &get_globs(globs, context.eval_context)? {
+            let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
             let entry = glob(&full_glob)?.next();
             let Some(Ok(item)) = entry else {
                 info!("Output glob {full_glob} did not match any directories for {output_id}");
                 continue;
             };
-            dirs.push(handle_dir(&item, source_dir, dest_dir)?);
+            dirs.push(handle_dir(&item, context)?);
         }
     }
     Ok(dirs)
@@ -330,14 +288,13 @@ fn add_dir_impl(
 fn add_fallback_impl(
     output_id: &String,
     output: &CommandOutputParameter,
-    source_dir: &Path,
-    context: &EvaluationContext,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     if let Some(binding) = &output.output_binding {
         if let Some(globs) = &binding.glob {
             let glob_ = globs.as_one();
-            let glob_ = do_eval_to_string(glob_, context);
-            let full_glob = format!("{}/{}", source_dir.display(), glob_);
+            let glob_ = do_eval_to_string(glob_, context.eval_context);
+            let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
 
             let entry = glob(&full_glob)?.next();
             let Some(Ok(entry)) = entry else {
@@ -349,13 +306,19 @@ fn add_fallback_impl(
                 let mut file = File::new_from_path(&entry)?;
                 file.contents = Some(contents);
                 let file_value = serde_json::to_value(vec![file])?; //could be array also so vec is expected
-                let value = do_eval(expression, &context.clone().with_context(&file_value))?;
+                let value = do_eval(
+                    expression,
+                    &context.eval_context.clone().with_context(&file_value),
+                )?;
                 return Ok(DefaultValue::Any(value));
             } else {
                 return Ok(DefaultValue::Any(serde_yaml::Value::String(contents)));
             }
         } else if let Some(expression) = &binding.output_eval {
-            return Ok(DefaultValue::Any(do_eval(expression, context)?));
+            return Ok(DefaultValue::Any(do_eval(
+                expression,
+                context.eval_context,
+            )?));
         }
     }
     Ok(DefaultValue::Any(serde_yaml::Value::Null))
@@ -393,20 +356,18 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::R
 //returns a file created in the output directory
 fn handle_file(
     path: &Path,
-    source_dir: &Path,
-    dest_dir: &Path,
     format: Option<&String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
-    context: &EvaluationContext,
+    context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
-    let relative_path = if let Ok(relative_path) = path.strip_prefix(source_dir) {
+    let relative_path = if let Ok(relative_path) = path.strip_prefix(context.source_dir) {
         relative_path
     } else {
         Path::new(path.file_name().unwrap_or_default())
     }
     .to_path_buf();
 
-    let dest_path = dest_dir.join(&relative_path);
+    let dest_path = context.dest_dir.join(&relative_path);
 
     fs::copy(path, &dest_path)?;
     let mut file = File::new_from_path(&dest_path)?;
@@ -414,7 +375,8 @@ fn handle_file(
 
     //handle secondaries
     if let Some(secondary_files) = secondary_files {
-        let secondary_files = copy_secondary_files(path, &dest_path, secondary_files, context)?;
+        let secondary_files =
+            copy_secondary_files(path, &dest_path, secondary_files, context.eval_context)?;
         file.secondary_files = Some(secondary_files);
     }
 
@@ -448,9 +410,9 @@ fn copy_secondary_files(
 }
 
 //returns a directory created in the output directory
-fn handle_dir(path: &Path, source_dir: &Path, dest_dir: &Path) -> anyhow::Result<DefaultValue> {
-    let relative_path = path.strip_prefix(source_dir)?.to_path_buf();
-    let dest_path = dest_dir.join(&relative_path);
+fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<DefaultValue> {
+    let relative_path = path.strip_prefix(context.source_dir)?.to_path_buf();
+    let dest_path = context.dest_dir.join(&relative_path);
     let dest_path_as_str = dest_path.to_string_lossy();
 
     copy_dir(path, &dest_path)?;

@@ -10,7 +10,7 @@ use crate::{
         file_system::{add_synthethic_paths, create_flattened_inputs, fill_input_metadata},
         get_stdin,
     },
-    output::collect_command_outputs,
+    output::{OutputCollectionContext, collect_command_outputs},
     pathmapper::PathMapper,
     workdir::stage_work_dir,
 };
@@ -139,7 +139,7 @@ impl TaskBackend for DockerBackend {
         //adds synthethic paths to the staged inputs and readds the updated value to the evaluation context.
         let staged_inputs = add_synthethic_paths(staged_inputs.clone(), &path_mapper);
         eval_context.inputs = Some(&staged_inputs);
-        
+
         //evalute environment expressions
         let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
         environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
@@ -368,12 +368,14 @@ impl TaskBackend for DockerBackend {
 
         let outputs = collect_command_outputs(
             &tool.outputs,
-            outdir.path(),
-            &request.out_dir,
             &stdout_out_file,
             &stderr_out_file,
-            &eval_context,
-            &namespaces,
+            &OutputCollectionContext {
+                source_dir: outdir.path(),
+                dest_dir: &request.out_dir,
+                eval_context: &eval_context,
+                namespaces: &namespaces,
+            },
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;
         println!("{json}");
