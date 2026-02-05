@@ -10,6 +10,7 @@ pub mod input;
 pub mod output;
 pub mod pathmapper;
 pub mod requirements;
+pub mod schema;
 pub mod secondary_files;
 pub mod workdir;
 

@@ -2,6 +2,7 @@ use crate::{
     environment::build_environment,
     input::{InputObject, load_input_file_from_file},
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
+    schema::replace_schema_definitions,
 };
 use anyhow::Ok;
 use cwl_core::{documents::CWLDocument, inputs::DefaultValue, load_cwl_file};
@@ -73,16 +74,20 @@ pub fn load_execution_context_with_inputs(
 
 /// Load an execution context from a CWL Document and an inputs object (if coming from workflow step for example).
 pub fn load_execution_context_from_document(
-    specification: CWLDocument,
+    mut specification: CWLDocument,
     inputs: InputObject,
     base_path: impl AsRef<Path>,
     outputs_path: Option<&Path>,
 ) -> anyhow::Result<ExecutionRequest> {
     let environment = build_environment(&inputs);
+    let requirements = collect_requirements(&specification, &inputs);
+    let hints = collect_hints(&specification, &inputs);
+
+    replace_schema_definitions(&mut specification, &requirements)?;
 
     let ctx = ExecutionRequest {
-        requirements: collect_requirements(&specification, &inputs),
-        hints: collect_hints(&specification, &inputs),
+        requirements,
+        hints,
         specification,
         inputs: inputs.inputs,
         working_dir: base_path.as_ref().to_path_buf(),

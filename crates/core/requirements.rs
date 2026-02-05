@@ -126,7 +126,7 @@ pub struct Include {
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaDefRequirement {
-    types: serde_yaml::Value,
+    pub types: serde_yaml::Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]

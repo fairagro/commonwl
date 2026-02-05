@@ -630,7 +630,7 @@ pub struct CommandInputArraySchema {
 #[serde(rename_all = "camelCase")]
 pub struct InputArraySchema {
     #[builder(into)]
-    pub items: OneOrMany<CommandInputType>,
+    pub items: OneOrMany<InputType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
@@ -645,7 +645,7 @@ pub struct InputArraySchema {
 impl From<CommandInputArraySchema> for InputArraySchema {
     fn from(value: CommandInputArraySchema) -> Self {
         Self {
-            items: value.items,
+            items: value.items.map(Into::into),
             name: value.name,
             label: value.label,
             doc: value.doc,
