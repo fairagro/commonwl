@@ -100,14 +100,16 @@ fn collect_output_item(
     stderr_file: &Path,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
+    let format = output.format.as_ref().map(|f| f.as_one().to_string());
     match &output.r#type {
-        CommandOutputParameterType::Stdout => handle_file(stdout_file, None, None, context),
-        CommandOutputParameterType::Stderr => handle_file(stderr_file, None, None, context),
+        CommandOutputParameterType::Stdout => handle_file(stdout_file, format, None, context),
+        CommandOutputParameterType::Stderr => handle_file(stderr_file, format, None, context),
         CommandOutputParameterType::CommandOutputType(one_or_many) => match one_or_many {
             OneOrMany::One(item) => collect_item(
                 output,
                 &output.output_binding,
                 item,
+                format,
                 output.secondary_files.as_ref(),
                 context,
             ),
@@ -118,6 +120,7 @@ fn collect_output_item(
                         output,
                         &output.output_binding,
                         item,
+                        format.clone(),
                         output.secondary_files.as_ref(),
                         context,
                     )
@@ -132,6 +135,7 @@ fn collect_item(
     output: &CommandOutputParameter,
     output_binding: &Option<CommandOutputBinding>,
     item: &CommandOutputType,
+    format: Option<String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
@@ -140,7 +144,7 @@ fn collect_item(
         CommandOutputType::CWLType(ty) => match ty {
             CWLType::File => {
                 let matches =
-                    add_file_impl(&output_id, output, output_binding, secondary_files, context)?;
+                    add_file_impl(&output_id, output_binding, format, secondary_files, context)?;
                 Ok(matches
                     .first()
                     .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null))
@@ -157,9 +161,14 @@ fn collect_item(
         },
         CommandOutputType::CommandOutputSchema(schema) => match &**schema {
             CommandOutputSchema::Record(rec) => collect_record_schema_item(output, rec, context),
-            CommandOutputSchema::Array(arr) => {
-                collect_array_schema_item(output, arr, output_binding, secondary_files, context)
-            }
+            CommandOutputSchema::Array(arr) => collect_array_schema_item(
+                output,
+                format,
+                arr,
+                output_binding,
+                secondary_files,
+                context,
+            ),
             CommandOutputSchema::Enum(_) => todo!(),
         },
         CommandOutputType::String(_) => todo!(),
@@ -179,6 +188,7 @@ fn collect_record_schema_item(
                     output,
                     &field.output_binding,
                     item,
+                    field.format.as_ref().map(|f| f.as_one().to_string()),
                     field.secondary_files.as_ref(),
                     context,
                 )?,
@@ -189,6 +199,7 @@ fn collect_record_schema_item(
                             output,
                             &field.output_binding,
                             item,
+                            field.format.as_ref().map(|f| f.as_one().to_string()),
                             field.secondary_files.as_ref(),
                             context,
                         )
@@ -204,6 +215,7 @@ fn collect_record_schema_item(
 
 fn collect_array_schema_item(
     output: &CommandOutputParameter,
+    format: Option<String>,
     array: &CommandOutputArraySchema,
     output_binding: &Option<CommandOutputBinding>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
@@ -216,8 +228,8 @@ fn collect_array_schema_item(
             CommandOutputType::CWLType(ty) => match ty {
                 CWLType::File => values.extend(add_file_impl(
                     &output_id,
-                    output,
                     output_binding,
+                    format,
                     secondary_files,
                     context,
                 )?),
@@ -234,8 +246,8 @@ fn collect_array_schema_item(
 
 fn add_file_impl(
     output_id: &String,
-    output: &CommandOutputParameter,
     output_binding: &Option<CommandOutputBinding>,
+    mut format: Option<String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
@@ -250,13 +262,8 @@ fn add_file_impl(
                     info!("Output glob {full_glob} did not match any files for {output_id}");
                     continue;
                 };
-                let format = handle_format(output, context.namespaces, context.eval_context);
-                files.push(handle_file(
-                    &item,
-                    format.as_ref(),
-                    secondary_files,
-                    context,
-                )?);
+                let format = handle_format(&mut format, context.namespaces, context.eval_context);
+                files.push(handle_file(&item, format, secondary_files, context)?);
             }
         }
     }
@@ -356,7 +363,7 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::R
 //returns a file created in the output directory
 fn handle_file(
     path: &Path,
-    format: Option<&String>,
+    format: Option<String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
@@ -371,7 +378,7 @@ fn handle_file(
 
     fs::copy(path, &dest_path)?;
     let mut file = File::new_from_path(&dest_path)?;
-    file.format = format.cloned();
+    file.format = format;
 
     //handle secondaries
     if let Some(secondary_files) = secondary_files {
@@ -435,17 +442,12 @@ fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<
 }
 
 fn handle_format(
-    output: &CommandOutputParameter,
+    format: &mut Option<String>,
     namespaces: &HashMap<String, String>,
     context: &EvaluationContext,
 ) -> Option<String> {
-    let mut format = output
-        .format
-        .as_ref()
-        .map(|format| format.as_one().to_string());
-
     //format accepts expression
-    if let Some(t_format) = &mut format {
+    if let Some(t_format) = format {
         if let Ok(value) = do_eval(t_format, context) {
             *t_format = value.as_str().unwrap().to_string();
         }
@@ -453,8 +455,8 @@ fn handle_format(
         if let Some((namespace, value)) = t_format.split_once(":")
             && let Some(resolved) = namespaces.get(namespace)
         {
-            format = Some(format!("{resolved}{value}"));
+            *format = Some(format!("{resolved}{value}"));
         }
     }
-    format
+    format.clone()
 }
