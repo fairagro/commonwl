@@ -176,9 +176,15 @@ fn collect_item(
             CommandOutputSchema::Record(rec) => {
                 collect_record_schema_item(output, rec, source_dir, dest_dir, context, namespaces)
             }
-            CommandOutputSchema::Array(arr) => {
-                collect_array_schema_item(output, arr, source_dir, dest_dir, context, namespaces)
-            }
+            CommandOutputSchema::Array(arr) => collect_array_schema_item(
+                output,
+                arr,
+                output_binding,
+                source_dir,
+                dest_dir,
+                context,
+                namespaces,
+            ),
             CommandOutputSchema::Enum(_) => todo!(),
         },
         CommandOutputType::String(_) => todo!(),
@@ -231,6 +237,7 @@ fn collect_record_schema_item(
 fn collect_array_schema_item(
     output: &CommandOutputParameter,
     array: &CommandOutputArraySchema,
+    output_binding: &Option<CommandOutputBinding>,
     source_dir: &Path,
     dest_dir: &Path,
     context: &EvaluationContext,
@@ -244,7 +251,7 @@ fn collect_array_schema_item(
                 CWLType::File => values.extend(add_file_impl(
                     &output_id,
                     output,
-                    &output.output_binding,
+                    output_binding,
                     source_dir,
                     dest_dir,
                     context,
