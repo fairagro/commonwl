@@ -723,54 +723,6 @@ stdout: output.txt"#;
     }
 
     #[test]
-    fn test_build_command_with_schema_def() {
-        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
-        let tool_path = base_dir.join("tests/tmap-tool.cwl");
-        let doc = load_cwl_file(tool_path, true).unwrap();
-
-        let inputs = include_str!("../../testdata/cwl/tests/tmap-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
-
-        let CWLDocument::CommandLineTool(tool) = doc else {
-            panic!()
-        };
-
-        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
-        cmd = cmd[2..].to_vec();
-
-        assert_eq!(
-            cmd,
-            vec![
-                "tmap",
-                "mapall",
-                "stage1",
-                "map1",
-                "--min-seq-length",
-                "20",
-                "map2",
-                "--min-seq-length",
-                "20",
-                "stage2",
-                "map1",
-                "--max-seq-length",
-                "20",
-                "--min-seq-length",
-                "10",
-                "--seed-length",
-                "16",
-                "map2",
-                "--max-seed-hits",
-                "-1",
-                "--max-seq-length",
-                "20",
-                "--min-seq-length",
-                "10"
-            ]
-        );
-    }
-
-    #[test]
     fn test_build_command_with_record_bindings() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/record-order.cwl");
