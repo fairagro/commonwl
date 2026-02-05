@@ -218,6 +218,11 @@ impl TaskBackend for DockerBackend {
             args.push(stdin.to_string());
         }
 
+        // manually check for an entypoint
+        if let Some(entrypoint) = self.get_docker_entrypoint(&container).await? {
+            args.splice(0..0, entrypoint);
+        }
+
         info!("Executing: {}", args.join(" "));
 
         //build crankshaft task object
@@ -389,6 +394,21 @@ impl TaskBackend for DockerBackend {
             stderr,
             outputs,
         })
+    }
+}
+
+impl DockerBackend {
+    ///Crankshaft backend overwrites docker entrypoint, so we need to get it beforehand and append it to the command
+    async fn get_docker_entrypoint(&self, container: &str) -> anyhow::Result<Option<Vec<String>>> {
+        //ensure image
+        self.client.ensure_image(container).await?;
+        let info = self.client.inner().inspect_image(container).await?;
+        if let Some(cfg) = info.config
+            && let Some(entrypoint) = cfg.entrypoint
+        {
+            return Ok(Some(entrypoint));
+        }
+        Ok(None)
     }
 }
 
