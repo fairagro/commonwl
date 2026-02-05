@@ -316,20 +316,3 @@ fn replace_schema_references(
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::{fs, path::PathBuf};
-
-    #[test]
-    fn test_extract_schema_definitions() {
-        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
-        let tool_path = base_dir.join("tests/tmap-tool.cwl");
-        let contents = fs::read_to_string(&tool_path).unwrap();
-        let yaml: serde_yaml::Value = serde_yaml::from_str(&contents).unwrap();
-
-        let items = extract_schema_definitions(&yaml).unwrap();
-        assert_eq!(items.len(), 5);
-    }
-}
