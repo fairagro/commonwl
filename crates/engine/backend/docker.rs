@@ -7,7 +7,7 @@ use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     input::{
         collect_inputs,
-        file_system::{create_flattened_inputs, fill_input_metadata},
+        file_system::{add_synthethic_paths, create_flattened_inputs, fill_input_metadata},
         get_stdin,
     },
     output::collect_command_outputs,
@@ -127,6 +127,7 @@ impl TaskBackend for DockerBackend {
         runtime.outdir = PathBuf::from(workdir);
         eval_context.runtime = Some(&runtime);
 
+        //needs to be constructed after we created the eval context
         let flattened_inputs = create_flattened_inputs(
             &mut inputs,
             &request.specification,
@@ -135,6 +136,10 @@ impl TaskBackend for DockerBackend {
             &request.working_dir,
             tmpdir.path(),
         )?;
+
+        //adds synthethic paths to the staged inputs and readds the updated value to the evaluation context.
+        let staged_inputs = add_synthethic_paths(staged_inputs.clone(), &path_mapper);
+        eval_context.inputs = Some(&staged_inputs);
 
         //evalute environment expressions
         let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;

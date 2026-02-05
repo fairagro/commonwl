@@ -195,7 +195,7 @@ fn handle_synthetic_directories(
 
         if path.is_none()
             && let FileOrDirectory::Directory(dir) = &mut input
-            && let Some(listing) = &dir.listing
+            && let Some(listing) = &mut dir.listing
             && let Some(basename) = &dir.basename
         {
             //create from listing
@@ -210,7 +210,6 @@ fn handle_synthetic_directories(
             dir.path = path;
 
             for item in listing {
-                let mut item = item.clone();
                 item.dry_validation();
 
                 if let Some(c_path) = item.path() {
@@ -227,7 +226,7 @@ fn handle_synthetic_directories(
                         }
                         FileOrDirectory::Directory(_) => copy_dir(&source_path, &c_host_path)?,
                     }
-                } else if let FileOrDirectory::File(file) = &mut item
+                } else if let FileOrDirectory::File(file) = item
                     && let Some(c_contents) = &file.contents
                 {
                     //write file literal if part of dir
@@ -236,6 +235,8 @@ fn handle_synthetic_directories(
                     } else {
                         &checksum(c_contents)
                     };
+
+                    file.path = Some(base_path.join(filename).to_string_lossy().into_owned());
 
                     let c_host_path = host_path.join(filename);
                     let staged_path = path_mapper.predict_staged_path(base_path.join(filename));
@@ -250,4 +251,64 @@ fn handle_synthetic_directories(
     }
 
     Ok(())
+}
+
+///adds the synthetic dirs we now created in flatten_inputs to the staged_inputs item
+///We could not do this before because we needed the evaluation context in place to do_eval
+pub fn add_synthethic_paths(
+    mut staged_inputs: HashMap<String, DefaultValue>,
+    path_mapper: &PathMapper,
+) -> HashMap<String, DefaultValue> {
+    for item in staged_inputs.values_mut() {
+        lock_item(item, path_mapper);
+    }
+    staged_inputs
+}
+
+pub fn lock_item(item: &mut DefaultValue, path_mapper: &PathMapper) {
+    match item {
+        DefaultValue::FileOrDirectory(fod) => lock_fod(fod, path_mapper),
+        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+            for item in vec {
+                if let Ok(mut dv) = serde_yaml::from_value(item.clone()) {
+                    lock_item(&mut dv, path_mapper);
+                    if let Ok(updated) = serde_yaml::to_value(dv) {
+                        *item = updated
+                    }
+                }
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            for item in map.values_mut() {
+                if let Ok(mut dv) = serde_yaml::from_value(item.clone()) {
+                    lock_item(&mut dv, path_mapper);
+                    if let Ok(updated) = serde_yaml::to_value(dv) {
+                        *item = updated
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+fn lock_fod(fod: &mut FileOrDirectory, path_mapper: &PathMapper) {
+    if fod.path().is_none()
+        && let Some(basename) = fod.basename()
+        && let Some(guest) = path_mapper.get_guest(basename)
+    {
+        fod.set_path(
+            path_mapper
+                .get_host(guest)
+                .map(|p| p.to_string_lossy().to_string()),
+        );
+
+        if let FileOrDirectory::Directory(dir) = fod
+            && let Some(listing) = &mut dir.listing
+        {
+            for item in listing {
+                lock_fod(item, path_mapper);
+            }
+        }
+    }
 }
