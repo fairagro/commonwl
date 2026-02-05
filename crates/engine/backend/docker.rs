@@ -207,9 +207,10 @@ impl TaskBackend for DockerBackend {
             } else {
                 stdin.to_string()
             };
-
             //handle paths
-            path_mapper.add(&stdin)?;
+            if !path_mapper.has_host(&stdin) {
+                path_mapper.add(&stdin)?;
+            }
             *stdin = path_mapper
                 .get_guest(&stdin)
                 .unwrap() //allowed as we just added it!

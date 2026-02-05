@@ -53,6 +53,14 @@ impl PathMapper {
         &self.stage_dir
     }
 
+    pub fn has_host(&self, path: impl AsRef<Path>) -> bool {
+        if path.as_ref().is_absolute() {
+            self.mappings.contains_key(path.as_ref())
+        } else {
+            self.local_mappings.contains_key(path.as_ref())
+        }
+    }
+
     pub fn correct_execution_paths(&self, mut args: Vec<String>) -> Vec<String> {
         for arg in &mut args {
             //remove local dirs
@@ -216,7 +224,9 @@ impl PathMapper {
         };
 
         let host_path = Self::resolve_location(path, base_dir)?;
-        let relative = host_path.strip_prefix(base_dir).unwrap_or(Path::new(host_path.file_name().unwrap_or_default()));
+        let relative = host_path
+            .strip_prefix(base_dir)
+            .unwrap_or(Path::new(host_path.file_name().unwrap_or_default()));
 
         let staged_path = if let Some(basename) = &file.basename {
             stage_dir.join(basename)
