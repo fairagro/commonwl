@@ -109,10 +109,10 @@ fn validate_array_schema(schema: &InputArraySchema, value: &DefaultValue) -> boo
             let item_value: DefaultValue =
                 serde_yaml::from_value(item.clone()).expect("DefaultValue violates itself");
             match &schema.items {
-                OneOrMany::One(t) => validate_input_type(&t.clone().into(), &item_value),
+                OneOrMany::One(t) => validate_input_type(&t.clone(), &item_value),
                 OneOrMany::Many(ts) => ts
                     .iter()
-                    .any(|t| validate_input_type(&t.clone().into(), &item_value)),
+                    .any(|t| validate_input_type(&t.clone(), &item_value)),
             }
         })
     } else {
