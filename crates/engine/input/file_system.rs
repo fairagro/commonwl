@@ -177,7 +177,15 @@ fn create_metadata_for_input(
             let value = serde_yaml::to_value(&items)?;
             Ok(DefaultValue::Any(value))
         }
-        //TODO: records
+        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            let mut new_map = HashMap::new();
+            for (key, value) in map {
+                let dv = serde_yaml::from_value(value.clone())?;
+                new_map.insert(key, create_metadata_for_input(&dv, input, path_mapper)?);
+            }
+            let value = serde_yaml::to_value(&new_map)?;
+            Ok(DefaultValue::Any(value))
+        }
         default => Ok(default.clone()),
     }
 }

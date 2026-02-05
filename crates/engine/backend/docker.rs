@@ -136,11 +136,10 @@ impl TaskBackend for DockerBackend {
             &request.working_dir,
             tmpdir.path(),
         )?;
-
         //adds synthethic paths to the staged inputs and readds the updated value to the evaluation context.
         let staged_inputs = add_synthethic_paths(staged_inputs.clone(), &path_mapper);
         eval_context.inputs = Some(&staged_inputs);
-
+        
         //evalute environment expressions
         let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
         environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());

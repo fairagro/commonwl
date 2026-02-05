@@ -6,7 +6,7 @@ use cwl_core::{
     BoolOrExpression, OneOrMany,
     documents::CWLDocument,
     files::{File, FileOrDirectory},
-    inputs::DefaultValue,
+    inputs::{DefaultValue, InputSchema, InputType},
     types::SecondaryFileSchema,
 };
 use std::{
@@ -61,55 +61,68 @@ pub fn collect_secondary_files_for_inputs(
             let input_id = input.id.as_ref().unwrap();
             let value = values.get_mut(input_id).unwrap();
             handle_value(value, secondary_files, context, path_mapper)?;
+        }
 
-            fn handle_value(
-                value: &mut DefaultValue,
-                secondary_files: &OneOrMany<SecondaryFileSchema>,
-                context: &EvaluationContext,
-                path_mapper: &mut PathMapper,
-            ) -> anyhow::Result<()> {
-                //we need to check all types that may contain files...
-                match value {
-                    DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
-                        file.dry_validation();
-                        if let Some(path) = &file.path {
-                            let mut secondaries = vec![];
-                            for item in secondary_files.as_many() {
-                                if let Some(result) =
-                                    handle_secondary_file_schema(path, &item, context)?
-                                {
-                                    let file =
-                                        File::builder().path(result.to_string_lossy()).build();
-                                    secondaries.push(FileOrDirectory::File(file));
-                                    path_mapper.add(result)?;
-                                }
-                            }
-                            file.secondary_files = Some(secondaries);
-                        }
-                    }
-                    DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
-                        for item in arr {
-                            if let Ok(mut dv) = serde_yaml::from_value::<DefaultValue>(item.clone())
-                            {
-                                handle_value(&mut dv, secondary_files, context, path_mapper)?;
-                                *item = serde_yaml::to_value(&dv)?;
-                            }
-                        }
-                    }
-                    DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
-                        for item in map.values_mut() {
-                            if let Ok(mut dv) = serde_yaml::from_value::<DefaultValue>(item.clone())
-                            {
-                                handle_value(&mut dv, secondary_files, context, path_mapper)?;
-                                *item = serde_yaml::to_value(&dv)?;
-                            }
-                        }
-                    }
-                    _ => {}
+        if let OneOrMany::One(InputType::InputSchema(schema)) = &input.r#type
+            && let InputSchema::Record(rec) = &**schema
+            && let Some(fields) = &rec.fields
+        {
+            let input_id = input.id.as_ref().unwrap();
+            let value = values.get_mut(input_id).unwrap();
+            for field in fields {
+                if let Some(sec_files) = &field.secondary_files
+                    && let DefaultValue::Any(yaml_value) = value
+                    && let Some(field_value) = yaml_value.get_mut(&field.name)
+                {
+                    let mut dv = serde_yaml::from_value(field_value.clone())?;
+                    handle_value(&mut dv, sec_files, context, path_mapper)?;
+                    *field_value = serde_yaml::to_value(dv)?;
                 }
-                Ok(())
             }
         }
+    }
+    Ok(())
+}
+
+fn handle_value(
+    value: &mut DefaultValue,
+    secondary_files: &OneOrMany<SecondaryFileSchema>,
+    context: &EvaluationContext,
+    path_mapper: &mut PathMapper,
+) -> anyhow::Result<()> {
+    //we need to check all types that may contain files...
+    match value {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+            file.dry_validation();
+            if let Some(path) = &file.path {
+                let mut secondaries = vec![];
+                for item in secondary_files.as_many() {
+                    if let Some(result) = handle_secondary_file_schema(path, &item, context)? {
+                        let file = File::builder().path(result.to_string_lossy()).build();
+                        secondaries.push(FileOrDirectory::File(file));
+                        path_mapper.add(result)?;
+                    }
+                }
+                file.secondary_files = Some(secondaries);
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+            for item in arr {
+                if let Ok(mut dv) = serde_yaml::from_value::<DefaultValue>(item.clone()) {
+                    handle_value(&mut dv, secondary_files, context, path_mapper)?;
+                    *item = serde_yaml::to_value(&dv)?;
+                }
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            for item in map.values_mut() {
+                if let Ok(mut dv) = serde_yaml::from_value::<DefaultValue>(item.clone()) {
+                    handle_value(&mut dv, secondary_files, context, path_mapper)?;
+                    *item = serde_yaml::to_value(&dv)?;
+                }
+            }
+        }
+        _ => {}
     }
     Ok(())
 }
