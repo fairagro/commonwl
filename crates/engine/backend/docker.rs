@@ -336,33 +336,29 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
-        let timelimit = if let Some(ttl) = ttl {
-            Some(match &ttl.timelimit {
-                IntegerOrExpression::Int(i) => *i as i64,
-                IntegerOrExpression::Long(i) => *i,
-                IntegerOrExpression::Expression(e) => {
-                    let value = do_eval(e, eval_context)?;
-                    value.as_i64().unwrap_or(-1)
-                }
-            })
-        } else {
-            None
-        };
+        let timelimit = ttl.as_ref().and_then(|ttl| match &ttl.timelimit {
+            IntegerOrExpression::Int(i) => Some(*i as i64),
+            IntegerOrExpression::Long(i) => Some(*i),
+            IntegerOrExpression::Expression(e) => {
+                let value = do_eval(e, eval_context).ok()?;
+                value.as_i64()
+            }
+        });
         let exit_status = if let Some(timeout) = timelimit
             && timeout != 0
         {
             let limit = Duration::from_secs(timeout.try_into()?); //this is intended to throw!
             let token_clone = token.clone();
             tokio::select! {
-                result = self.backend.run(task, token)? => result,
+                result = self.backend.run(task, token)? => result?,
                 _ = tokio::time::sleep(limit) => {
                     token_clone.cancel();
                     error!("Timelimit reached: {timeout}");
                     return Err(TaskRunError::Canceled.into());
                 }
-            }?
+            }
         } else {
-            //easy exec without time constraint
+            //no time constraint
             self.backend.run(task, token)?.await?
         };
         let first_code = exit_status.first().code().unwrap_or(1);
