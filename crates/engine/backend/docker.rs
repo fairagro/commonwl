@@ -22,7 +22,10 @@ use crankshaft::{
         Task,
         service::{
             name::{GeneratorIterator, UniqueAlphanumeric},
-            runner::{Backend, backend::docker},
+            runner::{
+                Backend,
+                backend::{TaskRunError, docker},
+            },
         },
         task::{
             Execution, Input, Output, Resources,
@@ -31,13 +34,14 @@ use crankshaft::{
         },
     },
 };
+use cwl_core::IntegerOrExpression;
 use cwl_core::{
     docstring,
     documents::CWLDocument,
     files::FileOrDirectory,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
-        InlineJavascriptRequirement, ResourceRequirement,
+        InlineJavascriptRequirement, ResourceRequirement, ToolTimeLimit,
     },
 };
 use nonempty::nonempty;
@@ -45,10 +49,11 @@ use std::{
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
+    time::Duration,
 };
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{error, info};
 use url::Url;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
@@ -105,6 +110,7 @@ impl TaskBackend for DockerBackend {
         let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
         let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
         let evr = tool.get_requirement_or_hint::<EnvVarRequirement>();
+        let ttl = tool.get_requirement_or_hint::<ToolTimeLimit>();
 
         //handle docker output dir
         let workdir = if let Some(dr) = dr
@@ -330,7 +336,35 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
-        let exit_status = self.backend.run(task, token)?.await?;
+        let timelimit = if let Some(ttl) = ttl {
+            Some(match &ttl.timelimit {
+                IntegerOrExpression::Int(i) => *i as i64,
+                IntegerOrExpression::Long(i) => *i,
+                IntegerOrExpression::Expression(e) => {
+                    let value = do_eval(e, eval_context)?;
+                    value.as_i64().unwrap_or(-1)
+                }
+            })
+        } else {
+            None
+        };
+        let exit_status = if let Some(timeout) = timelimit
+            && timeout != 0
+        {
+            let limit = Duration::from_secs(timeout.try_into()?); //this is intended to throw!
+            let token_clone = token.clone();
+            tokio::select! {
+                result = self.backend.run(task, token)? => result,
+                _ = tokio::time::sleep(limit) => {
+                    token_clone.cancel();
+                    error!("Timelimit reached: {timeout}");
+                    return Err(TaskRunError::Canceled.into());
+                }
+            }?
+        } else {
+            //easy exec without time constraint
+            self.backend.run(task, token)?.await?
+        };
         let first_code = exit_status.first().code().unwrap_or(1);
 
         //update runtime
