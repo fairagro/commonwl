@@ -5,6 +5,7 @@ use crate::{
     docker::build_container,
     environment::handle_environment,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
+    format::get_format_validator,
     input::{
         collect_inputs,
         file_system::{add_synthethic_paths, create_flattened_inputs, fill_input_metadata},
@@ -41,7 +42,6 @@ use cwl_core::{
 };
 use nonempty::nonempty;
 use std::{
-    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -85,7 +85,10 @@ impl TaskBackend for DockerBackend {
         request: &ExecutionRequest,
         token: CancellationToken,
     ) -> anyhow::Result<ExecutionResult> {
-        let mut inputs = collect_inputs(&request.specification, &request.inputs)?;
+        //create validator
+        let fv = get_format_validator(&request.specification, &request.working_dir)?;
+
+        let mut inputs = collect_inputs(&request.specification, &request.inputs, Some(&fv))?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
         let outdir = tempdir()?;
@@ -350,22 +353,6 @@ impl TaskBackend for DockerBackend {
             fs::create_dir_all(&request.out_dir)?;
         }
 
-        let namespaces = tool
-            .extension_fields
-            .get("$namespaces")
-            .and_then(|v| v.as_mapping())
-            .map(|mapping| {
-                mapping
-                    .iter()
-                    .filter_map(|(k, v)| {
-                        let key = k.as_str()?.to_string();
-                        let value = v.as_str()?.to_string();
-                        Some((key, value))
-                    })
-                    .collect::<HashMap<_, _>>()
-            })
-            .unwrap_or_default();
-
         let outputs = collect_command_outputs(
             &tool.outputs,
             &stdout_out_file,
@@ -374,7 +361,7 @@ impl TaskBackend for DockerBackend {
                 source_dir: outdir.path(),
                 dest_dir: &request.out_dir,
                 eval_context: &eval_context,
-                namespaces: &namespaces,
+                validator: &fv,
             },
         )?;
         let json = serde_json::to_string_pretty(&outputs)?;

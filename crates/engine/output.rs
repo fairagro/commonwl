@@ -1,6 +1,7 @@
 use crate::{
     context::Runtime,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
+    format::FormatValidator,
     secondary_files::handle_secondary_file_schema,
 };
 use cwl_core::{
@@ -27,7 +28,7 @@ pub struct OutputCollectionContext<'a> {
     pub source_dir: &'a Path,
     pub dest_dir: &'a Path,
     pub eval_context: &'a EvaluationContext<'a>,
-    pub namespaces: &'a HashMap<String, String>,
+    pub validator: &'a FormatValidator,
 }
 
 /// handles collection of command outputs after execution
@@ -247,7 +248,7 @@ fn collect_array_schema_item(
 fn add_file_impl(
     output_id: &String,
     output_binding: &Option<CommandOutputBinding>,
-    mut format: Option<String>,
+    format: Option<String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
@@ -262,7 +263,9 @@ fn add_file_impl(
                     info!("Output glob {full_glob} did not match any files for {output_id}");
                     continue;
                 };
-                let format = handle_format(&mut format, context.namespaces, context.eval_context);
+                let format = context
+                    .validator
+                    .handle(format.as_ref(), Some(context.eval_context));
                 files.push(handle_file(&item, format, secondary_files, context)?);
             }
         }
@@ -439,24 +442,4 @@ fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(
         dir,
     )))
-}
-
-fn handle_format(
-    format: &mut Option<String>,
-    namespaces: &HashMap<String, String>,
-    context: &EvaluationContext,
-) -> Option<String> {
-    //format accepts expression
-    if let Some(t_format) = format {
-        if let Ok(value) = do_eval(t_format, context) {
-            *t_format = value.as_str().unwrap().to_string();
-        }
-
-        if let Some((namespace, value)) = t_format.split_once(":")
-            && let Some(resolved) = namespaces.get(namespace)
-        {
-            *format = Some(format!("{resolved}{value}"));
-        }
-    }
-    format.clone()
 }

@@ -1,5 +1,6 @@
 use crate::{
     command::to_str,
+    format::FormatValidator,
     input::validation::{validate_command_input, validate_input_type},
     requirements::{ProcessHints, ProcessRequirements},
 };
@@ -145,12 +146,13 @@ fn adjust_path_to_base(
 pub fn collect_inputs(
     doc: &CWLDocument,
     inputs: &HashMap<String, serde_yaml::Value>,
+    fv: Option<&FormatValidator>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut values = HashMap::new();
     for input in &doc.get_inputs() {
         // collect the actual value
         let mut value = get_input_value(input, inputs)?;
-
+        let format = input.format.as_ref().map(|f| f.as_one());
         //do some validation
         let valid = match doc {
             CWLDocument::CommandLineTool(clt) => {
@@ -161,14 +163,14 @@ pub fn collect_inputs(
                         input.id.clone().unwrap_or_default()
                     )
                 };
-                validate_command_input(&command_input.r#type, &value)
+                validate_command_input(&command_input.r#type, &value, format, fv)
             }
 
             _ => match &input.r#type {
-                OneOrMany::One(item) => validate_input_type(&item.clone(), &value),
+                OneOrMany::One(item) => validate_input_type(&item.clone(), &value, format, fv),
                 OneOrMany::Many(items) => items
                     .iter()
-                    .any(|i| validate_input_type(&i.clone(), &value)),
+                    .any(|i| validate_input_type(&i.clone(), &value, format, fv)),
             },
         };
         //error if validity can not be confirmed
@@ -267,7 +269,7 @@ mod tests {
         ))
         .unwrap();
 
-        let inputs = collect_inputs(&CWLDocument::CommandLineTool(tool), &inputs_values);
+        let inputs = collect_inputs(&CWLDocument::CommandLineTool(tool), &inputs_values, None);
         assert!(inputs.is_ok());
 
         assert_eq!(inputs.unwrap().len(), 2);
@@ -346,7 +348,7 @@ mod tests {
 
         let inputs = load_input_file_from_file(&inputs_path, base_dir).unwrap();
         let doc = load_cwl_file(specification_path, false).unwrap();
-        let inputs = collect_inputs(&doc, &inputs.inputs).unwrap();
+        let inputs = collect_inputs(&doc, &inputs.inputs, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!("Oh no!")

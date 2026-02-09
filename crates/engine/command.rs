@@ -189,7 +189,7 @@ fn collect_input_bindings(
         if let CommandInputParameterType::CommandInputType(OneOrMany::Many(types)) = schema {
             types
                 .iter()
-                .find(|&t| validate_command_input(&t.clone().into(), value))
+                .find(|&t| validate_command_input(&t.clone().into(), value, None, None))
                 .map(|ty| CommandInputParameterType::from(ty.clone()))
         } else {
             None
@@ -596,7 +596,7 @@ stdout: output.txt";
         let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -632,7 +632,7 @@ stdout: output.txt"#;
         let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -659,7 +659,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -698,7 +698,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -730,7 +730,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -753,7 +753,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -773,7 +773,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -793,7 +793,7 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values).unwrap();
+        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()

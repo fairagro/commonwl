@@ -341,7 +341,7 @@ mod tests {
         let specification = load_cwl_file(cwl_file, true).unwrap();
         let inputs: HashMap<String, serde_yaml::Value> =
             serde_yaml::from_str(&fs::read_to_string(input_file).unwrap()).unwrap();
-        let inputs = collect_inputs(&specification, &inputs).unwrap();
+        let inputs = collect_inputs(&specification, &inputs, None).unwrap();
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
 
@@ -360,7 +360,7 @@ mod tests {
         let specification = load_cwl_file(cwl_file, true).unwrap();
         let inputs: HashMap<String, serde_yaml::Value> =
             serde_yaml::from_str(&fs::read_to_string(input_file).unwrap()).unwrap();
-        let inputs = collect_inputs(&specification, &inputs).unwrap();
+        let inputs = collect_inputs(&specification, &inputs, None).unwrap();
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
         assert!(result.is_ok());
@@ -378,7 +378,7 @@ mod tests {
         let specification = load_cwl_file(cwl_file, true).unwrap();
         let inputs: HashMap<String, serde_yaml::Value> =
             serde_yaml::from_str(&fs::read_to_string(input_file).unwrap()).unwrap();
-        let inputs = collect_inputs(&specification, &inputs).unwrap();
+        let inputs = collect_inputs(&specification, &inputs, None).unwrap();
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
         assert!(result.is_ok());
@@ -396,7 +396,7 @@ mod tests {
         let specification = load_cwl_file(cwl_file, true).unwrap();
         let inputs: HashMap<String, serde_yaml::Value> =
             serde_yaml::from_str(&fs::read_to_string(input_file).unwrap()).unwrap();
-        let inputs = collect_inputs(&specification, &inputs).unwrap();
+        let inputs = collect_inputs(&specification, &inputs, None).unwrap();
 
         let result = PathMapper::new(&inputs, &base_dir, &stage_dir);
         assert!(result.is_ok());

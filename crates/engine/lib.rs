@@ -13,6 +13,7 @@ pub mod requirements;
 pub mod schema;
 pub mod secondary_files;
 pub mod workdir;
+pub mod format;
 
 pub fn checksum(str: &str) -> String {
     let mut hasher = Sha1::new();
