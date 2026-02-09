@@ -253,21 +253,36 @@ fn add_file_impl(
     context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
     let mut files = vec![];
-    if let Some(binding) = output_binding
-        && let Some(globs) = &binding.glob
-    {
-        for glob_ in &get_globs(globs, context.eval_context)? {
-            let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
-            for entry in glob(&full_glob)? {
-                let Ok(item) = entry else {
-                    info!("Output glob {full_glob} did not match any files for {output_id}");
-                    continue;
+    if let Some(binding) = output_binding {
+        if let Some(globs) = &binding.glob {
+            for glob_ in &get_globs(globs, context.eval_context)? {
+                let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
+                for entry in glob(&full_glob)? {
+                    let Ok(item) = entry else {
+                        info!("Output glob {full_glob} did not match any files for {output_id}");
+                        continue;
+                    };
+                    let format = context
+                        .validator
+                        .handle(format.as_ref(), Some(context.eval_context));
+                    files.push(handle_file(&item, format, secondary_files, context)?);
+                }
+            }
+        } else if let Some(output_eval) = &binding.output_eval {
+            let value = do_eval(output_eval, context.eval_context)?;
+            let mut dv = serde_yaml::from_value(value)?;
+            if let DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) = &mut dv {
+                file.dry_validation();
+                let Some(path) = &file.path else {
+                    panic!("File has no path")
                 };
+                *file = File::new_from_path(Path::new(&path))?;
                 let format = context
                     .validator
                     .handle(format.as_ref(), Some(context.eval_context));
-                files.push(handle_file(&item, format, secondary_files, context)?);
+                file.format = format;
             }
+            files.push(dv);
         }
     }
     Ok(files)
@@ -279,17 +294,21 @@ fn add_dir_impl(
     context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
     let mut dirs = vec![];
-    if let Some(binding) = output_binding
-        && let Some(globs) = &binding.glob
-    {
-        for glob_ in &get_globs(globs, context.eval_context)? {
-            let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
-            let entry = glob(&full_glob)?.next();
-            let Some(Ok(item)) = entry else {
-                info!("Output glob {full_glob} did not match any directories for {output_id}");
-                continue;
-            };
-            dirs.push(handle_dir(&item, context)?);
+    if let Some(binding) = output_binding {
+        if let Some(globs) = &binding.glob {
+            for glob_ in &get_globs(globs, context.eval_context)? {
+                let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
+                let entry = glob(&full_glob)?.next();
+                let Some(Ok(item)) = entry else {
+                    info!("Output glob {full_glob} did not match any directories for {output_id}");
+                    continue;
+                };
+                dirs.push(handle_dir(&item, context)?);
+            }
+        } else if let Some(output_eval) = &binding.output_eval {
+            let value = do_eval(output_eval, context.eval_context)?;
+            let dv = serde_yaml::from_value(value)?;
+            dirs.push(dv);
         }
     }
     Ok(dirs)
