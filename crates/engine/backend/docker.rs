@@ -158,7 +158,7 @@ impl TaskBackend for DockerBackend {
         );
 
         //handle docker requirement
-        let mut container = "alpine".to_string();
+        let mut container = "ubuntu".to_string(); //add config "default-container"
         if let Some(dr) = dr {
             if let Some(df) = &dr.docker_file
                 && let Some(dt) = &dr.docker_image_id
