@@ -174,7 +174,7 @@ impl Directory {
         };
 
         match load_listing {
-            LoadListingEnum::NoListing => self.listing = Some(vec![]),
+            LoadListingEnum::NoListing => self.listing = None,
             LoadListingEnum::ShallowListing => self.listing = Some(Self::read_dir(path, false)?),
             LoadListingEnum::DeepListing => self.listing = Some(Self::read_dir(path, true)?),
         }
