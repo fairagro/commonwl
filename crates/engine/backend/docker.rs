@@ -34,7 +34,7 @@ use crankshaft::{
         },
     },
 };
-use cwl_core::IntegerOrExpression;
+use cwl_core::{IntegerOrExpression, requirements::LoadListingRequirement};
 use cwl_core::{
     docstring,
     documents::CWLDocument,
@@ -112,6 +112,7 @@ impl TaskBackend for DockerBackend {
         let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
         let evr = tool.get_requirement_or_hint::<EnvVarRequirement>();
         let ttl = tool.get_requirement_or_hint::<ToolTimeLimit>();
+        let llr = tool.get_requirement_or_hint::<LoadListingRequirement>();
 
         //handle docker output dir
         let workdir = if let Some(dr) = dr
@@ -123,7 +124,8 @@ impl TaskBackend for DockerBackend {
         };
 
         // fill input metadata for file or directory, this is useful for the evaluation context
-        let mut staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
+        let mut staged_inputs =
+            fill_input_metadata(&inputs, &request.specification, &path_mapper, llr)?;
 
         let eval_context = &mut EvaluationContext {
             inputs: Some(&staged_inputs.clone()),
@@ -196,7 +198,6 @@ impl TaskBackend for DockerBackend {
                 &mut path_mapper,
             )?;
         }
-
         //collect command string and correct args for staged paths
         let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
 

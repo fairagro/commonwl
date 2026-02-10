@@ -5,9 +5,10 @@ use crate::{
 use cwl_core::{
     FileMetaData, FilePathMetaData, Integer,
     documents::CWLDocument,
-    files::{File, FileOrDirectory},
+    files::{File, FileOrDirectory, LoadListingEnum},
     get_file_metadata, get_path_metadata,
     inputs::{DefaultValue, OperationInputParameter},
+    requirements::LoadListingRequirement,
 };
 use dircpy::copy_dir;
 use std::{collections::HashMap, fs, path::Path};
@@ -71,6 +72,7 @@ pub fn fill_input_metadata(
     inputs: &HashMap<String, DefaultValue>,
     doc: &CWLDocument,
     path_mapper: &PathMapper,
+    llr: Option<&LoadListingRequirement>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut map = HashMap::new();
     let providers = doc.get_inputs();
@@ -80,7 +82,7 @@ pub fn fill_input_metadata(
             .iter()
             .find(|i| i.id == Some(key.to_string()))
             .unwrap();
-        let value = create_metadata_for_input(value, input, path_mapper)?;
+        let value = create_metadata_for_input(value, input, path_mapper, llr)?;
         map.insert(key.clone(), value);
     }
 
@@ -91,6 +93,7 @@ fn create_metadata_for_input(
     value: &DefaultValue,
     input: &OperationInputParameter,
     path_mapper: &PathMapper,
+    llr: Option<&LoadListingRequirement>,
 ) -> anyhow::Result<DefaultValue> {
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) if f.path.is_some() => {
@@ -130,7 +133,12 @@ fn create_metadata_for_input(
             d.path = Some(host_path.to_string_lossy().to_string());
             if let Some(load_listing) = input.load_listing {
                 d.load_listing(load_listing)?;
+            } else if let Some(llr) = llr {
+                d.load_listing(llr.load_listing)?;
             }
+
+            //if llr is shallow and we recurse we add deep listing anyways. so we set llr to None if it is ShallowListing
+            let llr = llr.filter(|llr| llr.load_listing != LoadListingEnum::ShallowListing);
 
             if let Some(listing) = &mut d.listing {
                 for item in listing {
@@ -139,6 +147,7 @@ fn create_metadata_for_input(
                         &DefaultValue::FileOrDirectory(item.clone()),
                         input,
                         path_mapper,
+                        llr,
                     )? {
                         *item = fod;
                     }
@@ -156,6 +165,7 @@ fn create_metadata_for_input(
                         &DefaultValue::FileOrDirectory(item.clone()),
                         input,
                         path_mapper,
+                        llr,
                     )? {
                         *item = fod;
                     }
@@ -173,7 +183,7 @@ fn create_metadata_for_input(
             let mut items = vec![];
             for item in vec {
                 let dv = serde_yaml::from_value(item.clone())?;
-                items.push(create_metadata_for_input(&dv, input, path_mapper)?);
+                items.push(create_metadata_for_input(&dv, input, path_mapper, llr)?);
             }
             let value = serde_yaml::to_value(&items)?;
             Ok(DefaultValue::Any(value))
@@ -182,7 +192,10 @@ fn create_metadata_for_input(
             let mut new_map = HashMap::new();
             for (key, value) in map {
                 let dv = serde_yaml::from_value(value.clone())?;
-                new_map.insert(key, create_metadata_for_input(&dv, input, path_mapper)?);
+                new_map.insert(
+                    key,
+                    create_metadata_for_input(&dv, input, path_mapper, llr)?,
+                );
             }
             let value = serde_yaml::to_value(&new_map)?;
             Ok(DefaultValue::Any(value))
@@ -223,7 +236,7 @@ fn handle_synthetic_directories(
                 if let Some(c_path) = item.path() {
                     let c_path = Path::new(c_path);
                     let c_path = c_path.strip_prefix(work_dir).unwrap_or(c_path);
-                    
+
                     let c_host_path = host_path.join(c_path);
                     let staged_path = path_mapper.predict_staged_path(base_path.join(c_path));
 
