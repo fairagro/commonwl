@@ -226,7 +226,9 @@ fn collect_array_schema_item(
                     secondary_files,
                     context,
                 )?),
-                CWLType::Directory => todo!(),
+                CWLType::Directory => {
+                    values.extend(add_dir_impl(&output_id, output_binding, context)?)
+                }
                 _ => {}
             },
             CommandOutputType::CommandOutputSchema(_) => todo!(),
@@ -291,12 +293,15 @@ fn add_dir_impl(
         if let Some(globs) = &binding.glob {
             for glob_ in get_globs(globs, context.eval_context)? {
                 let full_glob = make_full_glob(&glob_, context)?;
-                let entry = glob(&full_glob)?.next();
-                let Some(Ok(item)) = entry else {
-                    info!("Output glob {full_glob} did not match any directories for {output_id}");
-                    continue;
-                };
-                dirs.push(handle_dir(&item, context)?);
+                for entry in glob(&full_glob)? {
+                    let Ok(item) = entry else {
+                        info!(
+                            "Output glob {full_glob} did not match any directories for {output_id}"
+                        );
+                        continue;
+                    };
+                    dirs.push(handle_dir(&item, context)?);
+                }
             }
         } else if let Some(output_eval) = &binding.output_eval {
             let value = do_eval(output_eval, context.eval_context)?;
