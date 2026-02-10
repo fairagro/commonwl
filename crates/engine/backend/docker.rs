@@ -57,6 +57,7 @@ use tracing::{error, info};
 use url::Url;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
+const CONTAINER_TMPDIR: &str = "/mnt/task/tmp";
 const CONTAINER_INPUT_DIR: &str = "/mnt/task/inputs";
 const CONTAINER_STDOUT_FILE: &str = "/mnt/task/stdout";
 const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
@@ -134,6 +135,8 @@ impl TaskBackend for DockerBackend {
         //create runtime struct
         let mut runtime = build_runtime(rr, eval_context);
         runtime.outdir = PathBuf::from(workdir);
+        runtime.tmpdir = PathBuf::from(CONTAINER_TMPDIR);
+
         eval_context.runtime = Some(&runtime);
 
         //needs to be constructed after we created the eval context
@@ -299,6 +302,17 @@ impl TaskBackend for DockerBackend {
                 .name("outdir")
                 .contents(Contents::Path(outdir.path().to_path_buf()))
                 .path(workdir)
+                .ty(input::Type::Directory)
+                .read_only(false)
+                .build(),
+        );
+
+        //add tmpdir input
+        task.add_input(
+            Input::builder()
+                .name("tmpdir")
+                .contents(Contents::Path(tmpdir.path().to_path_buf()))
+                .path(CONTAINER_TMPDIR)
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
