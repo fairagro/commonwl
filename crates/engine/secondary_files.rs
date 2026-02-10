@@ -13,6 +13,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use tracing::debug;
 
 pub fn handle_secondary_file_schema(
     path: impl AsRef<Path>,
@@ -28,9 +29,14 @@ pub fn handle_secondary_file_schema(
         serde_yaml::Value::String(s) => s,
         _ => return Ok(None),
     };
-
     let mut secondary_path_str = path.as_ref().as_os_str().to_owned();
-    secondary_path_str.push(&pattern);
+    if let Some(new_ext) = pattern.strip_prefix("^.") {
+        let mut pathbuf = PathBuf::from(&secondary_path_str);
+        pathbuf.set_extension(new_ext);
+        secondary_path_str = pathbuf.into_os_string();
+    } else {
+        secondary_path_str.push(&pattern);
+    }
 
     //check required and existent
     let is_required = if let Some(BoolOrExpression::Expression(req_exp)) = &item.required {
@@ -43,9 +49,10 @@ pub fn handle_secondary_file_schema(
         if is_required {
             anyhow::bail!("required secondary file not found {pattern}");
         }
+        debug!("secondary file not found {pattern}");
         return Ok(None);
     }
-
+    
     Ok(Some(PathBuf::from(secondary_path_str)))
 }
 

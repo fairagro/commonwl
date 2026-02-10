@@ -93,7 +93,7 @@ impl TaskBackend for DockerBackend {
         //create validator
         let fv = get_format_validator(&request.specification, &request.working_dir)?;
 
-        let mut inputs = collect_inputs(&request.specification, &request.inputs, Some(&fv))?;
+        let inputs = collect_inputs(&request.specification, &request.inputs, Some(&fv))?;
         let stage_dir = Path::new(CONTAINER_INPUT_DIR);
 
         let outdir = tempdir()?;
@@ -121,11 +121,11 @@ impl TaskBackend for DockerBackend {
             CONTAINER_WORKDIR
         };
 
-        // fill input metadata for file or directory and change paths to staged paths, this is useful for the evaluation context
-        let staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
+        // fill input metadata for file or directory, this is useful for the evaluation context
+        let mut staged_inputs = fill_input_metadata(&inputs, &request.specification, &path_mapper)?;
 
         let eval_context = &mut EvaluationContext {
-            inputs: Some(&staged_inputs),
+            inputs: Some(&staged_inputs.clone()),
             workdir: Some(&request.working_dir),
             ijsr,
             ..Default::default()
@@ -138,7 +138,7 @@ impl TaskBackend for DockerBackend {
 
         //needs to be constructed after we created the eval context
         let flattened_inputs = create_flattened_inputs(
-            &mut inputs,
+            &mut staged_inputs,
             &request.specification,
             eval_context,
             &mut path_mapper,
@@ -198,7 +198,7 @@ impl TaskBackend for DockerBackend {
         let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
 
         //correct and add the stdin value
-        let mut stdin = get_stdin(tool, &inputs);
+        let mut stdin = get_stdin(tool, &staged_inputs);
         if let Some(stdin) = &mut stdin {
             //evaluate expression
             *stdin = if let Ok(value) = do_eval(stdin, eval_context) {

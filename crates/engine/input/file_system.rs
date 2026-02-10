@@ -117,6 +117,7 @@ fn create_metadata_for_input(
                     .maybe_checksum(checksum)
                     .size(Integer::Long(size as i64))
                     .maybe_format(f.format.clone())
+                    .maybe_secondary_files(f.secondary_files.clone())
                     .build(),
             )))
         }
@@ -219,8 +220,10 @@ fn handle_synthetic_directories(
 
             for item in listing {
                 item.dry_validation();
-
                 if let Some(c_path) = item.path() {
+                    let c_path = Path::new(c_path);
+                    let c_path = c_path.strip_prefix(work_dir).unwrap_or(c_path);
+                    
                     let c_host_path = host_path.join(c_path);
                     let staged_path = path_mapper.predict_staged_path(base_path.join(c_path));
 

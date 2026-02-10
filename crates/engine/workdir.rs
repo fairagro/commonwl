@@ -13,6 +13,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
+use tracing::debug;
 
 pub fn stage_work_dir(
     iwdr: &InitialWorkDirRequirement,
@@ -61,6 +62,11 @@ fn stage_item(
     match item {
         ListingItems::Expression(expression) => {
             let evaluated = do_eval(expression, context)?;
+            if evaluated.is_null() {
+                //could be an optional type which is checked in input collection
+                debug!("expression returned null: {expression}");
+                return Ok(());
+            }
             let items = &serde_yaml::from_value(evaluated)?;
             stage_item(
                 items,
@@ -101,7 +107,18 @@ fn stage_dirent(
     path_mapper: &mut PathMapper,
 ) -> anyhow::Result<()> {
     //evaluate expression if so
-    let evaluated_content = do_eval(&dirent.entry, context)?;
+    let evaluated_content =
+        do_eval(&dirent.entry, context).unwrap_or(serde_yaml::Value::String(dirent.entry.clone()));
+
+    //probably array of files is given here, why is dirent used in the first place?
+    if dirent.entryname.is_none()
+        && let Ok(vec) = serde_yaml::from_value::<Vec<ListingItems>>(evaluated_content.clone())
+    {
+        for item in &vec {
+            stage_item(item, workdir, stagedir, context, guest_workdir, path_mapper)?;
+        }
+        return Ok(());
+    }
 
     //parse to DefaultValue
     let dv: DefaultValue = serde_yaml::from_value(evaluated_content)?;
@@ -184,6 +201,22 @@ fn stage_files(
         fs::create_dir_all(staged_path)?;
 
         //handle listing??
+    }
+
+    //secondary files
+    if let FileOrDirectory::File(f) = item
+        && let Some(sec_files) = &f.secondary_files
+    {
+        for item in sec_files {
+            stage_files(
+                item,
+                workdir,
+                stagedir,
+                entryname,
+                guest_workdir,
+                path_mapper,
+            )?;
+        }
     }
 
     update_pathmap(guest_workdir, path_mapper, item, workdir, None)?;

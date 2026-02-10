@@ -31,9 +31,13 @@ async fn main() -> anyhow::Result<()> {
     let outdir = matches.get_one::<PathBuf>("outdir").unwrap();
 
     let quiet = matches.get_one::<bool>("quiet").unwrap_or(&false);
+    let debug = matches.get_one::<bool>("debug").unwrap_or(&false);
 
-    if !quiet {
+    if !quiet && !debug {
         tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    }
+    if *debug {
+        tracing_subscriber::fmt().with_max_level(Level::DEBUG).init();
     }
 
     let config = Config::default();
@@ -71,6 +75,12 @@ fn cli() -> ArgMatches {
             Arg::new("quiet")
                 .short('q')
                 .long("quiet")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
+            Arg::new("debug")
+                .short('d')
+                .long("debug")
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(Arg::new("spec").help("CWL file").required(true).index(1))
