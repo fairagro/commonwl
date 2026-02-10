@@ -1,5 +1,4 @@
 use crate::{
-    context::Runtime,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     format::FormatValidator,
     secondary_files::handle_secondary_file_schema,
@@ -27,6 +26,7 @@ use tracing::info;
 pub struct OutputCollectionContext<'a> {
     pub source_dir: &'a Path,
     pub dest_dir: &'a Path,
+    pub workdir: &'a Path,
     pub eval_context: &'a EvaluationContext<'a>,
     pub validator: &'a FormatValidator,
 }
@@ -48,22 +48,14 @@ pub fn collect_command_outputs(
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                     f.dry_validation();
                     let path = f.path.clone().unwrap();
-                    let path = correct_output_path(
-                        Path::new(&path),
-                        context.source_dir,
-                        context.eval_context.runtime,
-                    );
+                    let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
                     *value = handle_file(&path, None, None, context)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
                     let path = d.path.clone().unwrap();
-                    let path = correct_output_path(
-                        Path::new(&path),
-                        context.source_dir,
-                        context.eval_context.runtime,
-                    );
+                    let path = correct_output_path(Path::new(&path), context);
                     *value = handle_dir(&path, context)?
                 }
                 _ => {}
@@ -82,15 +74,15 @@ pub fn collect_command_outputs(
     Ok(output_map)
 }
 
-fn correct_output_path(path: &Path, source_dir: &Path, runtime: Option<&Runtime>) -> PathBuf {
-    if path.starts_with(source_dir) {
+fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> PathBuf {
+    if path.starts_with(context.source_dir) {
         path.to_path_buf()
-    } else if let Some(runtime) = runtime
-        && let Ok(stripped) = path.strip_prefix(runtime.outdir.clone())
-    {
-        source_dir.join(stripped)
+    } else if let Ok(stripped) = path.strip_prefix(context.dest_dir) {
+        context.source_dir.join(stripped)
+    } else if let Ok(stripped) = path.strip_prefix(context.workdir) {
+        context.source_dir.join(stripped)
     } else {
-        source_dir.join(path)
+        context.source_dir.join(path)
     }
 }
 
@@ -253,10 +245,15 @@ fn add_file_impl(
     context: &OutputCollectionContext,
 ) -> anyhow::Result<Vec<DefaultValue>> {
     let mut files = vec![];
+
     if let Some(binding) = output_binding {
         if let Some(globs) = &binding.glob {
-            for glob_ in &get_globs(globs, context.eval_context)? {
-                let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
+            for glob_ in get_globs(globs, context.eval_context)? {
+                let full_glob = if !glob_.starts_with("/") {
+                    format!("{}/{}", context.source_dir.display(), glob_)
+                } else {
+                    glob_
+                };
                 for entry in glob(&full_glob)? {
                     let Ok(item) = entry else {
                         info!("Output glob {full_glob} did not match any files for {output_id}");

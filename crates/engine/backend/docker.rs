@@ -366,6 +366,8 @@ impl TaskBackend for DockerBackend {
         //update runtime
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
+        runtime.outdir = outdir.path().to_path_buf();
+
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
         //evaluate stderr/stdout
@@ -390,6 +392,7 @@ impl TaskBackend for DockerBackend {
             &OutputCollectionContext {
                 source_dir: outdir.path(),
                 dest_dir: &request.out_dir,
+                workdir: Path::new(workdir),
                 eval_context: &eval_context,
                 validator: &fv,
             },
