@@ -249,11 +249,7 @@ fn add_file_impl(
     if let Some(binding) = output_binding {
         if let Some(globs) = &binding.glob {
             for glob_ in get_globs(globs, context.eval_context)? {
-                let full_glob = if !glob_.starts_with("/") {
-                    format!("{}/{}", context.source_dir.display(), glob_)
-                } else {
-                    glob_
-                };
+                let full_glob = make_full_glob(&glob_, context)?;
                 for entry in glob(&full_glob)? {
                     let Ok(item) = entry else {
                         info!("Output glob {full_glob} did not match any files for {output_id}");
@@ -293,8 +289,8 @@ fn add_dir_impl(
     let mut dirs = vec![];
     if let Some(binding) = output_binding {
         if let Some(globs) = &binding.glob {
-            for glob_ in &get_globs(globs, context.eval_context)? {
-                let full_glob = format!("{}/{}", context.source_dir.display(), glob_);
+            for glob_ in get_globs(globs, context.eval_context)? {
+                let full_glob = make_full_glob(&glob_, context)?;
                 let entry = glob(&full_glob)?.next();
                 let Some(Ok(item)) = entry else {
                     info!("Output glob {full_glob} did not match any directories for {output_id}");
@@ -453,4 +449,17 @@ fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(
         dir,
     )))
+}
+
+fn make_full_glob(glob_: &str, context: &OutputCollectionContext) -> anyhow::Result<String> {
+    let full_glob = if !glob_.starts_with("/") {
+        format!("{}/{}", context.source_dir.display(), glob_)
+    } else {
+        if !glob_.starts_with(&context.source_dir.to_string_lossy().to_string()) {
+            anyhow::bail!("Can not access objects outside the working directory: {glob_}.");
+        }
+        glob_.to_owned()
+    };
+
+    Ok(full_glob)
 }
