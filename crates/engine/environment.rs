@@ -27,8 +27,11 @@ pub fn handle_environment(
 
     if let Some(evr) = evr {
         for item in &evr.env_def {
-            let parsed_value = eval_as_string(&item.env_value, eval_context)?;
-            environment.insert(item.env_name.clone(), parsed_value.to_string());
+            //do not overwrite input requirements
+            if !environment.contains_key(&item.env_name) {
+                let parsed_value = eval_as_string(&item.env_value, eval_context)?;
+                environment.insert(item.env_name.clone(), parsed_value.to_string());
+            }
         }
     }
 
