@@ -556,7 +556,12 @@ fn get_shell_command() -> Vec<String> {
 }
 
 fn apply_shell_quote(arg: Vec<String>) -> Vec<String> {
-    arg.iter().map(|a| format!("'{a}'")).collect()
+    arg.iter()
+        .map(|a| {
+            let escaped = a.replace('\'', "'\"'\"'");
+            format!("'{escaped}'")
+        })
+        .collect()
 }
 
 #[cfg(test)]
