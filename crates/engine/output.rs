@@ -389,14 +389,9 @@ fn handle_file(
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
-    let relative_path = if let Ok(relative_path) = path.strip_prefix(context.source_dir) {
-        relative_path
-    } else {
-        Path::new(path.file_name().unwrap_or_default())
-    }
-    .to_path_buf();
+    let filename = Path::new(path.file_name().unwrap_or_default());
 
-    let dest_path = context.dest_dir.join(&relative_path);
+    let dest_path = context.dest_dir.join(filename);
 
     fs::copy(path, &dest_path)?;
     let mut file = File::new_from_path(&dest_path)?;
