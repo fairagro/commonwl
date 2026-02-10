@@ -110,11 +110,17 @@ fn stage_dirent(
     let evaluated_content =
         do_eval(&dirent.entry, context).unwrap_or(serde_yaml::Value::String(dirent.entry.clone()));
 
+    if evaluated_content.is_null() {
+        debug!("Workdir Entry evaluated to null: {dirent:?}");
+        return Ok(());
+    }
+
     //probably array of files is given here, why is dirent used in the first place?
     if dirent.entryname.is_none()
-        && let Ok(vec) = serde_yaml::from_value::<Vec<ListingItems>>(evaluated_content.clone())
+        && let Ok(items) =
+            serde_yaml::from_value::<OneOrMany<ListingItems>>(evaluated_content.clone())
     {
-        for item in &vec {
+        for item in &items.as_many() {
             stage_item(item, workdir, stagedir, context, guest_workdir, path_mapper)?;
         }
         return Ok(());
@@ -197,10 +203,20 @@ fn stage_files(
         } else if item.is_dir() {
             copy_dir(path, staged_path)?;
         }
-    } else if item.is_dir() {
-        fs::create_dir_all(staged_path)?;
-
-        //handle listing??
+    } else if let FileOrDirectory::Directory(dir) = item {
+        fs::create_dir_all(&staged_path)?;
+        if let Some(listing) = &dir.listing {
+            for item in listing {
+                stage_files(
+                    item,
+                    workdir,
+                    &staged_path,
+                    None,
+                    guest_workdir,
+                    path_mapper,
+                )?;
+            }
+        }
     }
 
     //secondary files
