@@ -7,7 +7,7 @@ use cwl_core::{
     documents::CWLDocument,
     files::{File, FileOrDirectory, LoadListingEnum},
     get_file_metadata, get_path_metadata,
-    inputs::{DefaultValue, OperationInputParameter},
+    inputs::DefaultValue,
     requirements::LoadListingRequirement,
 };
 use dircpy::copy_dir;
@@ -82,7 +82,10 @@ pub fn fill_input_metadata(
             .iter()
             .find(|i| i.id == Some(key.to_string()))
             .unwrap();
-        let value = create_metadata_for_input(value, input, path_mapper, llr)?;
+
+        let load_listing = input.load_listing.or_else(|| llr.map(|r| r.load_listing));
+
+        let value = create_metadata_for_input(value, path_mapper, load_listing)?;
         map.insert(key.clone(), value);
     }
 
@@ -91,9 +94,8 @@ pub fn fill_input_metadata(
 
 fn create_metadata_for_input(
     value: &DefaultValue,
-    input: &OperationInputParameter,
     path_mapper: &PathMapper,
-    llr: Option<&LoadListingRequirement>,
+    load_listing: Option<LoadListingEnum>,
 ) -> anyhow::Result<DefaultValue> {
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) if f.path.is_some() => {
@@ -131,23 +133,20 @@ fn create_metadata_for_input(
             let host_path = path_mapper.get_host(guest_path).unwrap();
             let mut d = d.clone();
             d.path = Some(host_path.to_string_lossy().to_string());
-            if let Some(load_listing) = input.load_listing {
+            if let Some(load_listing) = load_listing {
                 d.load_listing(load_listing)?;
-            } else if let Some(llr) = llr {
-                d.load_listing(llr.load_listing)?;
             }
 
             //if llr is shallow and we recurse we add deep listing anyways. so we set llr to None if it is ShallowListing
-            let llr = llr.filter(|llr| llr.load_listing != LoadListingEnum::ShallowListing);
+            let load_listing = load_listing.filter(|ll| *ll != LoadListingEnum::ShallowListing);
 
             if let Some(listing) = &mut d.listing {
                 for item in listing {
                     item.dry_validation();
                     if let DefaultValue::FileOrDirectory(fod) = create_metadata_for_input(
                         &DefaultValue::FileOrDirectory(item.clone()),
-                        input,
                         path_mapper,
-                        llr,
+                        load_listing,
                     )? {
                         *item = fod;
                     }
@@ -163,9 +162,8 @@ fn create_metadata_for_input(
                     item.dry_validation();
                     if let DefaultValue::FileOrDirectory(fod) = create_metadata_for_input(
                         &DefaultValue::FileOrDirectory(item.clone()),
-                        input,
                         path_mapper,
-                        llr,
+                        load_listing,
                     )? {
                         *item = fod;
                     }
@@ -183,7 +181,7 @@ fn create_metadata_for_input(
             let mut items = vec![];
             for item in vec {
                 let dv = serde_yaml::from_value(item.clone())?;
-                items.push(create_metadata_for_input(&dv, input, path_mapper, llr)?);
+                items.push(create_metadata_for_input(&dv, path_mapper, load_listing)?);
             }
             let value = serde_yaml::to_value(&items)?;
             Ok(DefaultValue::Any(value))
@@ -194,7 +192,7 @@ fn create_metadata_for_input(
                 let dv = serde_yaml::from_value(value.clone())?;
                 new_map.insert(
                     key,
-                    create_metadata_for_input(&dv, input, path_mapper, llr)?,
+                    create_metadata_for_input(&dv, path_mapper, load_listing)?,
                 );
             }
             let value = serde_yaml::to_value(&new_map)?;
