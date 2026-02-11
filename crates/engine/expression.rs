@@ -64,11 +64,13 @@ pub fn do_eval(
     eval_context: &EvaluationContext,
 ) -> anyhow::Result<serde_yaml::Value> {
     let expressions = parse_expressions(expression);
+
     if expressions.is_empty() {
-        anyhow::bail!("No Expression")
+        // No CWL expressions found, just unescape and return
+        return Ok(serde_yaml::to_value(unescape_value(expression))?);
     }
 
-    let context = eval_context.context.unwrap_or_default();
+    let context = eval_context.context.unwrap_or(&serde_json::Value::Null);
     let inputs = serde_json::to_value(eval_context.inputs)?;
     let runtime = serde_json::to_value(eval_context.runtime)?;
 
@@ -234,12 +236,21 @@ fn replace_expressions(
         })
         .collect::<anyhow::Result<Vec<serde_yaml::Value>>>()?;
 
-    let mut result = expr.to_string();
+    let mut result = String::new();
+    let mut last_end = 0;
 
     for (i, e) in expressions.iter().enumerate() {
-        let expr = &expr[e.indices.clone()];
-        result = result.replace(expr, &to_str(&evaluations[i]));
+        // Add the part before this expression (with escapes processed)
+        result.push_str(&unescape_value(&expr[last_end..e.indices.start]));
+
+        // Add the evaluated expression
+        result.push_str(&to_str(&evaluations[i]));
+
+        last_end = e.indices.end;
     }
+
+    // Add the remaining part (with escapes processed)
+    result.push_str(&unescape_value(&expr[last_end..]));
 
     Ok(serde_yaml::to_value(result)?)
 }
@@ -249,65 +260,132 @@ fn parse_expressions(expr: &str) -> Vec<Expression> {
         return vec![];
     }
 
-    //split into substrings
-    let slices = split_ranges(expr, '$');
-    let map = expr.char_indices().collect::<HashMap<_, _>>();
-
+    let chars: Vec<char> = expr.chars().collect();
     let mut expressions = vec![];
+    let mut i = 0;
 
-    for (start, end) in &slices {
-        if map[start] != '$' || end - start < 4 || !['(', '{'].contains(&map[&(start + 1)]) {
-            continue;
-        }
-
-        let opening = map[&(start + 1)];
-        let closing = if opening == '(' { ')' } else { '}' };
-        let mut open_braces = 0;
-
-        let extype = if opening == '(' {
-            ExpressionType::Paren
-        } else {
-            ExpressionType::Bracket
-        };
-
-        //get expression body
-        for i in *start..*end {
-            if map[&i] == opening {
-                open_braces += 1;
-            }
-            if map[&i] == closing {
-                open_braces -= 1;
-                if open_braces == 0 {
-                    expressions.push(Expression {
-                        expression: expr[*start + 2..i].to_string(),
-                        ty: extype,
-                        indices: *start..i + 1,
-                    });
-                    break;
+    while i < chars.len() {
+        if chars[i] == '$' && i + 1 < chars.len() && (chars[i + 1] == '(' || chars[i + 1] == '{') {
+            // Count CONSECUTIVE backslashes immediately before the $
+            let mut backslash_count = 0;
+            if i > 0 {
+                let mut j = i - 1;
+                loop {
+                    if chars[j] == '\\' {
+                        backslash_count += 1;
+                        if j == 0 {
+                            break;
+                        }
+                        j -= 1;
+                    } else {
+                        break;
+                    }
                 }
             }
+
+            // If odd number of backslashes, the $ is escaped
+            if backslash_count % 2 == 1 {
+                i += 1;
+                continue;
+            }
+
+            let opening = chars[i + 1];
+            let closing = if opening == '(' { ')' } else { '}' };
+            let start_idx = i;
+            let mut open_braces = 0;
+
+            let extype = if opening == '(' {
+                ExpressionType::Paren
+            } else {
+                ExpressionType::Bracket
+            };
+
+            // Start from the opening brace
+            let mut k = i + 1;
+            let mut found = false;
+
+            while k < chars.len() {
+                if chars[k] == opening {
+                    open_braces += 1;
+                } else if chars[k] == closing {
+                    open_braces -= 1;
+                    if open_braces == 0 {
+                        let expr_body: String = chars[(start_idx + 2)..k].iter().collect();
+                        expressions.push(Expression {
+                            expression: expr_body,
+                            ty: extype,
+                            indices: start_idx..(k + 1),
+                        });
+                        i = k + 1;
+                        found = true;
+                        break;
+                    }
+                }
+                k += 1;
+            }
+
+            if !found {
+                i += 1;
+            }
+        } else {
+            i += 1;
         }
     }
 
     expressions
 }
 
-fn split_ranges(s: &str, delim: char) -> Vec<(usize, usize)> {
-    let mut slices = Vec::new();
-    let mut last_index = 0;
-
-    for (idx, _) in s.match_indices(delim) {
-        if last_index != idx {
-            slices.push((last_index, idx));
+fn unescape_value(expr: &str) -> String {
+   let chars: Vec<char> = expr.chars().collect();
+    let mut result = String::new();
+    let mut i = 0;
+    
+    while i < chars.len() {
+        if chars[i] == '\\' && i + 1 < chars.len() {
+            // Count consecutive backslashes
+            let mut backslash_count = 0;
+            let mut j = i;
+            while j < chars.len() && chars[j] == '\\' {
+                backslash_count += 1;
+                j += 1;
+            }
+            
+            // Check what follows the backslashes
+            if j < chars.len() && chars[j] == '$' && j + 1 < chars.len() && (chars[j + 1] == '(' || chars[j + 1] == '{') {
+                // Before CWL expression: $(... or ${...
+                // Each pair \\ becomes \, and if odd, the last one escapes the expression
+                let pairs = backslash_count / 2;
+                for _ in 0..pairs {
+                    result.push('\\');
+                }
+                if backslash_count % 2 == 1 {
+                    // Odd number: last backslash escapes the CWL expression
+                    result.push('$');
+                    i = j + 1;
+                } else {
+                    // Even number: CWL expression is not escaped
+                    result.push('$');
+                    i = j;
+                }
+            } else {
+                // Not before a CWL expression
+                // Process pairs: \\ -> \, and keep odd backslash
+                let pairs = backslash_count / 2;
+                for _ in 0..pairs {
+                    result.push('\\');
+                }
+                if backslash_count % 2 == 1 {
+                    result.push('\\');
+                }
+                i = j;
+            }
+        } else {
+            result.push(chars[i]);
+            i += 1;
         }
-        last_index = idx;
     }
-
-    if last_index < s.len() {
-        slices.push((last_index, s.len()));
-    }
-
-    slices
+    
+    result
 }
 
 fn to_str(value: &serde_yaml::Value) -> String {
@@ -356,5 +434,71 @@ mod tests {
         .unwrap();
         let str = serde_yaml::to_string(&result).unwrap();
         assert_eq!(str.trim(), ".");
+    }
+
+    #[test]
+    fn test_parse_with_quotes() {
+        let input = "'$(inputs.val)'";
+        let mut inputs = HashMap::new();
+        inputs.insert(
+            "val".to_string(),
+            DefaultValue::Any(serde_yaml::Value::String("val".to_string())),
+        );
+
+        let result = do_eval(
+            input,
+            &EvaluationContext {
+                inputs: Some(&inputs),
+                ijsr: Some(&InlineJavascriptRequirement::default()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.as_str().unwrap(), "'val'");
+    }
+
+    #[test]
+    fn test_parse_with_escaped() {
+        let input = r"'\$(inputs.val)'";
+        let mut inputs = HashMap::new();
+        inputs.insert(
+            "val".to_string(),
+            DefaultValue::Any(serde_yaml::Value::String("val".to_string())),
+        );
+
+        let result = do_eval(
+            input,
+            &EvaluationContext {
+                inputs: Some(&inputs),
+                ijsr: Some(&InlineJavascriptRequirement::default()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.as_str().unwrap(), "'$(inputs.val)'");
+    }
+
+    #[test]
+    fn test_parse_with_double_backslash() {
+        let input = r"'\\$(inputs.val)'";
+        let mut inputs = HashMap::new();
+        inputs.insert(
+            "val".to_string(),
+            DefaultValue::Any(serde_yaml::Value::String("val".to_string())),
+        );
+
+        let result = do_eval(
+            input,
+            &EvaluationContext {
+                inputs: Some(&inputs),
+                ijsr: Some(&InlineJavascriptRequirement::default()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.as_str().unwrap(), r"'\val'");
     }
 }
