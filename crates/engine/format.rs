@@ -23,11 +23,13 @@ use std::{
     vec,
 };
 
+#[derive(Debug)]
 pub struct FormatValidator {
     pub namespaces: HashMap<String, String>,
     pub ontologies: Vec<Ontology>,
 }
 
+#[derive(Debug)]
 pub enum Ontology {
     Graph(Graph),
     SetOntology(SetOntology<ArcStr>),

@@ -407,6 +407,7 @@ impl TaskBackend for DockerBackend {
             &OutputCollectionContext {
                 source_dir: outdir.path(),
                 dest_dir: &request.out_dir,
+                tmp_dir: tmpdir.path(),
                 workdir: Path::new(workdir),
                 eval_context: &eval_context,
                 validator: &fv,
