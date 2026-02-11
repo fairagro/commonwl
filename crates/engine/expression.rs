@@ -316,6 +316,7 @@ fn to_str(value: &serde_yaml::Value) -> String {
         serde_yaml::Value::Number(n) => n.to_string(),
         serde_yaml::Value::Bool(b) => b.to_string(),
         serde_yaml::Value::Null => "null".to_string(),
+        serde_yaml::Value::Mapping(m) => serde_json::to_string_pretty(m).unwrap_or(String::new()),
         _ => String::new(),
     }
 }

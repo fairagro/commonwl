@@ -1,6 +1,6 @@
 use crate::{
     context::Runtime,
-    expression::{self, EvaluationContext},
+    expression::{self, EvaluationContext, do_eval},
     input::validation::validate_command_input,
     pathmapper::PathMapper,
 };
@@ -82,11 +82,14 @@ pub fn build_command(
                     });
                 }
                 Argument::Binding(binding) => {
-                    let position = binding.position.clone().map(|p| match p {
-                        IntegerOrExpression::Int(i) => i,
-                        IntegerOrExpression::Long(l) => i32::try_from(l).unwrap_or_default(),
-                        IntegerOrExpression::Expression(_s) => todo!(), //evaluate expression
-                    });
+                    let position = get_binding_position(
+                        binding,
+                        &EvaluationContext {
+                            inputs: Some(inputs),
+                            runtime: Some(runtime),
+                            ..Default::default()
+                        },
+                    );
                     sort_key.push(SortKey::Int(position.unwrap_or_default()));
                     sort_key.push(SortKey::Int(i32::try_from(i)?));
                     bindings.push(BoundBinding {
@@ -139,7 +142,14 @@ pub fn build_command(
             let mut arg = if is_argument(&bound) {
                 use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
             } else {
-                generate_arg(&bound.binding, bound.value, runtime, ijsr, path_mapper)?
+                generate_arg(
+                    &bound.binding,
+                    bound.value,
+                    runtime,
+                    Some(inputs),
+                    ijsr,
+                    path_mapper,
+                )?
             };
 
             if bound.binding.shell_quote.unwrap_or(true) {
@@ -160,7 +170,14 @@ pub fn build_command(
             let arg = if is_argument(&bound) {
                 use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
             } else {
-                generate_arg(&bound.binding, bound.value, runtime, ijsr, path_mapper)?
+                generate_arg(
+                    &bound.binding,
+                    bound.value,
+                    runtime,
+                    Some(inputs),
+                    ijsr,
+                    path_mapper,
+                )?
             };
             args.extend(arg);
         }
@@ -203,6 +220,12 @@ fn collect_input_bindings(
         CommandInputType::CommandInputSchema(schema),
     )) = schema
     {
+        let json_value = serde_json::to_value(value)?;
+        let eval_context = &EvaluationContext {
+            context: Some(&json_value),
+            ..Default::default()
+        };
+
         match schema.as_ref() {
             CommandInputSchema::Enum(_) => {}
             CommandInputSchema::Record(record) => {
@@ -212,12 +235,12 @@ fn collect_input_bindings(
                     let mut sort_key = base_sort_key.to_owned();
                     if let Some(root_binding) = &binding {
                         sort_key.push(SortKey::Int(
-                            get_binding_position(root_binding).unwrap_or_default(),
+                            get_binding_position(root_binding, eval_context).unwrap_or_default(),
                         ));
                         sort_key.push(SortKey::Str(name.to_owned()));
                     }
                     sort_key.push(SortKey::Int(
-                        get_binding_position(&rec_binding).unwrap_or_default(),
+                        get_binding_position(&rec_binding, eval_context).unwrap_or_default(),
                     ));
 
                     let value = DefaultValue::Any(serde_yaml::Value::Null);
@@ -237,14 +260,16 @@ fn collect_input_bindings(
                         if let Some(fi_binding) = &field.input_binding {
                             let fi_binding = fi_binding.clone();
                             let mut sort_key = base_sort_key.to_owned();
+
                             if let Some(root_binding) = &binding {
                                 sort_key.push(SortKey::Int(
-                                    get_binding_position(root_binding).unwrap_or_default(),
+                                    get_binding_position(root_binding, eval_context)
+                                        .unwrap_or_default(),
                                 ));
                                 sort_key.push(SortKey::Str(name.to_owned()));
                             }
                             sort_key.push(SortKey::Int(
-                                get_binding_position(&fi_binding).unwrap_or_default(),
+                                get_binding_position(&fi_binding, eval_context).unwrap_or_default(),
                             ));
 
                             let is_optional = match &field.r#type {
@@ -296,8 +321,16 @@ fn collect_input_bindings(
                         let mut sort_key = base_sort_key.to_owned();
                         //add root key
                         if let Some(binding) = &binding {
+                            let json_value = serde_json::to_value(&item)?;
                             sort_key.push(SortKey::Int(
-                                get_binding_position(binding).unwrap_or_default(),
+                                get_binding_position(
+                                    binding,
+                                    &EvaluationContext {
+                                        context: Some(&json_value),
+                                        ..Default::default()
+                                    },
+                                )
+                                .unwrap_or_default(),
                             ));
                             sort_key.push(SortKey::Str(name.to_owned()));
                         }
@@ -333,8 +366,17 @@ fn collect_input_bindings(
     {
         let binding = binding.clone();
         let mut sort_key = base_sort_key.to_owned();
+
+        let json_value = serde_json::to_value(value)?;
         sort_key.push(SortKey::Int(
-            get_binding_position(&binding).unwrap_or_default(),
+            get_binding_position(
+                &binding,
+                &EvaluationContext {
+                    context: Some(&json_value),
+                    ..Default::default()
+                },
+            )
+            .unwrap_or_default(),
         ));
         sort_key.push(SortKey::Str(name.to_owned()));
 
@@ -352,6 +394,7 @@ pub(crate) fn generate_arg(
     binding: &CommandLineBinding,
     mut value: DefaultValue,
     runtime: &Runtime,
+    inputs: Option<&HashMap<String, DefaultValue>>,
     ijsr: Option<&InlineJavascriptRequirement>,
     path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
@@ -368,9 +411,9 @@ pub(crate) fn generate_arg(
             &EvaluationContext {
                 context: Some(&json_value),
                 runtime: Some(runtime),
+                inputs,
                 ijsr,
                 workdir: path_mapper.map(|m| m.base_dir()),
-                ..Default::default()
             },
         ) {
             result
@@ -533,11 +576,17 @@ fn is_argument(bound: &BoundBinding) -> bool {
     matches!(bound.value, DefaultValue::Any(serde_yaml::Value::Null))
 }
 
-fn get_binding_position(binding: &CommandLineBinding) -> Option<i32> {
-    binding.position.clone().map(|p| match p {
-        IntegerOrExpression::Int(i) => i,
-        IntegerOrExpression::Long(l) => i32::try_from(l).unwrap_or_default(),
-        IntegerOrExpression::Expression(_s) => todo!(), //evaluate expression
+fn get_binding_position(
+    binding: &CommandLineBinding,
+    eval_context: &EvaluationContext,
+) -> Option<i32> {
+    binding.position.clone().and_then(|p| match p {
+        IntegerOrExpression::Int(i) => Some(i),
+        IntegerOrExpression::Long(l) => i32::try_from(l).ok(),
+        IntegerOrExpression::Expression(s) => do_eval(&s, eval_context)
+            .ok()
+            .and_then(|value| value.as_i64())
+            .map(|v| v as i32),
     })
 }
 
@@ -815,7 +864,7 @@ stdout: output.txt"#;
         let b = CommandLineBinding::builder().build(); //all none
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
         assert_eq!(res, vec!["foo"]);
     }
 
@@ -827,7 +876,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
         assert_eq!(res, vec!["--opt", "foo"]);
     }
 
@@ -839,7 +888,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
         assert_eq!(res, vec!["--opt=foo"]);
     }
 
@@ -855,7 +904,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
         assert_eq!(res, vec!["--list", "a,b,c"]);
     }
 
@@ -868,7 +917,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
         assert_eq!(res, vec!["--list"]); //values need to be added recursively respecting the CommandLineBinding of their input schema
     }
 
@@ -900,14 +949,16 @@ stdout: output.txt"#;
                 serde_yaml::Value::String("b".into()),
                 serde_yaml::Value::String("c".into()),
             ]));
-            let mut res = generate_arg(&b, v.clone(), &Runtime::default(), None, None).unwrap(); //generates only -Y
+            let mut res =
+                generate_arg(&b, v.clone(), &Runtime::default(), None, None, None).unwrap(); //generates only -Y
             if let Some(inner_b) = &array_schema.input_binding {
                 if let Some(serde_yaml::Value::Sequence(vec)) = v.try_get_value_ref() {
                     for inner_v in vec {
                         //re-serde
                         let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
                         res.extend(
-                            generate_arg(inner_b, v, &Runtime::default(), None, None).unwrap(),
+                            generate_arg(inner_b, v, &Runtime::default(), None, None, None)
+                                .unwrap(),
                         );
                     }
                 }
