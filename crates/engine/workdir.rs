@@ -135,7 +135,7 @@ fn stage_dirent(
 
     let staged_path = stagedir.join(&entryname);
 
-    let string_content = match dv {
+    let mut string_content = match dv {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
             if let Some(contents) = file.contents {
                 contents.to_string()
@@ -168,6 +168,10 @@ fn stage_dirent(
         }
         DefaultValue::Any(value) => value.as_str().unwrap().to_string(),
     };
+
+    if !string_content.ends_with("\n") {
+        string_content += "\n";
+    }
 
     let parent = staged_path.parent().unwrap();
     fs::create_dir_all(parent)?;
