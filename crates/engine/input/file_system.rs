@@ -111,9 +111,11 @@ fn create_metadata_for_input(
                 dirname,
             } = get_path_metadata(host_path);
             let FileMetaData { size, checksum } = get_file_metadata(host_path)?;
-
+            let location = format!("file://{}", host_path.to_string_lossy());
+            
             Ok(DefaultValue::FileOrDirectory(FileOrDirectory::File(
                 File::builder()
+                    .location(location)
                     .path(host_path.to_string_lossy())
                     .maybe_basename(basename)
                     .maybe_nameroot(nameroot)

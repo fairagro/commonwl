@@ -97,6 +97,9 @@ fn handle_value(
     context: &EvaluationContext,
     path_mapper: &mut PathMapper,
 ) -> anyhow::Result<()> {
+    let json_value = serde_json::to_value(&value)?;
+    let context = &context.clone().with_context(&json_value);
+
     //we need to check all types that may contain files...
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
