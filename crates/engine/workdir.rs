@@ -1,6 +1,7 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string, extract_input_name},
     io::{directory::move_dir, file::move_file},
+    serialize::to_string_dump,
 };
 use anyhow::Context;
 use cwl_core::{
@@ -124,7 +125,6 @@ fn stage_dirent(
     update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
 
     let staged_path = stagedir.join(&entryname);
-
     let mut string_content = match dv {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
             if let Some(contents) = file.contents {
@@ -150,11 +150,14 @@ fn stage_dirent(
             )?;
             return Ok(());
         }
-        DefaultValue::Any(value) => value.as_str().unwrap().to_string(),
+        DefaultValue::Any(value) => match value {
+            serde_yaml::Value::String(s) => s,
+            _ => to_string_dump(&value)?,
+        },
     };
 
-    if !string_content.ends_with("\n") && !string_content.is_empty() {
-        string_content += "\n";
+    if dirent.entry.ends_with("\n") && !string_content.ends_with("\n"){
+        string_content += "\n"
     }
 
     let parent = staged_path.parent().unwrap();

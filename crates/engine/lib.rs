@@ -6,13 +6,14 @@ pub mod context;
 pub mod docker;
 pub mod environment;
 pub mod expression;
+pub mod format;
 pub mod input;
+pub mod io;
 pub mod output;
 pub mod requirements;
 pub mod schema;
+pub mod serialize;
 pub mod workdir;
-pub mod format;
-pub mod io;
 
 pub fn checksum(str: &str) -> String {
     let mut hasher = Sha1::new();
