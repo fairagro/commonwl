@@ -327,7 +327,14 @@ mod tests {
         ))
         .unwrap();
 
-        let inputs = collect_inputs(&CWLDocument::CommandLineTool(tool), &inputs_values, None);
+        let inputs = collect_inputs(
+            &CWLDocument::CommandLineTool(tool),
+            &inputs_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        );
         assert!(inputs.is_ok());
 
         assert_eq!(inputs.unwrap().len(), 2);
@@ -406,12 +413,20 @@ mod tests {
 
         let inputs = load_input_file_from_file(&inputs_path, base_dir).unwrap();
         let doc = load_cwl_file(specification_path, false).unwrap();
-        let inputs = collect_inputs(&doc, &inputs.inputs, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &inputs.inputs,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!("Oh no!")
         };
         let stdin = get_stdin(&tool, &inputs);
-        assert_eq!(stdin, Some("hello.txt".into()));
+        assert_eq!(stdin, Some("./hello.txt".into()));
     }
 }

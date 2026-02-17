@@ -586,7 +586,7 @@ mod tests {
         load_cwl_file,
         types::CWLType,
     };
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn test_build_command() {
@@ -612,15 +612,23 @@ stdout: output.txt";
         let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("."),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         let cmdline = cmd.join(" ");
-        assert_eq!(cmdline, "cat hello.txt");
+        assert_eq!(cmdline, "cat ./hello.txt");
     }
 
     #[test]
@@ -648,12 +656,20 @@ stdout: output.txt"#;
         let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
 
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("."),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
-        let cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
 
         let shell_cmd = get_shell_command();
 
@@ -662,7 +678,7 @@ stdout: output.txt"#;
             vec![
                 &shell_cmd[0],
                 &shell_cmd[1],
-                "'cd' 'testdir' && 'find' '.' | 'sort'"
+                "'cd' './testdir' && 'find' '.' | 'sort'"
             ]
         );
     }
@@ -675,7 +691,15 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
@@ -685,7 +709,7 @@ stdout: output.txt"#;
             cores: 69,
             ..Default::default()
         };
-        let mut cmd = build_command(&tool, &inputs, &runtime, None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &runtime).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -699,9 +723,9 @@ stdout: output.txt"#;
                 "1,2,3,4",
                 "-m",
                 "3",
-                "chr20.fa",
-                "example_human_Illumina.pe_1.fastq",
-                "example_human_Illumina.pe_2.fastq"
+                "./chr20.fa",
+                "./example_human_Illumina.pe_1.fastq",
+                "./example_human_Illumina.pe_2.fastq"
             ]
         );
     }
@@ -714,13 +738,21 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -728,12 +760,12 @@ stdout: output.txt"#;
             vec![
                 "bwa",
                 "mem",
-                "chr20.fa",
+                "./chr20.fa",
                 "-XXX",
                 "-YYY",
-                "example_human_Illumina.pe_1.fastq",
+                "./example_human_Illumina.pe_1.fastq",
                 "-YYY",
-                "example_human_Illumina.pe_2.fastq"
+                "./example_human_Illumina.pe_2.fastq"
             ]
         );
     }
@@ -746,13 +778,21 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
@@ -769,13 +809,21 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -789,16 +837,24 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
-        assert_eq!(cmd, vec!["cat", "hello.txt"]);
+        assert_eq!(cmd, vec!["cat", "./hello.txt"]);
     }
 
     #[test]
@@ -809,13 +865,21 @@ stdout: output.txt"#;
 
         let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
         let input_values = serde_yaml::from_str(inputs).unwrap();
-        let inputs = collect_inputs(&doc, &input_values, None).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata/cwl/tests"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!()
         };
 
-        let mut cmd = build_command(&tool, &inputs, &Runtime::default(), None).unwrap();
+        let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
         assert_eq!(cmd, Vec::<String>::new());
@@ -826,7 +890,7 @@ stdout: output.txt"#;
         let b = CommandLineBinding::builder().build(); //all none
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["foo"]);
     }
 
@@ -838,7 +902,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--opt", "foo"]);
     }
 
@@ -850,7 +914,7 @@ stdout: output.txt"#;
             .build();
         let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--opt=foo"]);
     }
 
@@ -866,7 +930,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--list", "a,b,c"]);
     }
 
@@ -879,7 +943,7 @@ stdout: output.txt"#;
             serde_yaml::Value::String("c".into()),
         ]));
 
-        let res = generate_arg(&b, v, &Runtime::default(), None, None, None).unwrap();
+        let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--list"]); //values need to be added recursively respecting the CommandLineBinding of their input schema
     }
 
@@ -911,16 +975,14 @@ stdout: output.txt"#;
                 serde_yaml::Value::String("b".into()),
                 serde_yaml::Value::String("c".into()),
             ]));
-            let mut res =
-                generate_arg(&b, v.clone(), &Runtime::default(), None, None, None).unwrap(); //generates only -Y
+            let mut res = generate_arg(&b, v.clone(), &Runtime::default(), None, None).unwrap(); //generates only -Y
             if let Some(inner_b) = &array_schema.input_binding {
                 if let Some(serde_yaml::Value::Sequence(vec)) = v.try_get_value_ref() {
                     for inner_v in vec {
                         //re-serde
                         let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
                         res.extend(
-                            generate_arg(inner_b, v, &Runtime::default(), None, None, None)
-                                .unwrap(),
+                            generate_arg(inner_b, v, &Runtime::default(), None, None).unwrap(),
                         );
                     }
                 }
