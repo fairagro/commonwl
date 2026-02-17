@@ -1,17 +1,23 @@
+use anyhow::Context;
+
 use crate::documents::CWLDocument;
 use std::{fs, path::Path};
 
-pub fn load_cwl_file<P: AsRef<Path>>(path: P, preprocess: bool) -> anyhow::Result<CWLDocument> {
+pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
+    path: P,
+    preprocess: bool,
+) -> anyhow::Result<CWLDocument> {
     let contents = if preprocess {
         preprocess_cwl_file(&path)?
     } else {
-        fs::read_to_string(&path)?
+        fs::read_to_string(&path).with_context(|| format!("CWL File {path:?}"))?
     };
     serde_yaml::from_str::<CWLDocument>(&contents).map_err(|e| e.into())
 }
 
-pub fn preprocess_cwl_file<P: AsRef<Path>>(path: P) -> anyhow::Result<String> {
-    let contents = fs::read_to_string(&path)?;
+pub fn preprocess_cwl_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<String> {
+    let contents =
+        fs::read_to_string(&path).with_context(|| format!("Could not read CWL File {path:?}"))?;
     let mut yaml: serde_yaml::Value = serde_yaml::from_str(&contents)?;
     let path = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
 
@@ -28,7 +34,8 @@ fn resolve_imports(value: &mut serde_yaml::Value, base_path: &Path) -> anyhow::R
                     map.get(serde_yaml::Value::String("$import".to_string()))
             {
                 let path = base_path.join(file);
-                let contents = fs::read_to_string(&path)?;
+                let contents = fs::read_to_string(&path)
+                    .with_context(|| format!("Could not read imported fragment {path:?}"))?;
                 let mut imported_value: serde_yaml::Value = serde_yaml::from_str(&contents)?;
                 resolve_imports(&mut imported_value, path.parent().unwrap_or(base_path))?;
                 *value = imported_value;
@@ -97,5 +104,4 @@ mod tests {
             serde_yaml::from_str(&contents).unwrap()
         }
     }
-
 }

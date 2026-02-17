@@ -1,8 +1,9 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     format::FormatValidator,
-    secondary_files::handle_secondary_file_schema,
+    io::file::handle_secondary_file_schema,
 };
+use anyhow::Context;
 use cwl_core::{
     OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
@@ -20,7 +21,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tracing::info;
+use tracing::{debug, info};
 
 #[derive(Debug)]
 pub struct OutputCollectionContext<'a> {
@@ -107,6 +108,7 @@ fn evaluate_command_binding(
                     let basename = item.file_name().map(|i| i.to_string_lossy().into_owned());
                     let mut dir = Directory::builder()
                         .path(item.to_string_lossy())
+                        .location(format!("file://{}", item.display()))
                         .maybe_basename(basename)
                         .build();
                     //handle load_listing
@@ -144,7 +146,7 @@ fn evaluate_command_binding(
                 single_value => vec![serde_yaml::from_value(single_value)?],
             },
             Err(_) => results,
-        }
+        };
     }
 
     //handle secondary_files
@@ -183,10 +185,11 @@ fn validate_output_item(
     item: &mut FileOrDirectory,
     format: Option<&String>,
     context: &OutputCollectionContext,
+    base_path: &Path,
 ) -> anyhow::Result<()> {
     match item {
-        FileOrDirectory::File(file) => validate_file(file, format, context)?,
-        FileOrDirectory::Directory(dir) => validate_dir(dir, context)?,
+        FileOrDirectory::File(file) => validate_file(file, format, context, base_path)?,
+        FileOrDirectory::Directory(dir) => validate_dir(dir, context, base_path)?,
     };
 
     Ok(())
@@ -197,19 +200,33 @@ fn validate_file(
     file: &mut File,
     format: Option<&String>,
     context: &OutputCollectionContext,
+    base_path: &Path,
 ) -> anyhow::Result<()> {
-    let path = get_designated_path(file.path.as_ref(), context);
+    let path = get_designated_path(file.path.as_ref(), base_path);
     let dirname = path.as_ref().and_then(|p| p.parent());
 
     if let Some(source_path) = &file.path
         && let Some(dest_path) = &path
     {
+        let mut source_path = source_path.to_owned();
+        if !Path::new(&source_path).exists() {
+            debug!("Path field contains container path. Trying to use location: {file:?}");
+            source_path = file
+                .location
+                .as_ref()
+                .unwrap()
+                .strip_prefix("file://")
+                .unwrap()
+                .to_string()
+        }
+
         let parent = dest_path.parent().unwrap();
         if !parent.exists() {
             fs::create_dir_all(parent)?;
         }
 
-        fs::copy(source_path, dest_path)?;
+        fs::copy(&source_path, dest_path)
+            .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
     }
 
     let format = context.validator.handle(format, Some(context.eval_context));
@@ -224,7 +241,7 @@ fn validate_file(
 
     if let Some(secondary_files) = &mut file.secondary_files {
         for item in secondary_files {
-            validate_output_item(item, None, context)?;
+            validate_output_item(item, None, context, base_path)?;
         }
     }
 
@@ -232,18 +249,38 @@ fn validate_file(
 }
 
 /// sets the designated path to the directory and copies it and its contents recursively to the output folder
-fn validate_dir(dir: &mut Directory, context: &OutputCollectionContext) -> anyhow::Result<()> {
-    let path = get_designated_path(dir.path.as_ref(), context);
+fn validate_dir(
+    dir: &mut Directory,
+    context: &OutputCollectionContext,
+    base_path: &Path,
+) -> anyhow::Result<()> {
+    let path = get_designated_path(dir.path.as_ref(), base_path);
+
+    let mut base_path = base_path.to_path_buf();
 
     if let Some(source_path) = &dir.path
         && let Some(dest_path) = &path
     {
+        let mut source_path = source_path.to_owned();
+        if !Path::new(&source_path).exists() {
+            debug!("Path field contains container path. Trying to use location: {dir:?}");
+            source_path = dir
+                .location
+                .as_ref()
+                .unwrap()
+                .strip_prefix("file://")
+                .unwrap()
+                .to_string()
+        }
+
         let parent = dest_path.parent().unwrap();
         if !parent.exists() {
             fs::create_dir_all(parent)?;
         }
 
-        copy_dir(source_path, dest_path)?;
+        copy_dir(&source_path, dest_path)
+            .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+        base_path = dest_path.to_path_buf();
     }
 
     dir.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
@@ -251,37 +288,23 @@ fn validate_dir(dir: &mut Directory, context: &OutputCollectionContext) -> anyho
 
     if let Some(listing) = &mut dir.listing {
         for item in listing {
-            validate_output_item(item, None, context)?;
+            validate_output_item(item, None, context, &base_path)?;
         }
     }
 
     Ok(())
 }
 
-/// creates the new output path by stripping prefixes of known folders 
-fn get_designated_path(
-    path: Option<&String>,
-    context: &OutputCollectionContext,
-) -> Option<PathBuf> {
-    path.as_ref().and_then(|p| {
+/// creates the new output path by stripping prefixes of known folders
+fn get_designated_path(path: Option<&String>, base_path: &Path) -> Option<PathBuf> {
+    path.as_ref().map(|p| {
         let path = Path::new(p);
-        path.strip_prefix(context.source_dir)
-            .ok()
-            .map(|relative| context.dest_dir.join(relative))
-            .or_else(|| {
-                path.strip_prefix(context.tmp_dir)
-                    .ok()
-                    .map(|relative| context.dest_dir.join(relative))
-            })
-            .or_else(|| {
-                path.strip_prefix(context.eval_context.workdir.unwrap())
-                    .ok()
-                    .map(|relative| context.dest_dir.join(relative))
-            })
+        let filename = path.file_name().unwrap();
+        base_path.join(filename)
     })
 }
 
-///collects a single output item 
+///collects a single output item
 fn collect_output_item(
     output: &CommandOutputParameter,
     stdout_file: &Path,
@@ -374,7 +397,7 @@ fn collect_item(
                     evaluate_command_binding(binding, context, secondary_files, &output_id)?;
                 for item in &mut values {
                     if let DefaultValue::FileOrDirectory(fod) = item {
-                        validate_output_item(fod, format, context)?;
+                        validate_output_item(fod, format, context, context.dest_dir)?;
                     }
                 }
 
@@ -435,7 +458,8 @@ fn handle_file(
 
     let dest_path = context.dest_dir.join(filename);
 
-    fs::copy(path, &dest_path)?;
+    fs::copy(path, &dest_path)
+        .with_context(|| format!("Could not copy {path:?} to {dest_path:?}"))?;
     let mut file = File::new_from_path(&dest_path)?;
     file.format = format;
 
@@ -466,7 +490,8 @@ fn copy_secondary_files(
             .strip_prefix(from_path.parent().unwrap())
             .map(|relative| Path::new(&to_path.parent().unwrap()).join(relative))?;
 
-        fs::copy(secondary_path, &copy_to_path)?;
+        fs::copy(&secondary_path, &copy_to_path)
+            .with_context(|| format!("Could not copy {secondary_path:?} to {copy_to_path:?}"))?;
         let file = File::new_from_path(&copy_to_path)?;
         secondaries.push(FileOrDirectory::File(file));
     }

@@ -1,3 +1,4 @@
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use sha1::Digest;
@@ -211,7 +212,7 @@ pub fn get_path_metadata(path: &Path) -> FilePathMetaData {
         .extension()
         .map(|e| format!(".{}", e.to_string_lossy()));
     let dirname = path.parent().map(|p| p.to_string_lossy().into_owned());
-    
+
     FilePathMetaData {
         basename,
         nameroot,
@@ -227,7 +228,8 @@ pub struct FileMetaData {
 }
 
 pub fn get_file_metadata(path: &Path) -> anyhow::Result<FileMetaData> {
-    let metadata = fs::metadata(path)?;
+    let metadata = fs::metadata(path)
+        .with_context(|| format!("Can not retrieve File metadata for {}", path.display()))?;
     let size = metadata.len();
 
     let mut hasher = Sha1::new();

@@ -8,12 +8,11 @@ pub mod environment;
 pub mod expression;
 pub mod input;
 pub mod output;
-pub mod pathmapper;
 pub mod requirements;
 pub mod schema;
-pub mod secondary_files;
 pub mod workdir;
 pub mod format;
+pub mod io;
 
 pub fn checksum(str: &str) -> String {
     let mut hasher = Sha1::new();

@@ -1,4 +1,5 @@
 use crate::{FileMetaData, FilePathMetaData, Integer, get_file_metadata, get_path_metadata};
+use anyhow::Context;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
@@ -23,6 +24,12 @@ impl FileOrDirectory {
         match self {
             Self::File(f) => f.path.as_ref(),
             Self::Directory(d) => d.path.as_ref(),
+        }
+    }
+    pub fn location(&self) -> Option<&String> {
+        match self {
+            Self::File(f) => f.location.as_ref(),
+            Self::Directory(d) => d.location.as_ref(),
         }
     }
 
@@ -184,7 +191,8 @@ impl Directory {
     fn read_dir(path: &str, recursive: bool) -> anyhow::Result<Vec<FileOrDirectory>> {
         let mut entries = Vec::new();
 
-        let read_dir = fs::read_dir(path)?;
+        let read_dir =
+            fs::read_dir(path).with_context(|| format!("Could not read directory {path}"))?;
 
         for entry in read_dir.flatten() {
             let path_buf = entry.path();

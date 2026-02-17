@@ -47,8 +47,8 @@ pub struct ExecutionRequest {
 
 /// Load an execution context from a CWL specification file and an inputs file.
 pub fn load_execution_context(
-    specification_path: impl AsRef<Path>,
-    inputs_path: impl AsRef<Path>,
+    specification_path: impl AsRef<Path> + std::fmt::Debug,
+    inputs_path: impl AsRef<Path> + std::fmt::Debug,
     outputs_path: Option<&Path>,
 ) -> anyhow::Result<ExecutionRequest> {
     let working_dir = env::current_dir()?;
@@ -60,7 +60,7 @@ pub fn load_execution_context(
 
 /// Load an execution context from a CWL specification file and an already built inputs object (if inputs come as arguments, for example).
 pub fn load_execution_context_with_inputs(
-    specification_path: impl AsRef<Path>,
+    specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs: InputObject,
     outputs_path: Option<&Path>,
 ) -> anyhow::Result<ExecutionRequest> {

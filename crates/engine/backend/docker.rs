@@ -1,18 +1,14 @@
 use crate::{
     backend::{ExecutionRequest, ExecutionResult, TaskBackend},
-    checksum, command,
+    command,
     context::build_runtime,
     docker::build_container,
     environment::handle_environment,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     format::get_format_validator,
-    input::{
-        collect_inputs,
-        file_system::{add_synthethic_paths, create_flattened_inputs, fill_input_metadata},
-        get_stdin,
-    },
+    input::{build_backend_input, collect_inputs, file_system::create_flattened_inputs, get_stdin},
+    io::file::collect_secondary_files_for_inputs,
     output::{OutputCollectionContext, collect_command_outputs},
-    pathmapper::PathMapper,
     workdir::stage_work_dir,
 };
 use crankshaft::{
@@ -38,7 +34,6 @@ use cwl_core::{IntegerOrExpression, requirements::LoadListingRequirement};
 use cwl_core::{
     docstring,
     documents::CWLDocument,
-    files::FileOrDirectory,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
         InlineJavascriptRequirement, ResourceRequirement, ToolTimeLimit,
@@ -94,13 +89,6 @@ impl TaskBackend for DockerBackend {
         //create validator
         let fv = get_format_validator(&request.specification, &request.working_dir)?;
 
-        let inputs = collect_inputs(&request.specification, &request.inputs, Some(&fv))?;
-        let stage_dir = Path::new(CONTAINER_INPUT_DIR);
-
-        let outdir = tempdir()?;
-        let tmpdir = tempdir()?;
-
-        let mut path_mapper = PathMapper::new(&inputs, &request.working_dir, stage_dir)?;
         let CWLDocument::CommandLineTool(tool) = &request.specification else {
             panic!("Currently only CommandLineTool is supported in Docker backend");
         };
@@ -114,6 +102,21 @@ impl TaskBackend for DockerBackend {
         let ttl = tool.get_requirement_or_hint::<ToolTimeLimit>();
         let llr = tool.get_requirement_or_hint::<LoadListingRequirement>();
 
+        let stage_dir = Path::new(CONTAINER_INPUT_DIR);
+
+        let mut staged_inputs = collect_inputs(
+            &request.specification,
+            &request.inputs,
+            &request.working_dir,
+            stage_dir,
+            llr,
+            Some(&fv),
+        )?;
+
+
+        let outdir = tempdir()?;
+        let tmpdir = tempdir()?;
+
         //handle docker output dir
         let workdir = if let Some(dr) = dr
             && let Some(dr_outdir) = &dr.docker_output_directory
@@ -123,14 +126,10 @@ impl TaskBackend for DockerBackend {
             CONTAINER_WORKDIR
         };
 
-        // fill input metadata for file or directory, this is useful for the evaluation context
-        let mut staged_inputs =
-            fill_input_metadata(&inputs, &request.specification, &path_mapper, llr)?;
-
         let eval_context = &mut EvaluationContext {
-            inputs: Some(&staged_inputs.clone()),
             workdir: Some(&request.working_dir),
             ijsr,
+            inputs: Some(&staged_inputs.clone()),
             ..Default::default()
         };
 
@@ -141,18 +140,24 @@ impl TaskBackend for DockerBackend {
 
         eval_context.runtime = Some(&runtime);
 
-        //needs to be constructed after we created the eval context
-        let flattened_inputs = create_flattened_inputs(
-            &mut staged_inputs,
+        //collect secondary files using evalcontrext and reassign inputs
+        collect_secondary_files_for_inputs(
             &request.specification,
+            &mut staged_inputs,
             eval_context,
-            &mut path_mapper,
             &request.working_dir,
-            tmpdir.path(),
         )?;
-        //adds synthethic paths to the staged inputs and readds the updated value to the evaluation context.
-        let staged_inputs = add_synthethic_paths(staged_inputs.clone(), &path_mapper);
-        eval_context.inputs = Some(&staged_inputs);
+
+        let eval_context = &mut EvaluationContext {
+            inputs: Some(&staged_inputs.clone()),
+            workdir: Some(&request.working_dir),
+            ijsr,
+            runtime: Some(&runtime),
+            ..Default::default()
+        };
+
+        //needs to be constructed after we created the eval context
+        let flattened_inputs = create_flattened_inputs(&staged_inputs)?;
 
         //evalute environment expressions
         let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
@@ -195,11 +200,20 @@ impl TaskBackend for DockerBackend {
                 outdir.path(),
                 eval_context,
                 workdir,
-                &mut path_mapper,
+                &mut staged_inputs,
             )?;
         }
+
+        let eval_context = &mut EvaluationContext {
+            inputs: Some(&staged_inputs),
+            workdir: Some(&request.working_dir),
+            ijsr,
+            runtime: Some(&runtime),
+            ..Default::default()
+        };
+
         //collect command string and correct args for staged paths
-        let mut args = command::build_command(tool, &staged_inputs, &runtime, Some(&path_mapper))?;
+        let mut args = command::build_command(tool, &staged_inputs, &runtime)?;
 
         //correct and add the stdin value
         let mut stdin = get_stdin(tool, &staged_inputs);
@@ -210,15 +224,6 @@ impl TaskBackend for DockerBackend {
             } else {
                 stdin.to_string()
             };
-            //handle paths
-            if !path_mapper.has_host(&stdin) {
-                path_mapper.add(&stdin)?;
-            }
-            *stdin = path_mapper
-                .get_guest(&stdin)
-                .unwrap() //allowed as we just added it!
-                .to_string_lossy()
-                .into_owned();
 
             args.push(stdin.to_string());
         }
@@ -256,45 +261,8 @@ impl TaskBackend for DockerBackend {
             .build();
 
         //add file inputs to task
-        for mut input in flattened_inputs {
-            input.dry_validation();
-            let path = input.path().cloned();
-
-            let ty = match input {
-                FileOrDirectory::File(_) => input::Type::File,
-                FileOrDirectory::Directory(_) => input::Type::Directory,
-            };
-            if let Some(path) = path {
-                let guest_path = path_mapper.get_guest(path).unwrap();
-
-                //do not restage iwdr inputs
-                if guest_path.starts_with(workdir) {
-                    continue;
-                }
-
-                let host_path = path_mapper.get_host(guest_path).unwrap();
-                task.add_input(
-                    Input::builder()
-                        .contents(Contents::Path(host_path.to_path_buf()))
-                        .path(guest_path.to_string_lossy())
-                        .ty(ty)
-                        .build(),
-                );
-            } else if let FileOrDirectory::File(file) = input
-                && let Some(contents) = &file.contents
-            {
-                //make content checksum
-                let path = path_mapper
-                    .stage_dir()
-                    .join(checksum(contents).split_off(5));
-                task.add_input(
-                    Input::builder()
-                        .contents(Contents::Literal(contents.as_bytes().to_vec()))
-                        .path(path.to_string_lossy())
-                        .ty(ty)
-                        .build(),
-                );
-            }
+        for input in flattened_inputs {
+            build_backend_input(&mut task, &input)?;
         }
 
         //add outdir mount

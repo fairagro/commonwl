@@ -1,4 +1,5 @@
 use crate::context::Runtime;
+use anyhow::Context as _;
 use boa_engine::{Context, JsString, JsValue, Source, property::PropertyKey};
 use cwl_core::{
     inputs::DefaultValue,
@@ -25,6 +26,13 @@ impl<'a> EvaluationContext<'a> {
     pub fn with_runtime(self, runtime: &'a Runtime) -> Self {
         Self {
             runtime: Some(runtime),
+            ..self
+        }
+    }
+
+    pub fn with_inputs(self, inputs: &'a HashMap<String, DefaultValue>) -> Self {
+        Self {
+            inputs: Some(inputs),
             ..self
         }
     }
@@ -158,7 +166,8 @@ fn js_eval(
             match item {
                 ExpressionLibItem::Include(include) => {
                     let include = &include.include;
-                    let contents = fs::read_to_string(workdir.join(include))?;
+                    let contents = fs::read_to_string(workdir.join(include))
+                        .with_context(|| format!("Could not read expression_lib {include}"))?;
                     context
                         .eval(Source::from_bytes(&contents))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -336,10 +345,10 @@ fn parse_expressions(expr: &str) -> Vec<Expression> {
 }
 
 fn unescape_value(expr: &str) -> String {
-   let chars: Vec<char> = expr.chars().collect();
+    let chars: Vec<char> = expr.chars().collect();
     let mut result = String::new();
     let mut i = 0;
-    
+
     while i < chars.len() {
         if chars[i] == '\\' && i + 1 < chars.len() {
             // Count consecutive backslashes
@@ -349,9 +358,13 @@ fn unescape_value(expr: &str) -> String {
                 backslash_count += 1;
                 j += 1;
             }
-            
+
             // Check what follows the backslashes
-            if j < chars.len() && chars[j] == '$' && j + 1 < chars.len() && (chars[j + 1] == '(' || chars[j + 1] == '{') {
+            if j < chars.len()
+                && chars[j] == '$'
+                && j + 1 < chars.len()
+                && (chars[j + 1] == '(' || chars[j + 1] == '{')
+            {
                 // Before CWL expression: $(... or ${...
                 // Each pair \\ becomes \, and if odd, the last one escapes the expression
                 let pairs = backslash_count / 2;
@@ -384,7 +397,7 @@ fn unescape_value(expr: &str) -> String {
             i += 1;
         }
     }
-    
+
     result
 }
 
@@ -397,6 +410,22 @@ fn to_str(value: &serde_yaml::Value) -> String {
         serde_yaml::Value::Mapping(m) => serde_json::to_string_pretty(m).unwrap_or(String::new()),
         _ => String::new(),
     }
+}
+
+pub fn extract_input_name(expr: &str) -> Option<String> {
+    let exprs = parse_expressions(expr);
+    if exprs.is_empty() {
+        return None;
+    }
+    let expr = &exprs[0].expression;
+
+    expr.find("inputs.").map(|start| {
+        let rest = &expr[start + 7..];
+        let end = rest
+            .find(|c: char| !c.is_alphanumeric() && c != '_')
+            .unwrap_or(rest.len());
+        rest[..end].to_string()
+    })
 }
 
 #[cfg(test)]

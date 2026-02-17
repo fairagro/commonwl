@@ -2,7 +2,6 @@ use crate::{
     context::Runtime,
     expression::{self, EvaluationContext, do_eval},
     input::validation::validate_command_input,
-    pathmapper::PathMapper,
 };
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
@@ -35,7 +34,6 @@ pub fn build_command(
     tool: &CommandLineTool,
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
-    path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     let mut args: Vec<String> = vec![];
 
@@ -140,26 +138,15 @@ pub fn build_command(
         let mut cmd = args.clone();
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
+                use_value_from(&bound.binding, inputs, runtime, ijsr)?
             } else {
-                generate_arg(
-                    &bound.binding,
-                    bound.value,
-                    runtime,
-                    Some(inputs),
-                    ijsr,
-                    path_mapper,
-                )?
+                generate_arg(&bound.binding, bound.value, runtime, Some(inputs), ijsr)?
             };
 
             if bound.binding.shell_quote.unwrap_or(true) {
                 arg = apply_shell_quote(arg);
             }
             cmd.extend(arg);
-        }
-        //correct paths before joining them
-        if let Some(path_mapper) = path_mapper {
-            cmd = path_mapper.correct_execution_paths(cmd);
         }
 
         let cmdline = cmd.join(" ");
@@ -168,24 +155,12 @@ pub fn build_command(
     } else {
         for bound in bindings {
             let arg = if is_argument(&bound) {
-                use_value_from(&bound.binding, inputs, runtime, ijsr, path_mapper)?
+                use_value_from(&bound.binding, inputs, runtime, ijsr)?
             } else {
-                generate_arg(
-                    &bound.binding,
-                    bound.value,
-                    runtime,
-                    Some(inputs),
-                    ijsr,
-                    path_mapper,
-                )?
+                generate_arg(&bound.binding, bound.value, runtime, Some(inputs), ijsr)?
             };
             args.extend(arg);
         }
-    }
-
-    //correct paths
-    if let Some(path_mapper) = path_mapper {
-        args = path_mapper.correct_execution_paths(args);
     }
 
     //remove empty args
@@ -396,7 +371,6 @@ pub(crate) fn generate_arg(
     runtime: &Runtime,
     inputs: Option<&HashMap<String, DefaultValue>>,
     ijsr: Option<&InlineJavascriptRequirement>,
-    path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     let sep = binding.separate.unwrap_or(true);
 
@@ -413,7 +387,7 @@ pub(crate) fn generate_arg(
                 runtime: Some(runtime),
                 inputs,
                 ijsr,
-                workdir: path_mapper.map(|m| m.base_dir()),
+                ..Default::default() //EvaluationContext { context: (), inputs, runtime: (), ijsr, workdir: () }workdir: path_mapper.map(|m| m.base_dir()),
             },
         ) {
             result
@@ -461,18 +435,7 @@ pub(crate) fn generate_arg(
             _ => argl = vec![DefaultValue::Any(value.clone())],
         },
         DefaultValue::FileOrDirectory(fd) => {
-            let mut fd = fd.clone();
-            //get mapped path
-            if let Some(path_mapper) = path_mapper
-                && let Some(path) = fd.path()
-            {
-                fd.set_path(
-                    path_mapper
-                        .get_guest(path)
-                        .map(|p| p.to_string_lossy().into_owned()),
-                );
-            }
-
+            let fd = fd.clone();
             argl = vec![DefaultValue::FileOrDirectory(fd)]
         }
     }
@@ -505,7 +468,6 @@ fn use_value_from(
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
     ijsr: Option<&InlineJavascriptRequirement>,
-    path_mapper: Option<&PathMapper>,
 ) -> anyhow::Result<Vec<String>> {
     //evaluate first
     let mut value = DefaultValue::Any(serde_yaml::Value::String(
@@ -519,7 +481,7 @@ fn use_value_from(
             inputs: Some(inputs),
             runtime: Some(runtime),
             ijsr,
-            workdir: path_mapper.map(|m| m.base_dir()),
+            //workdir: path_mapper.map(|m| m.base_dir()),
             ..Default::default()
         },
     ) {

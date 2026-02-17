@@ -2,18 +2,30 @@ use crate::{
     command::to_str,
     format::FormatValidator,
     input::validation::{validate_command_input, validate_input_type},
+    io::{directory::locate_dir, file::locate_file},
     requirements::{ProcessHints, ProcessRequirements},
+};
+use anyhow::Context;
+use crankshaft::engine::{
+    Task,
+    task::{
+        Input,
+        input::{self, Contents},
+    },
 };
 use cwl_core::{
     ExtractFromEnum, OneOrMany,
     documents::{CWLDocument, CommandLineTool},
+    files::{FileOrDirectory, LoadListingEnum},
     inputs::{CommandInputParameterType, DefaultValue, OperationInputParameter},
+    requirements::LoadListingRequirement,
 };
 use serde::Deserialize;
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
 };
+use url::Url;
 
 pub mod file_system;
 pub mod validation;
@@ -63,10 +75,11 @@ impl InputObject {
 }
 
 pub fn load_input_file_from_file(
-    path: impl AsRef<Path>,
+    path: impl AsRef<Path> + std::fmt::Debug,
     base_path: impl AsRef<Path>,
 ) -> anyhow::Result<InputObject> {
-    let content = std::fs::read_to_string(path.as_ref())?;
+    let content = std::fs::read_to_string(path.as_ref())
+        .with_context(|| format!("Could not read input file {path:?}"))?;
     let mut values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
 
     //calculate path relativity
@@ -146,6 +159,9 @@ fn adjust_path_to_base(
 pub fn collect_inputs(
     doc: &CWLDocument,
     inputs: &HashMap<String, serde_yaml::Value>,
+    work_dir: &Path,
+    stage_dir: &Path,
+    llr: Option<&LoadListingRequirement>,
     fv: Option<&FormatValidator>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut values = HashMap::new();
@@ -181,34 +197,38 @@ pub fn collect_inputs(
                 input.r#type
             )
         }
-        sanitize_paths(&mut value)?;
+        let load_listing = input.load_listing.or_else(|| llr.map(|r| r.load_listing));
+        load_input(&mut value, work_dir, stage_dir, load_listing)?;
         values.insert(input.id.clone().unwrap_or_default(), value);
     }
 
     Ok(values)
 }
 
-fn sanitize_paths(value: &mut DefaultValue) -> anyhow::Result<()> {
+fn load_input(
+    value: &mut DefaultValue,
+    work_dir: &Path,
+    stage_dir: &Path,
+    load_listing: Option<LoadListingEnum>,
+) -> anyhow::Result<()> {
     match value {
-        DefaultValue::FileOrDirectory(fod) => {
-            fod.dry_validation();
-            if let Some(path) = fod.path()
-                && path.starts_with("./")
-            {
-                fod.set_path(Some(path.strip_prefix("./").unwrap_or(path).into()));
-            }
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+            locate_file(file, work_dir, stage_dir)?;
+        }
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
+            locate_dir(dir, work_dir, stage_dir, load_listing)?;
         }
         DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
             for item in vec {
                 let mut dv = serde_yaml::from_value(item.clone())?;
-                sanitize_paths(&mut dv)?;
+                load_input(&mut dv, work_dir, stage_dir, load_listing)?;
                 *item = serde_yaml::to_value(&dv)?;
             }
         }
         DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
             for item in map.values_mut() {
                 let mut dv = serde_yaml::from_value(item.clone())?;
-                sanitize_paths(&mut dv)?;
+                load_input(&mut dv, work_dir, stage_dir, load_listing)?;
                 *item = serde_yaml::to_value(&dv)?;
             }
         }
@@ -250,6 +270,44 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
             .map(to_str);
     }
     None
+}
+
+pub fn build_backend_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
+    let ty = match input {
+        FileOrDirectory::File(_) => input::Type::File,
+        FileOrDirectory::Directory(_) => input::Type::Directory,
+    };
+    if let Some(path) = input.path()
+        && let Some(location) = input.location()
+    {
+        task.add_input(
+            Input::builder()
+                .contents(Contents::Url(Url::parse(location)?))
+                .path(path)
+                .ty(ty)
+                .build(),
+        );
+    } else if let FileOrDirectory::File(file) = &input
+        && let Some(contents) = &file.contents
+        && let Some(path) = &file.path
+    {
+        //make content checksum
+        task.add_input(
+            Input::builder()
+                .contents(Contents::Literal(contents.as_bytes().to_vec()))
+                .path(path)
+                .ty(ty)
+                .build(),
+        );
+    } else if let FileOrDirectory::Directory(dir) = &input
+        && let Some(listing) = &dir.listing
+    {
+        for item in listing {
+            build_backend_input(task, item)?;
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

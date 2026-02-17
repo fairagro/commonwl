@@ -1,4 +1,5 @@
 use crate::expression::{EvaluationContext, do_eval};
+use anyhow::Context;
 use cwl_core::documents::CWLDocument;
 use horned_owl::{
     io::ParserOutput,
@@ -41,18 +42,19 @@ const EQUIVALENT_CLASS: &str = "http://www.w3.org/2002/07/owl#equivalentClass";
 impl FormatValidator {
     pub fn new(
         namespaces: HashMap<String, String>,
-        ontologies: Vec<impl AsRef<Path>>,
+        ontologies: Vec<impl AsRef<Path> + std::fmt::Debug>,
     ) -> anyhow::Result<Self> {
         let mut ontos = vec![];
         for path in ontologies {
             if path.as_ref().extension().is_some_and(|ext| ext == "ttl") {
-                let content = fs::read_to_string(&path)?;
+                let content = fs::read_to_string(&path)
+                    .with_context(|| format!("Could not read ttl {path:?}"))?;
                 let mut reader = TurtleParser::from_string(content);
                 let graph = reader.decode().map_err(|e| anyhow::anyhow!("{e}"))?;
                 ontos.push(Ontology::Graph(graph));
             }
             if path.as_ref().extension().is_some_and(|ext| ext == "owl") {
-                let file = File::open(&path)?;
+                let file = File::open(&path).with_context(|| format!("Could not open {path:?}"))?;
                 let mut bufreader = BufReader::new(file);
                 let b = Build::new_arc();
                 let onot: ParserOutput<ArcStr, Arc<AnnotatedComponent<ArcStr>>> = ParserOutput::rdf(
