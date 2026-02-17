@@ -102,7 +102,6 @@ fn stage_dirent(
         debug!("Workdir Entry evaluated to null: {dirent:?}");
         return Ok(());
     }
-
     //probably array of files is given here, why is dirent used in the first place?
     if dirent.entryname.is_none()
         && let Ok(items) =
@@ -124,9 +123,12 @@ fn stage_dirent(
     //relocate used inputs
     update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
 
+    //if dirent ends with newline and has expression we use string interpolation which means we do json serialization
+    let has_trailing_newline = dirent.entry.ends_with("\n");
+
     let staged_path = stagedir.join(&entryname);
     let mut string_content = match dv {
-        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) if !has_trailing_newline => {
             if let Some(contents) = file.contents {
                 contents.to_string()
             } else {
@@ -142,7 +144,9 @@ fn stage_dirent(
                 }
             }
         }
-        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir))
+            if !has_trailing_newline =>
+        {
             stage_files(
                 &FileOrDirectory::Directory(dir),
                 stagedir,
@@ -154,9 +158,10 @@ fn stage_dirent(
             serde_yaml::Value::String(s) => s,
             _ => to_string_dump(&value)?,
         },
+        _ => to_string_dump(&dv)?,
     };
 
-    if dirent.entry.ends_with("\n") && !string_content.ends_with("\n"){
+    if has_trailing_newline && !string_content.ends_with("\n") {
         string_content += "\n"
     }
 

@@ -76,7 +76,7 @@ pub fn locate_dir(
         if let Some(listing) = &mut dir.listing {
             for item in listing {
                 match item {
-                    FileOrDirectory::File(file) => locate_file(file, work_dir, &path)?,
+                    FileOrDirectory::File(file) => locate_file(file, work_dir, &path, false)?,
                     FileOrDirectory::Directory(dir) => {
                         locate_dir(dir, work_dir, &path, load_listing)?
                     }
@@ -121,7 +121,7 @@ fn read_dir(
                 location: Some(path_buf.to_string_lossy().to_string()),
                 ..Default::default()
             };
-            locate_file(&mut file, work_dir, stage_dir)?;
+            locate_file(&mut file, work_dir, stage_dir, false)?;
             entries.push(FileOrDirectory::File(file));
         }
     }

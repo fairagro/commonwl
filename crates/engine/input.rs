@@ -198,8 +198,15 @@ pub fn collect_inputs(
             )
         }
         let load_listing = input.load_listing.or_else(|| llr.map(|r| r.load_listing));
+        let load_contents = input.load_contents.unwrap_or_default();
         let stage_dir = stage_dir.join(input.id.as_ref().unwrap());
-        load_input(&mut value, work_dir, &stage_dir, load_listing)?;
+        load_input(
+            &mut value,
+            work_dir,
+            &stage_dir,
+            load_listing,
+            load_contents,
+        )?;
         values.insert(input.id.clone().unwrap_or_default(), value);
     }
 
@@ -211,10 +218,11 @@ fn load_input(
     work_dir: &Path,
     stage_dir: &Path,
     load_listing: Option<LoadListingEnum>,
+    load_contents: bool,
 ) -> anyhow::Result<()> {
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
-            locate_file(file, work_dir, stage_dir)?;
+            locate_file(file, work_dir, stage_dir, load_contents)?;
         }
         DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
             locate_dir(dir, work_dir, stage_dir, load_listing)?;
@@ -222,14 +230,14 @@ fn load_input(
         DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
             for item in vec {
                 let mut dv = serde_yaml::from_value(item.clone())?;
-                load_input(&mut dv, work_dir, stage_dir, load_listing)?;
+                load_input(&mut dv, work_dir, stage_dir, load_listing, load_contents)?;
                 *item = serde_yaml::to_value(&dv)?;
             }
         }
         DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
             for item in map.values_mut() {
                 let mut dv = serde_yaml::from_value(item.clone())?;
-                load_input(&mut dv, work_dir, stage_dir, load_listing)?;
+                load_input(&mut dv, work_dir, stage_dir, None, false)?;
                 *item = serde_yaml::to_value(&dv)?;
             }
         }
@@ -428,6 +436,6 @@ mod tests {
             panic!("Oh no!")
         };
         let stdin = get_stdin(&tool, &inputs);
-        assert_eq!(stdin, Some("./hello.txt".into()));
+        assert_eq!(stdin, Some("./file1/hello.txt".into()));
     }
 }

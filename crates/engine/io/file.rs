@@ -13,13 +13,19 @@ use cwl_core::{
 };
 use std::{
     collections::HashMap,
+    fs,
     path::{MAIN_SEPARATOR_STR, Path, PathBuf},
 };
 use tracing::debug;
 use url::Url;
 
 /// locates a file by writing the location as Url and filling the staged metadata
-pub fn locate_file(file: &mut File, work_dir: &Path, stage_dir: &Path) -> anyhow::Result<()> {
+pub fn locate_file(
+    file: &mut File,
+    work_dir: &Path,
+    stage_dir: &Path,
+    load_contents: bool,
+) -> anyhow::Result<()> {
     if let Some(path) = &file.path
         && file.location.is_none()
     {
@@ -71,7 +77,17 @@ pub fn locate_file(file: &mut File, work_dir: &Path, stage_dir: &Path) -> anyhow
                 get_file_metadata(Path::new(location.strip_prefix("file://").unwrap()))
         {
             file.checksum = checksum;
-            file.size = Some(Integer::Long(size as i64))
+            file.size = Some(Integer::Long(size as i64));
+            if load_contents && size < 64 * 1024 {
+                file.contents = Some(fs::read_to_string(
+                    location.strip_prefix("file://").unwrap(),
+                )?);
+            } else if load_contents {
+                anyhow::bail!(
+                    "Can not load file contents if file is larger than {} bytes.",
+                    64 * 1024
+                )
+            }
         }
     }
 
@@ -86,7 +102,9 @@ pub fn locate_file(file: &mut File, work_dir: &Path, stage_dir: &Path) -> anyhow
     if let Some(secondary_files) = &mut file.secondary_files {
         for item in secondary_files {
             match item {
-                FileOrDirectory::File(file) => locate_file(file, work_dir, stage_dir)?,
+                FileOrDirectory::File(file) => {
+                    locate_file(file, work_dir, stage_dir, load_contents)?
+                }
                 FileOrDirectory::Directory(dir) => locate_dir(dir, work_dir, stage_dir, None)?,
             }
         }
@@ -215,7 +233,7 @@ pub fn handle_secondary_files(
                             ..Default::default()
                         };
                         //fill metadata
-                        locate_file(&mut sec_file, work_dir, stage_dir)?;
+                        locate_file(&mut sec_file, work_dir, stage_dir, false)?;
                         sec_files.push(FileOrDirectory::File(sec_file));
                     } else if item.is_dir() {
                         let mut sec_dir = Directory {
@@ -230,7 +248,9 @@ pub fn handle_secondary_files(
                 PathOrFile::File(mut vec) => {
                     for item in &mut vec {
                         match item {
-                            FileOrDirectory::File(file) => locate_file(file, work_dir, stage_dir)?,
+                            FileOrDirectory::File(file) => {
+                                locate_file(file, work_dir, stage_dir, false)?
+                            }
                             FileOrDirectory::Directory(dir) => {
                                 locate_dir(dir, work_dir, stage_dir, None)?
                             }
@@ -327,7 +347,7 @@ mod tests {
             .dirname("/mnt/task/inputs")
             .build();
 
-        locate_file(&mut file, workdir, stagedir).unwrap();
+        locate_file(&mut file, workdir, stagedir, false).unwrap();
 
         assert_eq!(file, expected);
     }
