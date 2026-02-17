@@ -1,12 +1,13 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     format::FormatValidator,
-    io::file::handle_secondary_file_schema,
+    io::file::{PathOrFile, handle_secondary_file_schema},
 };
 use anyhow::Context;
 use cwl_core::{
-    OneOrMany,
+    FileMetaData, Integer, OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
+    get_file_metadata,
     inputs::DefaultValue,
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
@@ -50,7 +51,7 @@ pub fn collect_command_outputs(
                     let path = f.path.clone().unwrap();
                     let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
-                    *value = handle_file(&path, None, None, context)?
+                    *value = handle_file(&path, None, context)?
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
@@ -154,9 +155,14 @@ fn evaluate_command_binding(
         for item in &mut results {
             if let DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) = item {
                 let path = file.path.clone().unwrap();
+
+                let json_value = serde_json::to_value(&file)?;
+                let eval_context = EvaluationContext {
+                    context: Some(&json_value),
+                    ..*context.eval_context
+                };
                 file.secondary_files =
-                    handle_secondary_files(Path::new(&path), secondary_files, context.eval_context)
-                        .ok();
+                    handle_secondary_files(Path::new(&path), secondary_files, &eval_context).ok();
             }
         }
     }
@@ -170,12 +176,18 @@ fn handle_secondary_files(
     context: &EvaluationContext,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     let mut secondaries = vec![];
+
     for item in &secondary_files.as_many() {
-        let Some(secondary_path) = handle_secondary_file_schema(path, item, context)? else {
+        let Some(secondary_file) = handle_secondary_file_schema(path, item, context)? else {
             continue;
         };
-        let file = File::new_from_path(&secondary_path)?;
-        secondaries.push(FileOrDirectory::File(file));
+        match secondary_file {
+            PathOrFile::Path(secondary_path) => {
+                let file = File::new_from_path(&secondary_path)?;
+                secondaries.push(FileOrDirectory::File(file));
+            }
+            PathOrFile::File(vec) => secondaries.extend(vec),
+        }
     }
     Ok(secondaries)
 }
@@ -202,7 +214,7 @@ fn validate_file(
     context: &OutputCollectionContext,
     base_path: &Path,
 ) -> anyhow::Result<()> {
-    let path = get_designated_path(file.path.as_ref(), base_path);
+    let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref());
     let dirname = path.as_ref().and_then(|p| p.parent());
 
     if let Some(source_path) = &file.path
@@ -227,6 +239,12 @@ fn validate_file(
 
         fs::copy(&source_path, dest_path)
             .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+
+        if file.size.is_none() || file.checksum.is_none() {
+            let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
+            file.checksum = checksum;
+            file.size = Some(Integer::Long(size as i64))
+        }
     }
 
     let format = context.validator.handle(format, Some(context.eval_context));
@@ -254,7 +272,7 @@ fn validate_dir(
     context: &OutputCollectionContext,
     base_path: &Path,
 ) -> anyhow::Result<()> {
-    let path = get_designated_path(dir.path.as_ref(), base_path);
+    let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref());
 
     let mut base_path = base_path.to_path_buf();
 
@@ -296,11 +314,16 @@ fn validate_dir(
 }
 
 /// creates the new output path by stripping prefixes of known folders
-fn get_designated_path(path: Option<&String>, base_path: &Path) -> Option<PathBuf> {
+fn get_designated_path(
+    path: Option<&String>,
+    base_path: &Path,
+    basename: Option<&String>,
+) -> Option<PathBuf> {
     path.as_ref().map(|p| {
         let path = Path::new(p);
-        let filename = path.file_name().unwrap();
-        base_path.join(filename)
+        let filename = path.file_name().unwrap().to_string_lossy();
+
+        base_path.join(basename.unwrap_or(&filename.to_string()))
     })
 }
 
@@ -313,8 +336,8 @@ fn collect_output_item(
 ) -> anyhow::Result<DefaultValue> {
     let format = output.format.as_ref().map(|f| f.as_one().to_string());
     match &output.r#type {
-        CommandOutputParameterType::Stdout => handle_file(stdout_file, format, None, context),
-        CommandOutputParameterType::Stderr => handle_file(stderr_file, format, None, context),
+        CommandOutputParameterType::Stdout => handle_file(stdout_file, format, context),
+        CommandOutputParameterType::Stderr => handle_file(stderr_file, format, context),
         CommandOutputParameterType::CommandOutputType(r#type) => collect_item(
             output,
             &output.output_binding,
@@ -451,7 +474,6 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::R
 fn handle_file(
     path: &Path,
     format: Option<String>,
-    secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     let filename = Path::new(path.file_name().unwrap_or_default());
@@ -463,41 +485,7 @@ fn handle_file(
     let mut file = File::new_from_path(&dest_path)?;
     file.format = format;
 
-    //handle secondaries
-    if let Some(secondary_files) = secondary_files {
-        let secondary_files =
-            copy_secondary_files(path, &dest_path, secondary_files, context.eval_context)?;
-        file.secondary_files = Some(secondary_files);
-    }
-
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::File(file)))
-}
-
-fn copy_secondary_files(
-    from_path: &Path,
-    to_path: &Path,
-    secondary_files: &OneOrMany<SecondaryFileSchema>,
-    context: &EvaluationContext,
-) -> anyhow::Result<Vec<FileOrDirectory>> {
-    let mut secondaries = vec![];
-
-    for item in &secondary_files.as_many() {
-        let Some(secondary_path) = handle_secondary_file_schema(from_path, item, context)? else {
-            continue;
-        };
-
-        let copy_to_path = secondary_path
-            .strip_prefix(from_path.parent().unwrap())
-            .map(|relative| Path::new(&to_path.parent().unwrap()).join(relative))?;
-
-        fs::copy(&secondary_path, &copy_to_path)
-            .with_context(|| format!("Could not copy {secondary_path:?} to {copy_to_path:?}"))?;
-        let file = File::new_from_path(&copy_to_path)?;
-        secondaries.push(FileOrDirectory::File(file));
-    }
-
-    //remove none values
-    Ok(secondaries)
 }
 
 //returns a directory created in the output directory

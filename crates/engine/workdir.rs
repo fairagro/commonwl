@@ -153,7 +153,7 @@ fn stage_dirent(
         DefaultValue::Any(value) => value.as_str().unwrap().to_string(),
     };
 
-    if !string_content.ends_with("\n") {
+    if !string_content.ends_with("\n") && !string_content.is_empty() {
         string_content += "\n";
     }
 

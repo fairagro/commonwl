@@ -198,7 +198,8 @@ pub fn collect_inputs(
             )
         }
         let load_listing = input.load_listing.or_else(|| llr.map(|r| r.load_listing));
-        load_input(&mut value, work_dir, stage_dir, load_listing)?;
+        let stage_dir = stage_dir.join(input.id.as_ref().unwrap());
+        load_input(&mut value, work_dir, &stage_dir, load_listing)?;
         values.insert(input.id.clone().unwrap_or_default(), value);
     }
 
