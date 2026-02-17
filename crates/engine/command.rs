@@ -628,7 +628,7 @@ stdout: output.txt";
 
         let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         let cmdline = cmd.join(" ");
-        assert_eq!(cmdline, "cat ./hello.txt");
+        assert_eq!(cmdline, "cat ./file1/hello.txt");
     }
 
     #[test]
@@ -678,7 +678,7 @@ stdout: output.txt"#;
             vec![
                 &shell_cmd[0],
                 &shell_cmd[1],
-                "'cd' './testdir' && 'find' '.' | 'sort'"
+                "'cd' './indir/testdir' && 'find' '.' | 'sort'"
             ]
         );
     }
@@ -723,9 +723,9 @@ stdout: output.txt"#;
                 "1,2,3,4",
                 "-m",
                 "3",
-                "./chr20.fa",
-                "./example_human_Illumina.pe_1.fastq",
-                "./example_human_Illumina.pe_2.fastq"
+                "./reference/chr20.fa",
+                "./reads/example_human_Illumina.pe_1.fastq",
+                "./reads/example_human_Illumina.pe_2.fastq"
             ]
         );
     }
@@ -760,12 +760,12 @@ stdout: output.txt"#;
             vec![
                 "bwa",
                 "mem",
-                "./chr20.fa",
+                "./reference/chr20.fa",
                 "-XXX",
                 "-YYY",
-                "./example_human_Illumina.pe_1.fastq",
+                "./reads/example_human_Illumina.pe_1.fastq",
                 "-YYY",
-                "./example_human_Illumina.pe_2.fastq"
+                "./reads/example_human_Illumina.pe_2.fastq"
             ]
         );
     }
@@ -854,7 +854,7 @@ stdout: output.txt"#;
         let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
-        assert_eq!(cmd, vec!["cat", "./hello.txt"]);
+        assert_eq!(cmd, vec!["cat", "./file1/hello.txt"]);
     }
 
     #[test]
