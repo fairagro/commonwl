@@ -139,6 +139,8 @@ fn simple_expression_eval(
 
     if let Some(value) = &mut json {
         normalize_json_numbers(value);
+    } else {
+        anyhow::bail!("Expression did not evaluate to a value");
     }
 
     Ok(serde_yaml::to_value(json)?)
@@ -197,6 +199,8 @@ fn js_eval(
 
     if let Some(value) = &mut json {
         normalize_json_numbers(value);
+    } else {
+        anyhow::bail!("Expression did not evaluate to a value");
     }
 
     Ok(serde_yaml::to_value(json)?)

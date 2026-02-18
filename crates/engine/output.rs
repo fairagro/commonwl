@@ -146,7 +146,9 @@ fn evaluate_command_binding(
                     .collect(),
                 single_value => vec![serde_yaml::from_value(single_value)?],
             },
-            Err(_) => results,
+            Err(e) => anyhow::bail!(
+                "Failed to evaluate outputEval expression for output {output_id}: {e}"
+            ),
         };
     }
 
@@ -360,7 +362,7 @@ fn collect_item(
 ) -> anyhow::Result<DefaultValue> {
     let output_id = output.id.clone().unwrap_or_default();
 
-    let optional = matches!(item, OneOrMany::Many(i) if i.contains(&CommandOutputType::CWLType(CWLType::Null)));
+    let is_optional = matches!(item, OneOrMany::Many(i) if i.contains(&CommandOutputType::CWLType(CWLType::Null)));
     let single = match item {
         OneOrMany::One(CommandOutputType::CommandOutputSchema(schema))
             if matches!(&**schema, CommandOutputSchema::Array(_)) =>
@@ -426,7 +428,7 @@ fn collect_item(
 
                 if single && !values.is_empty() || is_any && values.len() == 1 {
                     values[0].clone()
-                } else if optional && values.is_empty() {
+                } else if is_optional && values.is_empty() {
                     DefaultValue::Any(serde_yaml::Value::Null)
                 } else {
                     let value = serde_yaml::to_value(values)?;
