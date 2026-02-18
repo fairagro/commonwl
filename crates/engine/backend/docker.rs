@@ -1,15 +1,9 @@
 use crate::{
-    backend::{ExecutionRequest, ExecutionResult, TaskBackend},
-    command,
-    context::build_runtime,
+    backend::{TaskBackend, TaskExecutionRequest, TaskExecutionResult},
     docker::build_container,
-    environment::handle_environment,
-    expression::{EvaluationContext, do_eval, do_eval_to_string},
-    format::get_format_validator,
-    input::{collect_inputs, file_system::create_flattened_inputs, get_stdin, mount_input},
-    io::file::collect_secondary_files_for_inputs,
-    output::{OutputCollectionContext, collect_command_outputs},
-    workdir::{mount_workdir_item, stage_work_dir},
+    expression::{do_eval, do_eval_to_string},
+    input::mount_input,
+    workdir::mount_workdir_item,
 };
 use crankshaft::{
     config::backend::docker::Config,
@@ -30,25 +24,14 @@ use crankshaft::{
         },
     },
 };
-use cwl_core::{IntegerOrExpression, requirements::LoadListingRequirement};
-use cwl_core::{
-    docstring,
-    documents::CWLDocument,
-    requirements::{
-        DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
-        InlineJavascriptRequirement, ResourceRequirement, ToolTimeLimit,
-    },
-};
+use cwl_core::IntegerOrExpression;
 use nonempty::nonempty;
 use std::{
-    fs,
-    path::{Path, PathBuf},
     sync::{Arc, Mutex},
     time::Duration,
 };
-use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
-use tracing::{error, info};
+use tracing::error;
 use url::Url;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
@@ -81,94 +64,14 @@ impl DockerBackend {
 }
 
 impl TaskBackend for DockerBackend {
-    async fn run(
+    async fn run<'a>(
         &self,
-        request: &ExecutionRequest,
+        request: &'a TaskExecutionRequest<'a>,
         token: CancellationToken,
-    ) -> anyhow::Result<ExecutionResult> {
-        //create validator
-        let fv = get_format_validator(&request.specification, &request.working_dir)?;
-
-        let CWLDocument::CommandLineTool(tool) = &request.specification else {
-            panic!("Currently only CommandLineTool is supported in Docker backend");
-        };
-
-        //get neccessary requirements
-        let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
-        let dr = tool.get_requirement_or_hint::<DockerRequirement>();
-        let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
-        let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
-        let evr = tool.get_requirement_or_hint::<EnvVarRequirement>();
-        let ttl = tool.get_requirement_or_hint::<ToolTimeLimit>();
-        let llr = tool.get_requirement_or_hint::<LoadListingRequirement>();
-
-        let stage_dir = Path::new(CONTAINER_INPUT_DIR);
-
-        let mut staged_inputs = collect_inputs(
-            &request.specification,
-            &request.inputs,
-            &request.working_dir,
-            stage_dir,
-            llr,
-            Some(&fv),
-        )?;
-
-        let outdir = tempdir()?;
-        let tmpdir = tempdir()?;
-
-        //handle docker output dir
-        let workdir = if let Some(dr) = dr
-            && let Some(dr_outdir) = &dr.docker_output_directory
-        {
-            dr_outdir
-        } else {
-            CONTAINER_WORKDIR
-        };
-
-        let eval_context = &mut EvaluationContext {
-            workdir: Some(&request.working_dir),
-            ijsr,
-            inputs: Some(&staged_inputs.clone()),
-            ..Default::default()
-        };
-
-        //create runtime struct
-        let mut runtime = build_runtime(rr, eval_context);
-        runtime.outdir = PathBuf::from(workdir);
-        runtime.tmpdir = PathBuf::from(CONTAINER_TMPDIR);
-
-        eval_context.runtime = Some(&runtime);
-
-        //collect secondary files using evalcontrext and reassign inputs
-        collect_secondary_files_for_inputs(
-            &request.specification,
-            &mut staged_inputs,
-            eval_context,
-            &request.working_dir,
-        )?;
-
-        let eval_context = &mut EvaluationContext {
-            inputs: Some(&staged_inputs.clone()),
-            workdir: Some(&request.working_dir),
-            ijsr,
-            runtime: Some(&runtime),
-            ..Default::default()
-        };
-
-        //needs to be constructed after we created the eval context
-        let flattened_inputs = create_flattened_inputs(&staged_inputs)?;
-
-        //evalute environment expressions
-        let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
-        environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
-        environment.insert(
-            "TMPDIR".to_string(),
-            runtime.tmpdir.to_string_lossy().into(),
-        );
-
+    ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
         let mut container = "ubuntu".to_string(); //add config "default-container"
-        if let Some(dr) = dr {
+        if let Some(dr) = request.docker {
             if let Some(df) = &dr.docker_file
                 && let Some(dt) = &dr.docker_image_id
             {
@@ -179,98 +82,63 @@ impl TaskBackend for DockerBackend {
             }
         }
 
-        let stdout_file = if let Some(s) = &tool.stdout {
+        let stdout_file = if let Some(s) = request.stdout_file {
             &format!("/mnt/task/{s}")
         } else {
             CONTAINER_STDOUT_FILE
         };
 
-        let stderr_file = if let Some(s) = &tool.stderr {
+        let stderr_file = if let Some(s) = request.stderr_file {
             &format!("/mnt/task/{s}")
         } else {
             CONTAINER_STDERR_FILE
         };
 
-        // handle iwdr copy/link to outdir
-        let mounts = if let Some(iwdr) = iwdr {
-            stage_work_dir(
-                iwdr,
-                &request.working_dir,
-                outdir.path(),
-                eval_context,
-                workdir,
-                &mut staged_inputs,
-            )?
-        } else {
-            vec![]
-        };
-
-        let eval_context = &mut EvaluationContext {
-            inputs: Some(&staged_inputs),
-            workdir: Some(&request.working_dir),
-            ijsr,
-            runtime: Some(&runtime),
-            ..Default::default()
-        };
-
-        //collect command string and correct args for staged paths
-        let mut args = command::build_command(tool, &staged_inputs, &runtime)?;
-
-        //correct and add the stdin value
-        let mut stdin = get_stdin(tool, &staged_inputs);
-        if let Some(stdin) = &mut stdin {
-            //evaluate expression
-            *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
-                serde_yaml::to_string(&value)?.trim().to_owned()
-            } else {
-                stdin.to_string()
-            };
-
-            args.push(stdin.to_string());
-        }
-
+        let mut args = request
+            .command
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
         // manually check for an entypoint
         if let Some(entrypoint) = self.get_docker_entrypoint(&container).await? {
             args.splice(0..0, entrypoint);
         }
 
-        info!("Executing: {}", args.join(" "));
-
         //build crankshaft task object
         let mut task = Task::builder()
-            .maybe_name(tool.label.clone())
-            .maybe_description(tool.doc.as_ref().map(|d| docstring(d.clone())))
+            .name(request.id)
+            .maybe_description(request.description)
             .executions(nonempty![
                 Execution::builder()
-                    .work_dir(workdir)
-                    .env(environment)
+                    .work_dir(request.staged_dir)
+                    .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
-                    .maybe_stdin(stdin)
+                    .maybe_stdin(request.stdin_file)
                     .build()
             ])
             .resources(
                 Resources::builder()
-                    .cpu(runtime.cores as f64)
+                    .cpu(request.runtime.cores as f64)
                     //.disk(request.runtime.outdir_size) //we don't use this currently
-                    .ram(runtime.ram as f64)
+                    .ram(request.runtime.ram as f64)
                     .build(),
             )
             .build();
 
         //add file inputs to task
-        for input in flattened_inputs {
-            mount_input(&mut task, &input)?;
+        for input in request.inputs {
+            mount_input(&mut task, input)?;
         }
 
-        for mount in mounts {
+        for mount in request.mounts {
             mount_workdir_item(
-                mount,
-                outdir.path(),
-                tool.has_requirement::<DockerRequirement>(), //hints not valid per spec here
+                mount.clone(),
+                request.outdir,
+                request.use_container,
                 &mut task,
             )?;
         }
@@ -279,8 +147,8 @@ impl TaskBackend for DockerBackend {
         task.add_input(
             Input::builder()
                 .name("outdir")
-                .contents(Contents::Path(outdir.path().to_path_buf()))
-                .path(workdir)
+                .contents(Contents::Path(request.outdir.to_path_buf()))
+                .path(request.staged_dir)
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
@@ -290,7 +158,7 @@ impl TaskBackend for DockerBackend {
         task.add_input(
             Input::builder()
                 .name("tmpdir")
-                .contents(Contents::Path(tmpdir.path().to_path_buf()))
+                .contents(Contents::Path(request.tmpdir.to_path_buf()))
                 .path(CONTAINER_TMPDIR)
                 .ty(input::Type::Directory)
                 .read_only(false)
@@ -298,11 +166,11 @@ impl TaskBackend for DockerBackend {
         );
 
         //handle stderr output
-        let stderr_out_file = if let Some(stderr) = &tool.stderr {
-            let stderr = do_eval_to_string(stderr, eval_context);
-            outdir.path().join(stderr)
+        let stderr_out_file = if let Some(stderr) = request.stderr_file {
+            let stderr = do_eval_to_string(stderr, request.eval_context);
+            request.outdir.join(stderr)
         } else {
-            tmpdir.path().join("stderr")
+            request.tmpdir.join("stderr")
         };
         task.add_output(
             Output::builder()
@@ -314,11 +182,11 @@ impl TaskBackend for DockerBackend {
         );
 
         //handle stdout output
-        let stdout_out_file = if let Some(stdout) = &tool.stdout {
-            let stdout = do_eval_to_string(stdout, eval_context);
-            outdir.path().join(stdout)
+        let stdout_out_file = if let Some(stdout) = request.stdout_file {
+            let stdout = do_eval_to_string(stdout, request.eval_context);
+            request.outdir.join(stdout)
         } else {
-            tmpdir.path().join("stdout")
+            request.tmpdir.join("stdout")
         };
         task.add_output(
             Output::builder()
@@ -329,14 +197,17 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
-        let timelimit = ttl.as_ref().and_then(|ttl| match &ttl.timelimit {
-            IntegerOrExpression::Int(i) => Some(*i as i64),
-            IntegerOrExpression::Long(i) => Some(*i),
-            IntegerOrExpression::Expression(e) => {
-                let value = do_eval(e, eval_context).ok()?;
-                value.as_i64()
-            }
-        });
+        let timelimit = request
+            .timelimit
+            .as_ref()
+            .and_then(|ttl| match &ttl.timelimit {
+                IntegerOrExpression::Int(i) => Some(*i as i64),
+                IntegerOrExpression::Long(i) => Some(*i),
+                IntegerOrExpression::Expression(e) => {
+                    let value = do_eval(e, request.eval_context).ok()?;
+                    value.as_i64()
+                }
+            });
         let exit_status = if let Some(timeout) = timelimit
             && timeout != 0
         {
@@ -354,55 +225,19 @@ impl TaskBackend for DockerBackend {
             //no time constraint
             self.backend.run(task, token)?.await?
         };
-        let first_code = exit_status.first().code().unwrap_or(1);
 
-        //update runtime
-        let mut runtime = runtime.clone();
-        runtime.exit_code = Some(first_code);
-        runtime.outdir = outdir.path().to_path_buf();
-
-        let eval_context = eval_context.clone().with_runtime(&runtime);
-
-        //evaluate stderr/stdout
-        let stdout = fs::read_to_string(&stdout_out_file)?;
-        if !stdout.is_empty() {
-            eprintln!("{stdout}");
-        }
-        let stderr = fs::read_to_string(&stderr_out_file)?;
-        if !stderr.is_empty() {
-            eprintln!("{stderr}");
-        }
-
-        // need to collect outputs
-        if !&request.out_dir.exists() {
-            fs::create_dir_all(&request.out_dir)?;
-        }
-
-        let outputs = collect_command_outputs(
-            &tool.outputs,
-            &stdout_out_file,
-            &stderr_out_file,
-            &OutputCollectionContext {
-                source_dir: outdir.path(),
-                dest_dir: &request.out_dir,
-                tmp_dir: tmpdir.path(),
-                workdir: Path::new(workdir),
-                eval_context: &eval_context,
-                validator: &fv,
-            },
-        )?;
-        let json = serde_json::to_string_pretty(&outputs)?;
-        println!("{json}");
-
-        //evaluate exitstatus based on tool's expected exit codes
-
-        Ok(ExecutionResult {
+        Ok(TaskExecutionResult {
             exit_status,
-            stdout,
-            stderr,
-            outputs,
+            stdout_file: stdout_out_file,
+            stderr_file: stderr_out_file,
         })
     }
+
+    const INPUT_DIR: &str = CONTAINER_INPUT_DIR;
+
+    const WORK_DIR: &str = CONTAINER_WORKDIR;
+
+    const TMP_DIR: &str = CONTAINER_TMPDIR;
 }
 
 impl DockerBackend {
@@ -422,8 +257,10 @@ impl DockerBackend {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
-    use crate::backend::load_execution_context;
+    use crate::backend::{execute, load_execution_context};
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -448,7 +285,7 @@ mod tests {
         let request =
             load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = backend.run(&request, cancellation_token).await;
+        let result = execute(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
 
         //check if output file exists
@@ -471,7 +308,7 @@ mod tests {
         let request =
             load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = backend.run(&request, cancellation_token).await;
+        let result = execute(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
     }
 
@@ -490,7 +327,7 @@ mod tests {
         let request =
             load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = backend.run(&request, cancellation_token).await;
+        let result = execute(backend, &request, cancellation_token).await;
 
         assert!(result.is_ok());
         //check if output file exists

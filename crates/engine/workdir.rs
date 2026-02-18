@@ -330,6 +330,11 @@ pub fn mount_workdir_item(
                 .read_only(mount.readonly)
                 .build(),
         );
+    } else {
+        anyhow::bail!(
+            "Workdir item target {:?} is outside of working directory and container is not used, can not stage",
+            mount.target
+        );
     }
     Ok(())
 }

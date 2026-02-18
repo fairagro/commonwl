@@ -1,8 +1,8 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
     backend::{
-        EngineStatus, TaskBackend, docker::DockerBackend, evaluate_exitcodes,
-        load_execution_context, load_execution_context_with_inputs,
+        EngineStatus, docker::DockerBackend, evaluate_exitcodes, execute, load_execution_context,
+        load_execution_context_with_inputs,
     },
     input::InputObject,
 };
@@ -37,7 +37,9 @@ async fn main() -> anyhow::Result<()> {
         tracing_subscriber::fmt().with_max_level(Level::INFO).init();
     }
     if *debug {
-        tracing_subscriber::fmt().with_max_level(Level::DEBUG).init();
+        tracing_subscriber::fmt()
+            .with_max_level(Level::DEBUG)
+            .init();
     }
 
     let config = Config::default();
@@ -49,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let cancellation_token = CancellationToken::new();
-    let result = backend.run(&request, cancellation_token).await?;
+    let result = execute(backend, &request, cancellation_token).await?;
     let exit_status = result.exit_status;
 
     let evaluated_code = evaluate_exitcodes(exit_status, &request.specification);
