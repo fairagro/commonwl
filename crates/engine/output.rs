@@ -259,6 +259,12 @@ fn validate_file(
         .as_ref()
         .and_then(|p| format!("file://{p}").into());
 
+    if file.basename.is_none() {
+        file.basename = path
+            .as_ref()
+            .map(|p| p.file_name().unwrap().to_string_lossy().into_owned());
+    }
+
     if let Some(secondary_files) = &mut file.secondary_files {
         for item in secondary_files {
             validate_output_item(item, None, context, base_path)?;
@@ -422,9 +428,7 @@ fn collect_item(
                 let mut values =
                     evaluate_command_binding(binding, context, secondary_files, &output_id)?;
                 for item in &mut values {
-                    if let DefaultValue::FileOrDirectory(fod) = item {
-                        validate_output_item(fod, format, context, context.dest_dir)?;
-                    }
+                    validate_output_item_recurse(item, format, context)?;
                 }
 
                 if single && !values.is_empty() || is_any && values.len() == 1 {
@@ -441,6 +445,35 @@ fn collect_item(
         }
     };
     Ok(value)
+}
+
+fn validate_output_item_recurse(
+    item: &mut DefaultValue,
+    format: Option<&String>,
+    context: &OutputCollectionContext,
+) -> anyhow::Result<()> {
+    match item {
+        DefaultValue::FileOrDirectory(fod) => {
+            validate_output_item(fod, format, context, context.dest_dir)?
+        }
+        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            for item in map.values_mut() {
+                let mut dv = serde_yaml::from_value(item.clone())?;
+                validate_output_item_recurse(&mut dv, format, context)?;
+                *item = serde_yaml::to_value(dv)?;
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+            for item in arr {
+                let mut dv = serde_yaml::from_value(item.clone())?;
+                validate_output_item_recurse(&mut dv, format, context)?;
+                *item = serde_yaml::to_value(dv)?;
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
 }
 
 fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::Result<Vec<String>> {
