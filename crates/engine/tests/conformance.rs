@@ -2,7 +2,7 @@ use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
     backend::{
-        ExecutionResult, TaskBackend, docker::DockerBackend, load_execution_context_with_inputs,
+        ExecutionResult, docker::DockerBackend, execute, load_execution_context_with_inputs,
     },
     input::{InputObject, load_input_file_from_file},
 };
@@ -99,7 +99,7 @@ async fn test_command_line_tools_docker_backend() {
         let cancellation_token = CancellationToken::new();
 
         eprintln!("Running Test {}", test.id);
-        let result = backend.run(&request, cancellation_token).await;
+        let result = execute(backend, &request, cancellation_token).await;
         if test.should_fail {
             assert!(result.is_err());
         } else {
