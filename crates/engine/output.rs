@@ -394,7 +394,8 @@ fn collect_item(
 
     let value = match item {
         OneOrMany::One(CommandOutputType::CommandOutputSchema(schema))
-            if matches!(&**schema, CommandOutputSchema::Record(_)) =>
+            if matches!(&**schema, CommandOutputSchema::Record(_)) && output_binding.is_none() =>
+        //collect fields only if no binding on output is present
         {
             let mut fields = HashMap::new();
             if let CommandOutputSchema::Record(record) = &**schema
@@ -439,7 +440,6 @@ fn collect_item(
             }
         }
     };
-
     Ok(value)
 }
 
