@@ -281,7 +281,7 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
     None
 }
 
-pub fn build_backend_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
+pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
     let ty = match input {
         FileOrDirectory::File(_) => input::Type::File,
         FileOrDirectory::Directory(_) => input::Type::Directory,
@@ -312,7 +312,7 @@ pub fn build_backend_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::
         && let Some(listing) = &dir.listing
     {
         for item in listing {
-            build_backend_input(task, item)?;
+            mount_input(task, item)?;
         }
     }
 

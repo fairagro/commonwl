@@ -4,6 +4,13 @@ use crate::{
     serialize::to_string_dump,
 };
 use anyhow::Context;
+use crankshaft::engine::{
+    Task,
+    task::{
+        Input,
+        input::{self, Contents},
+    },
+};
 use cwl_core::{
     OneOrMany,
     files::{Dirent, FileOrDirectory},
@@ -18,6 +25,26 @@ use std::{
 };
 use tracing::debug;
 
+#[derive(Debug, Clone)]
+pub enum MountType {
+    File,
+    Directory,
+}
+
+#[derive(Debug, Clone)]
+pub enum Source {
+    File(PathBuf),
+    Contents(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkDirMount {
+    pub source: Source,
+    pub target: PathBuf,
+    pub ty: MountType,
+    pub readonly: bool,
+}
+
 pub fn stage_work_dir(
     iwdr: &InitialWorkDirRequirement,
     workdir: &Path,
@@ -25,24 +52,31 @@ pub fn stage_work_dir(
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<WorkDirMount>> {
     match &iwdr.listing {
         WorkDirItems::Expression(expression) => {
             let evaluated = do_eval(expression, context)?;
             let items = &serde_yaml::from_value(evaluated)?;
             update_inputs(expression, inputs, container_workdir, None);
-            stage_item(items, workdir, stagedir, context, container_workdir, inputs)?;
-            Ok(())
+            stage_item(items, workdir, stagedir, context, container_workdir, inputs)
         }
         WorkDirItems::ListingItems(items) => match &**items {
             OneOrMany::One(item) => {
                 stage_item(item, workdir, stagedir, context, container_workdir, inputs)
             }
             OneOrMany::Many(items) => {
+                let mut mounts = vec![];
                 for item in items {
-                    stage_item(item, workdir, stagedir, context, container_workdir, inputs)?;
+                    mounts.extend(stage_item(
+                        item,
+                        workdir,
+                        stagedir,
+                        context,
+                        container_workdir,
+                        inputs,
+                    )?);
                 }
-                Ok(())
+                Ok(mounts)
             }
         },
     }
@@ -55,19 +89,18 @@ fn stage_item(
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<WorkDirMount>> {
     match item {
         ListingItems::Expression(expression) => {
             let evaluated = do_eval(expression, context)?;
             if evaluated.is_null() {
                 //could be an optional type which is checked in input collection
                 debug!("expression returned null: {expression}");
-                return Ok(());
+                return Ok(vec![]);
             }
             let items = &serde_yaml::from_value(evaluated)?;
             update_inputs(expression, inputs, container_workdir, None);
-            stage_item(items, workdir, stagedir, context, container_workdir, inputs)?;
-            Ok(())
+            stage_item(items, workdir, stagedir, context, container_workdir, inputs)
         }
         ListingItems::Dirent(dirent) => stage_dirent(
             dirent,
@@ -77,12 +110,13 @@ fn stage_item(
             container_workdir,
             inputs,
         ),
-        ListingItems::FileOrDirectory(fod) => stage_files(fod, stagedir, None),
+        ListingItems::FileOrDirectory(fod) => stage_files(fod, workdir, stagedir, None, true),
         ListingItems::Vec(items) => {
+            let mut mounts = vec![];
             for item in items {
-                stage_files(item, stagedir, None)?;
+                mounts.extend(stage_files(item, workdir, stagedir, None, true)?);
             }
-            Ok(())
+            Ok(mounts)
         }
     }
 }
@@ -94,23 +128,32 @@ fn stage_dirent(
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<WorkDirMount>> {
     //evaluate expression if so
     let evaluated_content =
         do_eval(&dirent.entry, context).unwrap_or(serde_yaml::Value::String(dirent.entry.clone()));
     if evaluated_content.is_null() {
         debug!("Workdir Entry evaluated to null: {dirent:?}");
-        return Ok(());
+        return Ok(vec![]);
     }
+
     //probably array of files is given here, why is dirent used in the first place?
     if dirent.entryname.is_none()
         && let Ok(items) =
             serde_yaml::from_value::<OneOrMany<ListingItems>>(evaluated_content.clone())
     {
+        let mut mounts = vec![];
         for item in &items.as_many() {
-            stage_item(item, workdir, stagedir, context, container_workdir, inputs)?;
+            mounts.extend(stage_item(
+                item,
+                workdir,
+                stagedir,
+                context,
+                container_workdir,
+                inputs,
+            )?);
         }
-        return Ok(());
+        return Ok(mounts);
     }
 
     //parse to DefaultValue
@@ -144,15 +187,14 @@ fn stage_dirent(
                 }
             }
         }
-        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir))
-            if !has_trailing_newline =>
-        {
-            stage_files(
+        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) if !has_trailing_newline => {
+            return stage_files(
                 &FileOrDirectory::Directory(dir),
+                workdir,
                 stagedir,
                 dirent.entryname.as_ref(),
-            )?;
-            return Ok(());
+                !dirent.writable.unwrap_or(false),
+            );
         }
         DefaultValue::Any(value) => match value {
             serde_yaml::Value::String(s) => s,
@@ -165,51 +207,67 @@ fn stage_dirent(
         string_content += "\n"
     }
 
-    let parent = staged_path.parent().unwrap();
-    fs::create_dir_all(parent)
-        .with_context(|| format!("Could not create directory at {parent:?}"))?;
-    //create the file
-    fs::write(&staged_path, string_content)
-        .with_context(|| format!("Could not write to {staged_path:?}"))?;
-    Ok(())
+    Ok(vec![WorkDirMount {
+        source: Source::Contents(string_content.into_bytes()),
+        target: staged_path,
+        ty: MountType::File,
+        readonly: !dirent.writable.unwrap_or(false),
+    }])
 }
 
 fn stage_files(
     item: &FileOrDirectory,
+    workdir: &Path,
     stagedir: &Path,
     entryname: Option<&String>,
-) -> anyhow::Result<()> {
+    readonly: bool,
+) -> anyhow::Result<Vec<WorkDirMount>> {
+    let mut mounts = vec![];
     let staged_path = if let Some(entryname) = &entryname {
         stagedir.join(entryname)
     } else if let Some(basename) = item.basename() {
         stagedir.join(basename)
     } else {
-        let path = item.path().unwrap();
+        let path = item
+            .location()
+            .or(item.path())
+            .expect("Can not guess staged_path");
         let path = PathBuf::from(path);
         stagedir.join(path.file_name().unwrap())
     };
 
-    let parent = staged_path.parent().unwrap();
-    fs::create_dir_all(parent)
-        .with_context(|| format!("Could not create directory at {parent:?}"))?;
-
     if let Some(path) = item.location() {
         let path = path.strip_prefix("file://").unwrap_or(path); //TODO: check scheme
-
-        if item.is_file() {
-            fs::copy(path, &staged_path)
-                .with_context(|| format!("Could not copy from {path:?} to {staged_path:?}"))?;
-        } else if item.is_dir() {
-            copy_dir(path, &staged_path)
-                .with_context(|| format!("Could not copy from {path:?} to {staged_path:?}"))?;
+        let mut path = PathBuf::from(path);
+        if !path.is_absolute() {
+            path = workdir.join(path);
         }
-    } else if let FileOrDirectory::Directory(dir) = item {
-        fs::create_dir_all(&staged_path)
-            .with_context(|| format!("Could not create directory at {staged_path:?}"))?;
-        if let Some(listing) = &dir.listing {
-            for item in listing {
-                stage_files(item, &staged_path, None)?;
-            }
+        if item.is_file() {
+            mounts.push(WorkDirMount {
+                source: Source::File(path.clone()),
+                target: staged_path.clone(),
+                ty: MountType::File,
+                readonly,
+            });
+        } else if item.is_dir() {
+            mounts.push(WorkDirMount {
+                source: Source::File(path.clone()),
+                target: staged_path.clone(),
+                ty: MountType::Directory,
+                readonly,
+            });
+        }
+    } else if let FileOrDirectory::Directory(dir) = item
+        && let Some(listing) = &dir.listing
+    {
+        mounts.push(WorkDirMount {
+            source: Source::Contents(vec![]),
+            target: staged_path.clone(),
+            ty: MountType::Directory,
+            readonly,
+        });
+        for item in listing {
+            mounts.extend(stage_files(item, workdir, &staged_path, None, readonly)?);
         }
     }
 
@@ -218,10 +276,61 @@ fn stage_files(
         && let Some(sec_files) = &f.secondary_files
     {
         for item in sec_files {
-            stage_files(item, stagedir, entryname)?;
+            mounts.extend(stage_files(item, workdir, stagedir, entryname, readonly)?);
         }
     }
 
+    Ok(mounts)
+}
+
+pub fn mount_workdir_item(
+    mount: WorkDirMount,
+    outdir: &Path,
+    use_container: bool,
+    task: &mut Task,
+) -> anyhow::Result<()> {
+    if mount.target.starts_with(outdir) {
+        if let Some(parent) = mount.target.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Could not create parent directories for {:?}", mount.target)
+            })?;
+        }
+        match (mount.ty, mount.source) {
+            (MountType::File, Source::File(path)) => {
+                fs::copy(&path, &mount.target).with_context(|| {
+                    format!("Could not copy from {path:?} to {:?}", mount.target)
+                })?;
+            }
+            (MountType::File, Source::Contents(items)) => {
+                fs::write(&mount.target, &items)
+                    .with_context(|| format!("Could not write to {:?}", mount.target))?;
+            }
+            (MountType::Directory, Source::File(path)) => copy_dir(&path, &mount.target)
+                .with_context(|| format!("Could not copy from {path:?} to {:?}", mount.target))?,
+            (MountType::Directory, Source::Contents(_)) => {
+                fs::create_dir_all(&mount.target).with_context(|| {
+                    format!("Could not create parent directories for {:?}", mount.target)
+                })?;
+            }
+        };
+    } else if use_container {
+        task.add_input(
+            Input::builder()
+                .path(mount.target.to_string_lossy())
+                .contents(match mount.source {
+                    Source::File(path) => Contents::Path(path),
+                    Source::Contents(data) => Contents::Literal(data),
+                })
+                .ty(match mount.ty {
+                    MountType::File => input::Type::File,
+                    MountType::Directory => input::Type::Directory,
+                })
+                .read_only(mount.readonly)
+                .build(),
+        );
+    }
     Ok(())
 }
 

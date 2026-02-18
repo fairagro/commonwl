@@ -6,10 +6,10 @@ use crate::{
     environment::handle_environment,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     format::get_format_validator,
-    input::{build_backend_input, collect_inputs, file_system::create_flattened_inputs, get_stdin},
+    input::{collect_inputs, file_system::create_flattened_inputs, get_stdin, mount_input},
     io::file::collect_secondary_files_for_inputs,
     output::{OutputCollectionContext, collect_command_outputs},
-    workdir::stage_work_dir,
+    workdir::{mount_workdir_item, stage_work_dir},
 };
 use crankshaft::{
     config::backend::docker::Config,
@@ -113,7 +113,6 @@ impl TaskBackend for DockerBackend {
             Some(&fv),
         )?;
 
-
         let outdir = tempdir()?;
         let tmpdir = tempdir()?;
 
@@ -193,7 +192,7 @@ impl TaskBackend for DockerBackend {
         };
 
         // handle iwdr copy/link to outdir
-        if let Some(iwdr) = iwdr {
+        let mounts = if let Some(iwdr) = iwdr {
             stage_work_dir(
                 iwdr,
                 &request.working_dir,
@@ -201,8 +200,10 @@ impl TaskBackend for DockerBackend {
                 eval_context,
                 workdir,
                 &mut staged_inputs,
-            )?;
-        }
+            )?
+        } else {
+            vec![]
+        };
 
         let eval_context = &mut EvaluationContext {
             inputs: Some(&staged_inputs),
@@ -262,7 +263,16 @@ impl TaskBackend for DockerBackend {
 
         //add file inputs to task
         for input in flattened_inputs {
-            build_backend_input(&mut task, &input)?;
+            mount_input(&mut task, &input)?;
+        }
+
+        for mount in mounts {
+            mount_workdir_item(
+                mount,
+                outdir.path(),
+                tool.has_requirement::<DockerRequirement>(), //hints not valid per spec here
+                &mut task,
+            )?;
         }
 
         //add outdir mount
