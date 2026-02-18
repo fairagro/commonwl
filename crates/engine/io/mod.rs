@@ -4,14 +4,18 @@ pub mod directory;
 pub mod file;
 
 pub fn get_location(path: &str, work_dir: &Path) -> String {
+    let path = urlencoding::decode(path)
+        .unwrap_or(std::borrow::Cow::Borrowed(path))
+        .to_string();
     if path.starts_with("file://") {
-        return path.to_string();
+        return path;
     }
-    let path = Path::new(path);
+
+    let path = Path::new(&path);
     if path.is_absolute() {
-        format!("file://{}", path.display())
+        format!("file://{}", path.to_string_lossy())
     } else {
-        format!("file://{}", work_dir.join(path).display())
+        format!("file://{}", work_dir.join(path).to_string_lossy())
     }
 }
 
