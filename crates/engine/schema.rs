@@ -129,7 +129,6 @@ fn add_schema_defs_to_command_inputs_impl(
         }
         _ => {}
     }
-
     Ok(())
 }
 
@@ -300,6 +299,8 @@ fn replace_schema_references(
                 if schemas.contains_key(&s) {
                     *value = schemas[&s].clone();
                 }
+            } else if schemas.contains_key(&format!("#{s}")) {
+                *value = schemas[&format!("#{s}")].clone();
             }
         }
         serde_yaml::Value::Sequence(arr) => {
@@ -308,7 +309,10 @@ fn replace_schema_references(
             }
         }
         serde_yaml::Value::Mapping(map) => {
-            for v in map.values_mut() {
+            for (k, v) in map {
+                if *k == serde_yaml::Value::String("name".to_string()) {
+                    continue;
+                }
                 replace_schema_references(v, schemas)?;
             }
         }
