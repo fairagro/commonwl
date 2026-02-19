@@ -1,6 +1,7 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     format::FormatValidator,
+    input::validation::validate_input_type,
     io::file::{PathOrFile, handle_secondary_file_schema},
 };
 use anyhow::Context;
@@ -11,7 +12,7 @@ use cwl_core::{
     inputs::DefaultValue,
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
-        CommandOutputSchema, CommandOutputType,
+        CommandOutputSchema, CommandOutputType, OutputType,
     },
     types::{CWLType, SecondaryFileSchema},
 };
@@ -343,7 +344,7 @@ fn collect_output_item(
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
     let format = output.format.as_ref().map(|f| f.as_one().to_string());
-    match &output.r#type {
+    let value = match &output.r#type {
         CommandOutputParameterType::Stdout => handle_file(stdout_file, format, context),
         CommandOutputParameterType::Stderr => handle_file(stderr_file, format, context),
         CommandOutputParameterType::CommandOutputType(r#type) => collect_item(
@@ -354,7 +355,35 @@ fn collect_output_item(
             output.secondary_files.as_ref(),
             context,
         ),
+    }?;
+
+    //validate output to schema
+    if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
+        let valid = match r#type {
+            OneOrMany::One(r#type) => validate_input_type(
+                &Into::<OutputType>::into(r#type.clone()).into(),
+                &value,
+                None,
+                None,
+            ),
+            OneOrMany::Many(items) => items.iter().any(|t| {
+                validate_input_type(
+                    &Into::<OutputType>::into(t.clone()).into(),
+                    &value,
+                    None,
+                    None,
+                )
+            }),
+        };
+        if !valid {
+            anyhow::bail!(
+                "Output value {value:?} does not match output type {:?}",
+                r#type
+            )
+        }
     }
+
+    Ok(value)
 }
 
 // recursive implementention of item collection

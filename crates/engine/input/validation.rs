@@ -1,15 +1,18 @@
 use cwl_core::{
     OneOrMany,
     files::FileOrDirectory,
-    inputs::{
-        CommandInputParameterType, DefaultValue, InputArraySchema, InputEnumSchema,
-        InputRecordSchema, InputSchema, InputType,
-    },
+    inputs::{CommandInputParameterType, DefaultValue, InputType},
     types::CWLType,
 };
 use tracing::error;
 
-use crate::format::FormatValidator;
+use crate::{
+    format::FormatValidator,
+    schema_val::{
+        ValidationArraySchema, ValidationEnumSchema, ValidationRecordSchema, ValidationSchema,
+        ValidationType,
+    },
+};
 
 pub fn validate_command_input(
     schema: &CommandInputParameterType,
@@ -20,24 +23,34 @@ pub fn validate_command_input(
     match schema {
         CommandInputParameterType::Stdin => !value.is_null(), // for stdin we accept any existing value
         CommandInputParameterType::CommandInputType(one_or_many) => match one_or_many {
-            OneOrMany::One(item) => validate_input_type(&item.clone().into(), value, format, fv),
-            OneOrMany::Many(items) => items
-                .iter()
-                .any(|i| validate_input_type(&i.clone().into(), value, format, fv)),
+            OneOrMany::One(item) => validate_input_type(
+                &Into::<InputType>::into(item.clone()).into(),
+                value,
+                format,
+                fv,
+            ),
+            OneOrMany::Many(items) => items.iter().any(|i| {
+                validate_input_type(
+                    &Into::<InputType>::into(i.clone()).into(),
+                    value,
+                    format,
+                    fv,
+                )
+            }),
         },
     }
 }
 
 pub fn validate_input_type(
-    r#type: &InputType,
+    r#type: &ValidationType,
     value: &DefaultValue,
     format: Option<&String>,
     fv: Option<&FormatValidator>,
 ) -> bool {
     match r#type {
-        InputType::CWLType(ty) => validate_cwl_type(*ty, value, format, fv),
-        InputType::InputSchema(schema) => validate_schema(schema, value, format, fv),
-        InputType::String(_) => {
+        ValidationType::CWLType(ty) => validate_cwl_type(*ty, value, format, fv),
+        ValidationType::Schema(schema) => validate_schema(schema, value, format, fv),
+        ValidationType::String(_) => {
             if let Some(val) = value.try_get_value_ref() {
                 val.is_string()
             } else {
@@ -97,20 +110,20 @@ fn validate_cwl_type(
 }
 
 fn validate_schema(
-    schema: &InputSchema,
+    schema: &ValidationSchema,
     value: &DefaultValue,
     format: Option<&String>,
     fv: Option<&FormatValidator>,
 ) -> bool {
     match schema {
-        InputSchema::Record(rec) => validate_record_schema(rec, value, fv),
-        InputSchema::Enum(enu) => validate_enum_schema(enu, value),
-        InputSchema::Array(arr) => validate_array_schema(arr, value, format, fv),
+        ValidationSchema::Record(rec) => validate_record_schema(rec, value, fv),
+        ValidationSchema::Enum(enu) => validate_enum_schema(enu, value),
+        ValidationSchema::Array(arr) => validate_array_schema(arr, value, format, fv),
     }
 }
 
 fn validate_record_schema(
-    schema: &InputRecordSchema,
+    schema: &ValidationRecordSchema,
     value: &DefaultValue,
     fv: Option<&FormatValidator>,
 ) -> bool {
@@ -144,10 +157,10 @@ fn validate_record_schema(
             } else {
                 // Field is missing - check if it's optional (has null in union type)
                 match &f.r#type {
-                    OneOrMany::One(InputType::CWLType(CWLType::Null)) => true,
+                    OneOrMany::One(ValidationType::CWLType(CWLType::Null)) => true,
                     OneOrMany::Many(items) => items
                         .iter()
-                        .any(|item| matches!(item, InputType::CWLType(CWLType::Null))),
+                        .any(|item| matches!(item, ValidationType::CWLType(CWLType::Null))),
                     _ => false,
                 }
             }
@@ -157,7 +170,7 @@ fn validate_record_schema(
 }
 
 fn validate_array_schema(
-    schema: &InputArraySchema,
+    schema: &ValidationArraySchema,
     value: &DefaultValue,
     format: Option<&String>,
     fv: Option<&FormatValidator>,
@@ -168,10 +181,10 @@ fn validate_array_schema(
             let item_value: DefaultValue =
                 serde_yaml::from_value(item.clone()).expect("DefaultValue violates itself");
             match &schema.items {
-                OneOrMany::One(t) => validate_input_type(&t.clone(), &item_value, format, fv),
+                OneOrMany::One(t) => validate_input_type(t, &item_value, format, fv),
                 OneOrMany::Many(ts) => ts
                     .iter()
-                    .any(|t| validate_input_type(&t.clone(), &item_value, format, fv)),
+                    .any(|t| validate_input_type(t, &item_value, format, fv)),
             }
         })
     } else {
@@ -179,7 +192,7 @@ fn validate_array_schema(
     }
 }
 
-fn validate_enum_schema(schema: &InputEnumSchema, value: &DefaultValue) -> bool {
+fn validate_enum_schema(schema: &ValidationEnumSchema, value: &DefaultValue) -> bool {
     if let DefaultValue::Any(val) = value {
         if let Some(s) = val.as_str() {
             schema.symbols.contains(&s.to_string())

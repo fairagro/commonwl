@@ -223,6 +223,16 @@ pub enum OutputSchema {
     Array(OutputArraySchema),
 }
 
+impl From<CommandOutputSchema> for OutputSchema {
+    fn from(value: CommandOutputSchema) -> Self {
+        match value {
+            CommandOutputSchema::Record(rec) => OutputSchema::Record(rec.into()),
+            CommandOutputSchema::Enum(enu) => OutputSchema::Enum(enu.into()),
+            CommandOutputSchema::Array(arr) => OutputSchema::Array(arr.into()),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
 pub enum CommandOutputType {
@@ -257,6 +267,18 @@ impl Default for OneOrMany<OutputType> {
     }
 }
 
+impl From<CommandOutputType> for OutputType {
+    fn from(value: CommandOutputType) -> Self {
+        match value {
+            CommandOutputType::CWLType(t) => OutputType::CWLType(t),
+            CommandOutputType::CommandOutputSchema(schema) => {
+                OutputType::OutputSchema(Box::new((*schema).into()))
+            }
+            CommandOutputType::String(s) => OutputType::String(s),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputRecordSchema {
@@ -285,6 +307,19 @@ pub struct OutputRecordSchema {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+impl From<CommandOutputRecordSchema> for OutputRecordSchema {
+    fn from(value: CommandOutputRecordSchema) -> Self {
+        Self {
+            fields: value
+                .fields
+                .map(|fields| fields.into_iter().map(Into::into).collect()),
+            label: value.label,
+            doc: value.doc,
+            name: value.name,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -331,6 +366,20 @@ pub struct OutputRecordField {
 
 make_shorthand_impl!(OutputRecordField, "name", "type");
 
+impl From<CommandOutputRecordField> for OutputRecordField {
+    fn from(value: CommandOutputRecordField) -> Self {
+        Self {
+            name: value.name,
+            r#type: value.r#type.map(Into::into),
+            doc: value.doc,
+            label: value.label,
+            secondary_files: value.secondary_files,
+            streamable: value.streamable,
+            format: value.format,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputEnumSchema {
@@ -355,6 +404,17 @@ pub struct OutputEnumSchema {
     pub doc: Option<OneOrMany<String>>,
 }
 
+impl From<CommandOutputEnumSchema> for OutputEnumSchema {
+    fn from(value: CommandOutputEnumSchema) -> Self {
+        Self {
+            symbols: value.symbols,
+            name: value.name,
+            label: value.label,
+            doc: value.doc,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputArraySchema {
@@ -377,6 +437,17 @@ pub struct OutputArraySchema {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+impl From<CommandOutputArraySchema> for OutputArraySchema {
+    fn from(value: CommandOutputArraySchema) -> Self {
+        Self {
+            items: value.items.map(Into::into),
+            name: value.name,
+            label: value.label,
+            doc: value.doc,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]

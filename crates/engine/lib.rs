@@ -12,6 +12,7 @@ pub mod io;
 pub mod output;
 pub mod requirements;
 pub mod schema;
+pub mod schema_val;
 pub mod serialize;
 pub mod workdir;
 

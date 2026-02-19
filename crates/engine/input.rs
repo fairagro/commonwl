@@ -183,10 +183,12 @@ pub fn collect_inputs(
             }
 
             _ => match &input.r#type {
-                OneOrMany::One(item) => validate_input_type(&item.clone(), &value, format, fv),
+                OneOrMany::One(item) => {
+                    validate_input_type(&item.clone().into(), &value, format, fv)
+                }
                 OneOrMany::Many(items) => items
                     .iter()
-                    .any(|i| validate_input_type(&i.clone(), &value, format, fv)),
+                    .any(|i| validate_input_type(&i.clone().into(), &value, format, fv)),
             },
         };
         //error if validity can not be confirmed
