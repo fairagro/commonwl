@@ -98,9 +98,9 @@ fn validate_cwl_type(
         DefaultValue::Any(value) => match r#type {
             CWLType::Null => value.is_null(),
             CWLType::Boolean => value.is_bool(),
-            CWLType::Int => value.is_i64(),
-            CWLType::Long => value.is_i64(),
-            CWLType::Float => value.is_f64(),
+            CWLType::Int => value.is_i64() || value.is_u64(),
+            CWLType::Long => value.is_i64() || value.is_u64(),
+            CWLType::Float => value.is_f64() || value.is_i64() || value.is_u64(),
             CWLType::Double => value.is_f64(),
             CWLType::String => value.is_string(),
             CWLType::Any => true,
