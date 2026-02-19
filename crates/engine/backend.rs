@@ -13,18 +13,20 @@ use crate::{
         ExecutionRequest, InputObject, create_execution_request_from_document,
         create_execution_request_with_inputs,
     },
+    scatter,
     schema::format_validation::get_format_validator,
     tree::build_execution_tree,
 };
 use anyhow::Context;
 use cwl_core::{
     OneOrMany, docstring,
-    documents::{CWLDocument, StringOrDocument},
+    documents::{CWLDocument, ScatterMethod, StringOrDocument, WorkflowStep},
     files::FileOrDirectory,
     inputs::DefaultValue,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
-        InlineJavascriptRequirement, LoadListingRequirement, ResourceRequirement, ToolTimeLimit,
+        InlineJavascriptRequirement, LoadListingRequirement, ResourceRequirement,
+        ScatterFeatureRequirement, ToolTimeLimit,
     },
 };
 use futures_util::{
@@ -34,12 +36,13 @@ use futures_util::{
 use indexmap::IndexMap;
 use nonempty::NonEmpty;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     process::ExitStatus,
 };
 use tempfile::tempdir;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
 
@@ -127,9 +130,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         panic!("Not a Workflow");
     };
 
-    let llr = request
-        .specification
-        .get_requirement_or_hint::<LoadListingRequirement>();
+    let llr = wf.get_requirement_or_hint::<LoadListingRequirement>();
+    let sfr = wf.get_requirement_or_hint::<ScatterFeatureRequirement>();
 
     let inputs = collect_inputs(
         &request.specification,
@@ -150,6 +152,16 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
 
     for wave in waves {
         let mut handles = Vec::new();
+
+        let scattered_step_ids: HashSet<String> = wave
+            .iter()
+            .filter(|step| step.scatter.is_some() && sfr.is_some())
+            .map(|step| step.id.clone().unwrap())
+            .collect::<HashSet<_>>();
+
+        // Accumulate scatter outputs: step_id/output_name -> Vec<Value>
+        let mut scatter_accum: HashMap<String, Vec<DefaultValue>> = HashMap::new();
+
         for step in wave {
             let step_id_clone = step.id.clone().unwrap();
             let backend_clone = backend.clone();
@@ -173,36 +185,43 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let outdir_clone = Some(&*request.out_dir);
             let working_dir_clone = request.working_dir.clone();
             info!("Starting execution of step {}", step_id_clone);
-            match &step.run {
-                StringOrDocument::String(s) => {
-                    let specification_path = working_dir_clone.join(s);
 
-                    let request = create_execution_request_with_inputs(
-                        specification_path,
-                        inputs,
+            //decide if we need to scatter this step
+            if let Some(scatter) = &step.scatter
+                && sfr.is_some()
+            {
+                let scatter_keys = scatter.as_many();
+                let method = step
+                    .scatter_method
+                    .as_ref()
+                    .unwrap_or(&ScatterMethod::Dotproduct);
+                let scatter_inputs = scatter::gather_inputs(&scatter_keys, &inputs)?;
+                let jobs = scatter::gather_jobs(&scatter_inputs, &scatter_keys, method)?;
+
+                for job in jobs {
+                    let mut sub_inputs = inputs.clone();
+                    for (k, v) in job {
+                        sub_inputs.inputs.insert(k, v);
+                    }
+
+                    handles.push(execute_step(
+                        step,
+                        backend_clone.clone(),
+                        &working_dir_clone,
                         outdir_clone,
-                    )?;
-                    let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
-                        tokio::spawn(async move {
-                            let result = execute(backend_clone, &request, token_clone).await?;
-                            Ok((step_id_clone, result))
-                        });
-                    handles.push(handle);
+                        sub_inputs,
+                        token_clone.clone(),
+                    )?);
                 }
-                StringOrDocument::Document(cwldocument) => {
-                    let request = create_execution_request_from_document(
-                        *cwldocument.clone(),
-                        inputs,
-                        working_dir_clone,
-                        outdir_clone,
-                    )?;
-                    let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
-                        tokio::spawn(async move {
-                            let result = execute(backend_clone, &request, token_clone).await?;
-                            Ok((step_id_clone, result))
-                        });
-                    handles.push(handle);
-                }
+            } else {
+                handles.push(execute_step(
+                    step,
+                    backend_clone,
+                    &working_dir_clone,
+                    outdir_clone,
+                    inputs,
+                    token_clone,
+                )?);
             }
         }
 
@@ -213,10 +232,21 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                 .context("Step task panicked")?
                 .context("Step execution failed")?;
 
-            // Merge this step's outputs into completed_outputs for downstream steps
-            // Key format: "step_id/output_name" matching CWL source references
             for (output_name, value) in exec_result.outputs {
-                completed_outputs.insert(format!("{}/{}", step_id, output_name), value);
+                let key = format!("{}/{}", step_id, output_name);
+                if scattered_step_ids.contains(&step_id) && sfr.is_some() {
+                    scatter_accum.entry(key).or_default().push(value);
+                } else {
+                    completed_outputs.insert(key, value);
+                }
+            }
+        }
+
+        if sfr.is_some() {
+            // For scattered steps, we need to aggregate outputs into arrays
+            for (key, values) in scatter_accum {
+                let values = serde_yaml::to_value(values)?;
+                completed_outputs.insert(key, DefaultValue::Any(values));
             }
         }
     }
@@ -240,6 +270,44 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         stderr: String::new(),
         outputs,
     })
+}
+
+fn execute_step<T: TaskBackend + Clone + Send + 'static>(
+    step: &WorkflowStep,
+    backend: T,
+    working_dir: &Path,
+    outdir: Option<&Path>,
+    inputs: InputObject,
+    token: CancellationToken,
+) -> anyhow::Result<JoinHandle<anyhow::Result<(String, ExecutionResult)>>> {
+    let step_id_clone = step.id.clone().unwrap();
+    match &step.run {
+        StringOrDocument::String(s) => {
+            let specification_path = working_dir.join(s);
+
+            let request = create_execution_request_with_inputs(specification_path, inputs, outdir)?;
+            let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
+                tokio::spawn(async move {
+                    let result = execute(backend, &request, token).await?;
+                    Ok((step_id_clone, result))
+                });
+            Ok(handle)
+        }
+        StringOrDocument::Document(cwldocument) => {
+            let request = create_execution_request_from_document(
+                *cwldocument.clone(),
+                inputs,
+                working_dir,
+                outdir,
+            )?;
+            let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
+                tokio::spawn(async move {
+                    let result = execute(backend, &request, token).await?;
+                    Ok((step_id_clone, result))
+                });
+            Ok(handle)
+        }
+    }
 }
 
 pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
