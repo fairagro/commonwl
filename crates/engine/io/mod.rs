@@ -38,15 +38,6 @@ pub fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<Path
     Ok(path.to_path_buf())
 }
 
-pub fn location_to_path(location: &str) -> anyhow::Result<PathBuf> {
-    let url = Url::parse(location)?;
-    if url.scheme() != "file" {
-        anyhow::bail!("Only file URLs are supported, got: {}", location);
-    }
-    url.to_file_path()
-        .map_err(|_| anyhow::anyhow!("Invalid file URL: {}", location))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -7,7 +7,7 @@ use crate::{
     },
     expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
-    io::{file::collect_secondary_files_for_inputs, location_to_path},
+    io::file::collect_secondary_files_for_inputs,
     output::{OutputCollectionContext, collect_command_outputs, collect_expression_outputs},
     request::{
         ExecutionRequest, InputObject, create_execution_request_from_document,
