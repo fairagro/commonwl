@@ -3,17 +3,16 @@ use crate::{
     environment::{
         env::handle_environment,
         runtime::{Runtime, build_runtime},
-        workdir::{self, WorkDirMount, stage_work_dir},
+        workdir::{WorkDirMount, stage_work_dir},
     },
     expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
-    io::file::collect_secondary_files_for_inputs,
-    output::{OutputCollectionContext, collect_command_outputs},
+    io::{file::collect_secondary_files_for_inputs, location_to_path},
+    output::{OutputCollectionContext, collect_command_outputs, collect_expression_outputs},
     request::{
-        ExecutionRequest, InputObject, create_execution_request,
-        create_execution_request_from_document, create_execution_request_with_inputs,
+        ExecutionRequest, InputObject, create_execution_request_from_document,
+        create_execution_request_with_inputs,
     },
-    requirements::ProcessRequirements,
     schema::format_validation::get_format_validator,
     tree::build_execution_tree,
 };
@@ -109,10 +108,10 @@ pub fn execute<T: TaskBackend + Clone + Send + 'static>(
 ) -> BoxFuture<'_, anyhow::Result<ExecutionResult>> {
     match &request.specification {
         CWLDocument::Workflow(_) => execute_workflow(backend, request, token).boxed(),
-        CWLDocument::CommandLineTool(_) => {
+        CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => {
             execute_commandline_tool(backend, request, token).boxed()
         }
-        _ => todo!(),
+        _ => panic!("Unsupported document type for execution"),
     }
 }
 
@@ -122,7 +121,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
     //create validator
-    let fv = get_format_validator(&request.specification, &request.working_dir)?;
+    let _fv = get_format_validator(&request.specification, &request.working_dir)?;
 
     let CWLDocument::Workflow(wf) = &request.specification else {
         panic!("Not a Workflow");
@@ -209,7 +208,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                             .insert(output.id.clone().unwrap(), DefaultValue::Any(value.clone()));
                     }
                 }
-                OneOrMany::Many(items) => {}
+                OneOrMany::Many(_items) => {}
             }
         }
     }
@@ -229,20 +228,37 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     //create validator
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
 
-    let CWLDocument::CommandLineTool(tool) = &request.specification else {
-        panic!("Tool is not a CommandLineTool");
-    };
-
     //get neccessary requirements
-    let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
-    let dr = tool.get_requirement_or_hint::<DockerRequirement>();
-    let rr = tool.get_requirement_or_hint::<ResourceRequirement>();
-    let iwdr = tool.get_requirement_or_hint::<InitialWorkDirRequirement>();
-    let evr = tool.get_requirement_or_hint::<EnvVarRequirement>();
-    let ttl = tool.get_requirement_or_hint::<ToolTimeLimit>();
-    let llr = tool.get_requirement_or_hint::<LoadListingRequirement>();
+    let ijsr = request
+        .specification
+        .get_requirement_or_hint::<InlineJavascriptRequirement>();
+    let dr = request
+        .specification
+        .get_requirement_or_hint::<DockerRequirement>();
+    let rr = request
+        .specification
+        .get_requirement_or_hint::<ResourceRequirement>();
+    let iwdr = request
+        .specification
+        .get_requirement_or_hint::<InitialWorkDirRequirement>();
+    let evr = request
+        .specification
+        .get_requirement_or_hint::<EnvVarRequirement>();
+    let ttl = request
+        .specification
+        .get_requirement_or_hint::<ToolTimeLimit>();
+    let llr = request
+        .specification
+        .get_requirement_or_hint::<LoadListingRequirement>();
 
-    let stage_dir = Path::new(T::INPUT_DIR);
+    let outdir = tempdir()?;
+    let tmpdir = tempdir()?;
+
+    let stage_dir = match &request.specification {
+        CWLDocument::CommandLineTool(_) => Path::new(T::INPUT_DIR),
+        CWLDocument::ExpressionTool(_) => outdir.path(),
+        _ => unreachable!(),
+    };
 
     let mut inputs = collect_inputs(
         &request.specification,
@@ -252,9 +268,6 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
         llr,
         Some(&fv),
     )?;
-
-    let outdir = tempdir()?;
-    let tmpdir = tempdir()?;
 
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
@@ -328,106 +341,135 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
         ..Default::default()
     };
 
-    //collect command string and correct args for staged paths
-    let mut args = command::build_command(tool, &inputs, &runtime)?;
+    //execute commandline tool
+    if let CWLDocument::CommandLineTool(tool) = &request.specification {
+        //collect command string and correct args for staged paths
+        let mut args = command::build_command(tool, &inputs, &runtime)?;
 
-    //correct and add the stdin value
-    let mut stdin = get_stdin(tool, &inputs);
-    if let Some(stdin) = &mut stdin {
-        //evaluate expression
-        *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
-            serde_yaml::to_string(&value)?.trim().to_owned()
-        } else {
-            stdin.to_string()
-        };
+        //correct and add the stdin value
+        let mut stdin = get_stdin(tool, &inputs);
+        if let Some(stdin) = &mut stdin {
+            //evaluate expression
+            *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
+                serde_yaml::to_string(&value)?.trim().to_owned()
+            } else {
+                stdin.to_string()
+            };
 
-        args.push(stdin.to_string());
-    }
+            args.push(stdin.to_string());
+        }
 
-    info!("Executing: {}", args.join(" "));
+        info!("Executing: {}", args.join(" "));
 
-    let doc = tool.doc.as_ref().map(|d| docstring(d.clone()));
-    let result = backend
-        .run(
-            &TaskExecutionRequest {
-                id: &tool.id.clone().unwrap_or("Unnamed".to_owned()),
-                description: doc.as_deref(),
+        let doc = tool.doc.as_ref().map(|d| docstring(d.clone()));
+        let result = backend
+            .run(
+                &TaskExecutionRequest {
+                    id: &tool.id.clone().unwrap_or("Unnamed".to_owned()),
+                    description: doc.as_deref(),
 
-                command: args
-                    .iter()
-                    .map(|s| s.as_str())
-                    .collect::<Vec<&str>>()
-                    .as_slice(),
-                inputs: &flattened_inputs,
-                mounts: &mounts,
+                    command: args
+                        .iter()
+                        .map(|s| s.as_str())
+                        .collect::<Vec<&str>>()
+                        .as_slice(),
+                    inputs: &flattened_inputs,
+                    mounts: &mounts,
 
-                env: &environment,
-                runtime: &runtime,
-                eval_context,
+                    env: &environment,
+                    runtime: &runtime,
+                    eval_context,
 
-                docker: dr,
-                timelimit: ttl,
-                use_container: tool.has_requirement::<DockerRequirement>(), //hints no sufficient
+                    docker: dr,
+                    timelimit: ttl,
+                    use_container: tool.has_requirement::<DockerRequirement>(), //hints no sufficient
 
-                stdin_file: stdin.as_ref(),
-                stdout_file: tool.stdout.as_ref(),
-                stderr_file: tool.stderr.as_ref(),
+                    stdin_file: stdin.as_ref(),
+                    stdout_file: tool.stdout.as_ref(),
+                    stderr_file: tool.stderr.as_ref(),
 
-                outdir: outdir.path(),
-                tmpdir: tmpdir.path(),
-                working_dir: &request.working_dir,
-                staged_dir: workdir,
+                    outdir: outdir.path(),
+                    tmpdir: tmpdir.path(),
+                    working_dir: &request.working_dir,
+                    staged_dir: workdir,
+                },
+                token,
+            )
+            .await?;
+
+        let first_code = result.exit_status.first().code().unwrap_or(1);
+
+        //update runtime
+        let mut runtime = runtime.clone();
+        runtime.exit_code = Some(first_code);
+        runtime.outdir = outdir.path().to_path_buf();
+
+        let eval_context = eval_context.clone().with_runtime(&runtime);
+
+        //evaluate stderr/stdout
+        let stdout = fs::read_to_string(&result.stdout_file)?;
+        if !stdout.is_empty() {
+            eprintln!("{stdout}");
+        }
+        let stderr = fs::read_to_string(&result.stderr_file)?;
+        if !stderr.is_empty() {
+            eprintln!("{stderr}");
+        }
+
+        // need to collect outputs
+        if !&request.out_dir.exists() {
+            fs::create_dir_all(&request.out_dir)?;
+        }
+
+        let outputs = collect_command_outputs(
+            &tool.outputs,
+            &result.stdout_file,
+            &result.stderr_file,
+            &OutputCollectionContext {
+                source_dir: outdir.path(),
+                dest_dir: &request.out_dir,
+                tmp_dir: tmpdir.path(),
+                workdir: Path::new(workdir),
+                eval_context: &eval_context,
+                validator: &fv,
             },
-            token,
-        )
-        .await?;
+        )?;
+        //evaluate exitstatus based on tool's expected exit codes
 
-    let first_code = result.exit_status.first().code().unwrap_or(1);
+        Ok(ExecutionResult {
+            exit_status: result.exit_status,
+            stdout,
+            stderr,
+            outputs,
+        })
+    } else if let CWLDocument::ExpressionTool(tool) = &request.specification {
+        let expression = &tool.expression;
 
-    //update runtime
-    let mut runtime = runtime.clone();
-    runtime.exit_code = Some(first_code);
-    runtime.outdir = outdir.path().to_path_buf();
+        info!("Executing: {expression}");
 
-    let eval_context = eval_context.clone().with_runtime(&runtime);
+        let result = do_eval(expression, eval_context)?;
+        let outputs = collect_expression_outputs(
+            &tool.outputs,
+            &result,
+            &OutputCollectionContext {
+                source_dir: outdir.path(),
+                dest_dir: &request.out_dir,
+                tmp_dir: tmpdir.path(),
+                workdir: Path::new(workdir),
+                eval_context,
+                validator: &fv,
+            },
+        )?;
 
-    //evaluate stderr/stdout
-    let stdout = fs::read_to_string(&result.stdout_file)?;
-    if !stdout.is_empty() {
-        eprintln!("{stdout}");
+        Ok(ExecutionResult {
+            exit_status: NonEmpty::new(ExitStatus::default()),
+            stdout: String::new(),
+            stderr: String::new(),
+            outputs,
+        })
+    } else {
+        anyhow::bail!("Unsupported document type for execution")
     }
-    let stderr = fs::read_to_string(&result.stderr_file)?;
-    if !stderr.is_empty() {
-        eprintln!("{stderr}");
-    }
-
-    // need to collect outputs
-    if !&request.out_dir.exists() {
-        fs::create_dir_all(&request.out_dir)?;
-    }
-
-    let outputs = collect_command_outputs(
-        &tool.outputs,
-        &result.stdout_file,
-        &result.stderr_file,
-        &OutputCollectionContext {
-            source_dir: outdir.path(),
-            dest_dir: &request.out_dir,
-            tmp_dir: tmpdir.path(),
-            workdir: Path::new(workdir),
-            eval_context: &eval_context,
-            validator: &fv,
-        },
-    )?;
-
-    //evaluate exitstatus based on tool's expected exit codes
-
-    Ok(ExecutionResult {
-        exit_status: result.exit_status,
-        stdout,
-        stderr,
-        outputs,
-    })
 }
 
 pub enum EngineStatus {

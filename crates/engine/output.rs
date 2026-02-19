@@ -12,7 +12,7 @@ use cwl_core::{
     inputs::DefaultValue,
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
-        CommandOutputSchema, CommandOutputType, OutputType,
+        CommandOutputSchema, CommandOutputType, ExpressionToolOutputParameter, OutputType,
     },
     types::{CWLType, SecondaryFileSchema},
 };
@@ -248,6 +248,23 @@ fn validate_file(
             file.checksum = checksum;
             file.size = Some(Integer::Long(size as i64))
         }
+    } else if let Some(dest_path) = &path
+        && let Some(contents) = &file.contents
+    {   
+        //create the literal file
+        let parent = dest_path.parent().unwrap();
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
+
+        fs::write(dest_path, contents)
+            .with_context(|| format!("Could not write contents to {dest_path:?}"))?;
+
+        if file.size.is_none() || file.checksum.is_none() {
+            let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
+            file.checksum = checksum;
+            file.size = Some(Integer::Long(size as i64))
+        }
     }
 
     let format = context.validator.handle(format, Some(context.eval_context));
@@ -308,6 +325,9 @@ fn validate_dir(
         copy_dir(&source_path, dest_path)
             .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
         base_path = dest_path.to_path_buf();
+    } else if let Some(dest_path) = &path {
+        //no source path, but we still want to create the directory
+        fs::create_dir_all(dest_path)?;
     }
 
     dir.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
@@ -328,6 +348,9 @@ fn get_designated_path(
     base_path: &Path,
     basename: Option<&String>,
 ) -> Option<PathBuf> {
+    if path.is_none() {
+        return Some(base_path.join(basename.unwrap()));
+    }
     path.as_ref().map(|p| {
         let path = Path::new(p);
         let filename = path.file_name().unwrap().to_string_lossy();
@@ -588,4 +611,46 @@ fn make_full_glob(glob_: &str, context: &OutputCollectionContext) -> anyhow::Res
     };
 
     Ok(full_glob)
+}
+
+pub fn collect_expression_outputs(
+    outputs: &[ExpressionToolOutputParameter],
+    value: &serde_yaml::Value,
+    context: &OutputCollectionContext,
+) -> anyhow::Result<HashMap<String, DefaultValue>> {
+    let mut output_map = HashMap::new();
+    for output in outputs {
+        let output_id = output.id.clone().unwrap_or_default();
+        if let Some(result) = value.get(&output_id) {
+            let mut value: DefaultValue = serde_yaml::from_value(result.clone())?;
+
+            //validate output to schema
+            let valid = match &output.r#type {
+                OneOrMany::One(r#type) => validate_input_type(
+                    &Into::<OutputType>::into(r#type.clone()).into(),
+                    &value,
+                    None,
+                    None,
+                ),
+                OneOrMany::Many(items) => items.iter().any(|t| {
+                    validate_input_type(
+                        &Into::<OutputType>::into(t.clone()).into(),
+                        &value,
+                        None,
+                        None,
+                    )
+                }),
+            };
+            if !valid {
+                anyhow::bail!(
+                    "Output value {value:?} does not match output type {:?}",
+                    output.r#type
+                )
+            }
+            let format = output.format.as_ref().map(|f| f.as_one().to_string());
+            validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+            output_map.insert(output_id, value);
+        }
+    }
+    Ok(output_map)
 }

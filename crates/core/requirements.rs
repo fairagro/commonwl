@@ -86,6 +86,23 @@ pub enum WorkflowRequirements {
 }
 
 impl FromShortHand for WorkflowRequirements {}
+impl_conversion_methods!(WorkflowRequirements, InlineJavascriptRequirement);
+impl_conversion_methods!(WorkflowRequirements, SchemaDefRequirement);
+impl_conversion_methods!(WorkflowRequirements, LoadListingRequirement);
+impl_conversion_methods!(WorkflowRequirements, DockerRequirement);
+impl_conversion_methods!(WorkflowRequirements, SoftwareRequirement);
+impl_conversion_methods!(WorkflowRequirements, InitialWorkDirRequirement);
+impl_conversion_methods!(WorkflowRequirements, EnvVarRequirement);
+impl_conversion_methods!(WorkflowRequirements, ShellCommandRequirement);
+impl_conversion_methods!(WorkflowRequirements, ResourceRequirement);
+impl_conversion_methods!(WorkflowRequirements, NetworkAccess);
+impl_conversion_methods!(WorkflowRequirements, InplaceUpdateRequirement);
+impl_conversion_methods!(WorkflowRequirements, ToolTimeLimit);
+impl_conversion_methods!(WorkflowRequirements, SubworkflowFeatureRequirement);
+impl_conversion_methods!(WorkflowRequirements, ScatterFeatureRequirement);
+impl_conversion_methods!(WorkflowRequirements, MultipleInputFeatureRequirement);
+impl_conversion_methods!(WorkflowRequirements, StepInputExpressionRequirement);
+
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]

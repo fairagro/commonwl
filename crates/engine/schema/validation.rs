@@ -103,7 +103,7 @@ fn validate_cwl_type(
             CWLType::Float => value.is_f64() || value.is_i64() || value.is_u64(),
             CWLType::Double => value.is_f64(),
             CWLType::String => value.is_string(),
-            CWLType::Any => true,
+            CWLType::Any => !value.is_null(),
             _ => false,
         },
     }

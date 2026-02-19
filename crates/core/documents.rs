@@ -36,6 +36,30 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.inputs.iter().map(|i| i.clone().into()).collect(),
         }
     }
+
+    pub fn get_requirement<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,
+    {
+        match self {
+            Self::Operation(o) => o.get_requirement::<T>(),
+            Self::CommandLineTool(clt) => clt.get_requirement::<T>(),
+            Self::ExpressionTool(et) => et.get_requirement::<T>(),
+            Self::Workflow(wf) => wf.get_requirement::<T>(),
+        }
+    }
+
+    pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,
+    {
+        match self {
+            Self::Operation(o) => o.get_requirement_or_hint::<T>(),
+            Self::CommandLineTool(clt) => clt.get_requirement_or_hint::<T>(),
+            Self::ExpressionTool(et) => et.get_requirement_or_hint::<T>(),
+            Self::Workflow(wf) => wf.get_requirement_or_hint::<T>(),
+        }
+    }
 }
 
 impl From<CommandLineTool> for CWLDocument {
@@ -84,7 +108,7 @@ macro_rules! impl_document_defaults {
 
             pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
             where
-                T: ExtractFromEnum<$req_enum> 
+                T: ExtractFromEnum<$req_enum>,
             {
                 let maybe_req = self.get_requirement::<T>();
                 let maybe_hint = self.hints.as_ref().and_then(|hints| {
