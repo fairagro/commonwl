@@ -121,17 +121,30 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
     //create validator
-    let _fv = get_format_validator(&request.specification, &request.working_dir)?;
+    let fv = get_format_validator(&request.specification, &request.working_dir)?;
 
     let CWLDocument::Workflow(wf) = &request.specification else {
         panic!("Not a Workflow");
     };
 
+    let llr = request
+        .specification
+        .get_requirement_or_hint::<LoadListingRequirement>();
+
+    let inputs = collect_inputs(
+        &request.specification,
+        &request.inputs,
+        &request.working_dir,
+        &request.working_dir, //?
+        llr,
+        Some(&fv),
+    )?;
+
     let waves = build_execution_tree(wf)?;
-    let mut completed_outputs: HashMap<String, serde_yaml::Value> = HashMap::new();
+    let mut completed_outputs: HashMap<String, DefaultValue> = HashMap::new();
 
     //insert inputs into completed outputs
-    for (k, v) in &request.inputs {
+    for (k, v) in &inputs {
         completed_outputs.insert(k.clone(), v.clone());
     }
 
@@ -141,7 +154,17 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let step_id_clone = step.id.clone().unwrap();
             let backend_clone = backend.clone();
             let token_clone = token.clone();
-            let step_inputs = completed_outputs.clone();
+            let mut step_inputs = HashMap::new();
+            for item in &step.r#in {
+                if let Some(sources) = &item.source {
+                    for source in &sources.as_many() {
+                        if let Some(value) = completed_outputs.get(source) {
+                            let yaml_value = serde_yaml::to_value(value)?;
+                            step_inputs.insert(item.id.clone().unwrap(), yaml_value);
+                        }
+                    }
+                }
+            }
             let inputs = InputObject {
                 inputs: step_inputs,
                 requirements: vec![],
@@ -149,6 +172,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             };
             let outdir_clone = Some(&*request.out_dir);
             let working_dir_clone = request.working_dir.clone();
+            info!("Starting execution of step {}", step_id_clone);
             match &step.run {
                 StringOrDocument::String(s) => {
                     let specification_path = working_dir_clone.join(s);
@@ -192,7 +216,6 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             // Merge this step's outputs into completed_outputs for downstream steps
             // Key format: "step_id/output_name" matching CWL source references
             for (output_name, value) in exec_result.outputs {
-                let value = serde_yaml::to_value(value)?;
                 completed_outputs.insert(format!("{}/{}", step_id, output_name), value);
             }
         }
@@ -204,8 +227,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             match output_source {
                 OneOrMany::One(item) => {
                     if let Some(value) = completed_outputs.get(item) {
-                        outputs
-                            .insert(output.id.clone().unwrap(), DefaultValue::Any(value.clone()));
+                        outputs.insert(output.id.clone().unwrap(), value.clone());
                     }
                 }
                 OneOrMany::Many(_items) => {}
@@ -446,6 +468,13 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
         let expression = &tool.expression;
 
         info!("Executing: {expression}");
+
+        //definitivly use js engine
+        if eval_context.ijsr.is_none() {
+            eval_context.ijsr = Some(&InlineJavascriptRequirement {
+                expression_lib: None,
+            });
+        }
 
         let result = do_eval(expression, eval_context)?;
         let outputs = collect_expression_outputs(
