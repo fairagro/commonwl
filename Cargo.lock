@@ -587,6 +587,7 @@ dependencies = [
  "clap",
  "commonwl",
  "crankshaft",
+ "serde_json",
  "tokio",
  "tokio-util",
  "tracing",

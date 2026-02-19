@@ -39,6 +39,7 @@ const CONTAINER_INPUT_DIR: &str = "/mnt/task/inputs";
 const CONTAINER_STDOUT_FILE: &str = "/mnt/task/stdout";
 const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
 
+#[derive(Debug, Clone)]
 pub struct DockerBackend {
     //wrapper to Bollard Docker client
     client: Docker,
@@ -259,7 +260,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::{backend::execute, request::create_execution_request};
+    use crate::{backend::execute_commandline_tool, request::create_execution_request};
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -284,7 +285,7 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute(backend, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
 
         //check if output file exists
@@ -307,7 +308,7 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute(backend, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
     }
 
@@ -326,7 +327,7 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute(backend, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
 
         assert!(result.is_ok());
         //check if output file exists

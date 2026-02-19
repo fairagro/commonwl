@@ -11,6 +11,7 @@ pub mod output;
 pub mod request;
 pub mod requirements;
 pub mod schema;
+pub mod tree;
 
 pub fn checksum(str: &str) -> String {
     let mut hasher = Sha1::new();

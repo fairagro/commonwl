@@ -1,7 +1,7 @@
 use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
-    backend::{ExecutionResult, docker::DockerBackend, execute},
+    backend::{ExecutionResult, docker::DockerBackend, execute_commandline_tool},
     request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file},
 };
 use serde::Deserialize;
@@ -97,7 +97,7 @@ async fn test_command_line_tools_docker_backend() {
         let cancellation_token = CancellationToken::new();
 
         eprintln!("Running Test {}", test.id);
-        let result = execute(backend, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
         if test.should_fail {
             assert!(result.is_err());
         } else {

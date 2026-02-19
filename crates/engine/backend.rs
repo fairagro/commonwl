@@ -1,24 +1,36 @@
 use crate::{
     command,
-    environment::env::handle_environment,
-    environment::runtime::{Runtime, build_runtime},
-    environment::workdir::{WorkDirMount, stage_work_dir},
+    environment::{
+        env::handle_environment,
+        runtime::{Runtime, build_runtime},
+        workdir::{self, WorkDirMount, stage_work_dir},
+    },
     expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
     io::file::collect_secondary_files_for_inputs,
     output::{OutputCollectionContext, collect_command_outputs},
-    request::ExecutionRequest,
+    request::{
+        ExecutionRequest, InputObject, create_execution_request,
+        create_execution_request_from_document, create_execution_request_with_inputs,
+    },
+    requirements::ProcessRequirements,
     schema::format_validation::get_format_validator,
+    tree::build_execution_tree,
 };
+use anyhow::Context;
 use cwl_core::{
-    docstring,
-    documents::CWLDocument,
+    OneOrMany, docstring,
+    documents::{CWLDocument, StringOrDocument},
     files::FileOrDirectory,
     inputs::DefaultValue,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
         InlineJavascriptRequirement, LoadListingRequirement, ResourceRequirement, ToolTimeLimit,
     },
+};
+use futures_util::{
+    FutureExt,
+    future::{BoxFuture, join_all},
 };
 use indexmap::IndexMap;
 use nonempty::NonEmpty;
@@ -46,7 +58,7 @@ pub trait TaskBackend {
         token: CancellationToken,
     ) -> impl Future<Output = anyhow::Result<TaskExecutionResult>> + Send;
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 
 pub struct ExecutionResult {
     pub exit_status: NonEmpty<ExitStatus>,
@@ -90,7 +102,126 @@ pub struct TaskExecutionResult {
     pub stderr_file: PathBuf,
 }
 
-pub async fn execute<T: TaskBackend>(
+pub fn execute<T: TaskBackend + Clone + Send + 'static>(
+    backend: T,
+    request: &ExecutionRequest,
+    token: CancellationToken,
+) -> BoxFuture<'_, anyhow::Result<ExecutionResult>> {
+    match &request.specification {
+        CWLDocument::Workflow(_) => execute_workflow(backend, request, token).boxed(),
+        CWLDocument::CommandLineTool(_) => {
+            execute_commandline_tool(backend, request, token).boxed()
+        }
+        _ => todo!(),
+    }
+}
+
+pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
+    backend: T,
+    request: &ExecutionRequest,
+    token: CancellationToken,
+) -> anyhow::Result<ExecutionResult> {
+    //create validator
+    let fv = get_format_validator(&request.specification, &request.working_dir)?;
+
+    let CWLDocument::Workflow(wf) = &request.specification else {
+        panic!("Not a Workflow");
+    };
+
+    let waves = build_execution_tree(wf)?;
+    let mut completed_outputs: HashMap<String, serde_yaml::Value> = HashMap::new();
+
+    //insert inputs into completed outputs
+    for (k, v) in &request.inputs {
+        completed_outputs.insert(k.clone(), v.clone());
+    }
+
+    for wave in waves {
+        let mut handles = Vec::new();
+        for step in wave {
+            let step_id_clone = step.id.clone().unwrap();
+            let backend_clone = backend.clone();
+            let token_clone = token.clone();
+            let step_inputs = completed_outputs.clone();
+            let inputs = InputObject {
+                inputs: step_inputs,
+                requirements: vec![],
+                hints: vec![],
+            };
+            let outdir_clone = Some(&*request.out_dir);
+            let working_dir_clone = request.working_dir.clone();
+            match &step.run {
+                StringOrDocument::String(s) => {
+                    let specification_path = working_dir_clone.join(s);
+
+                    let request = create_execution_request_with_inputs(
+                        specification_path,
+                        inputs,
+                        outdir_clone,
+                    )?;
+                    let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
+                        tokio::spawn(async move {
+                            let result = execute(backend_clone, &request, token_clone).await?;
+                            Ok((step_id_clone, result))
+                        });
+                    handles.push(handle);
+                }
+                StringOrDocument::Document(cwldocument) => {
+                    let request = create_execution_request_from_document(
+                        *cwldocument.clone(),
+                        inputs,
+                        working_dir_clone,
+                        outdir_clone,
+                    )?;
+                    let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
+                        tokio::spawn(async move {
+                            let result = execute(backend_clone, &request, token_clone).await?;
+                            Ok((step_id_clone, result))
+                        });
+                    handles.push(handle);
+                }
+            }
+        }
+
+        let wave_results = join_all(handles).await;
+
+        for join_result in wave_results {
+            let (step_id, exec_result) = join_result
+                .context("Step task panicked")?
+                .context("Step execution failed")?;
+
+            // Merge this step's outputs into completed_outputs for downstream steps
+            // Key format: "step_id/output_name" matching CWL source references
+            for (output_name, value) in exec_result.outputs {
+                let value = serde_yaml::to_value(value)?;
+                completed_outputs.insert(format!("{}/{}", step_id, output_name), value);
+            }
+        }
+    }
+
+    let mut outputs = HashMap::new();
+    for output in &wf.outputs {
+        if let Some(output_source) = &output.output_source {
+            match output_source {
+                OneOrMany::One(item) => {
+                    if let Some(value) = completed_outputs.get(item) {
+                        outputs
+                            .insert(output.id.clone().unwrap(), DefaultValue::Any(value.clone()));
+                    }
+                }
+                OneOrMany::Many(items) => {}
+            }
+        }
+    }
+    Ok(ExecutionResult {
+        exit_status: NonEmpty::new(ExitStatus::default()),
+        stdout: String::new(),
+        stderr: String::new(),
+        outputs,
+    })
+}
+
+pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     backend: T,
     request: &ExecutionRequest,
     token: CancellationToken,
@@ -99,7 +230,7 @@ pub async fn execute<T: TaskBackend>(
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
 
     let CWLDocument::CommandLineTool(tool) = &request.specification else {
-        panic!("Currently only CommandLineTool is supported in Docker backend");
+        panic!("Tool is not a CommandLineTool");
     };
 
     //get neccessary requirements
@@ -113,7 +244,7 @@ pub async fn execute<T: TaskBackend>(
 
     let stage_dir = Path::new(T::INPUT_DIR);
 
-    let mut staged_inputs = collect_inputs(
+    let mut inputs = collect_inputs(
         &request.specification,
         &request.inputs,
         &request.working_dir,
@@ -128,7 +259,7 @@ pub async fn execute<T: TaskBackend>(
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
         ijsr,
-        inputs: Some(&staged_inputs.clone()),
+        inputs: Some(&inputs.clone()),
         ..Default::default()
     };
 
@@ -151,13 +282,13 @@ pub async fn execute<T: TaskBackend>(
     //collect secondary files using evalcontrext and reassign inputs
     collect_secondary_files_for_inputs(
         &request.specification,
-        &mut staged_inputs,
+        &mut inputs,
         eval_context,
         &request.working_dir,
     )?;
 
     let eval_context = &mut EvaluationContext {
-        inputs: Some(&staged_inputs.clone()),
+        inputs: Some(&inputs.clone()),
         workdir: Some(&request.working_dir),
         ijsr,
         runtime: Some(&runtime),
@@ -165,7 +296,7 @@ pub async fn execute<T: TaskBackend>(
     };
 
     //needs to be constructed after we created the eval context
-    let flattened_inputs = flatten_inputs(&staged_inputs)?;
+    let flattened_inputs = flatten_inputs(&inputs)?;
 
     //evalute environment expressions
     let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
@@ -183,14 +314,14 @@ pub async fn execute<T: TaskBackend>(
             outdir.path(),
             eval_context,
             workdir,
-            &mut staged_inputs,
+            &mut inputs,
         )?
     } else {
         vec![]
     };
 
     let eval_context = &mut EvaluationContext {
-        inputs: Some(&staged_inputs),
+        inputs: Some(&inputs),
         workdir: Some(&request.working_dir),
         ijsr,
         runtime: Some(&runtime),
@@ -198,10 +329,10 @@ pub async fn execute<T: TaskBackend>(
     };
 
     //collect command string and correct args for staged paths
-    let mut args = command::build_command(tool, &staged_inputs, &runtime)?;
+    let mut args = command::build_command(tool, &inputs, &runtime)?;
 
     //correct and add the stdin value
-    let mut stdin = get_stdin(tool, &staged_inputs);
+    let mut stdin = get_stdin(tool, &inputs);
     if let Some(stdin) = &mut stdin {
         //evaluate expression
         *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
@@ -288,8 +419,6 @@ pub async fn execute<T: TaskBackend>(
             validator: &fv,
         },
     )?;
-    let json = serde_json::to_string_pretty(&outputs)?;
-    println!("{json}");
 
     //evaluate exitstatus based on tool's expected exit codes
 

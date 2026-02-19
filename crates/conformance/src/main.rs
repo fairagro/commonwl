@@ -54,6 +54,8 @@ async fn main() -> anyhow::Result<()> {
     let evaluated_code = evaluate_exitcodes(exit_status, &request.specification);
 
     if let EngineStatus::Success(_) = evaluated_code {
+        let json = serde_json::to_string_pretty(&result.outputs)?;
+        println!("{json}");
         exit(0)
     } else {
         exit(1)
