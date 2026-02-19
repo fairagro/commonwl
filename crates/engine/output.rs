@@ -1,8 +1,8 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
-    format::FormatValidator,
-    input::validation::validate_input_type,
     io::file::{PathOrFile, handle_secondary_file_schema},
+    schema::format_validation::FormatValidator,
+    schema::validation::validate_input_type,
 };
 use anyhow::Context;
 use cwl_core::{

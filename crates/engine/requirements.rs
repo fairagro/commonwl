@@ -1,4 +1,4 @@
-use crate::input::InputObject;
+use crate::request::InputObject;
 use cwl_core::{
     ExtractFromEnum,
     documents::CWLDocument,
@@ -273,7 +273,7 @@ fn same_variant<T>(a: &T, b: &T) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::input::load_input_file_from_file;
+    use crate::request::load_input_file_from_file;
     use std::path::Path;
 
     #[test]

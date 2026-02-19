@@ -1,10 +1,8 @@
 use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
-    backend::{
-        ExecutionResult, docker::DockerBackend, execute, load_execution_context_with_inputs,
-    },
-    input::{InputObject, load_input_file_from_file},
+    backend::{ExecutionResult, docker::DockerBackend, execute},
+    request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file},
 };
 use serde::Deserialize;
 use std::{
@@ -90,7 +88,7 @@ async fn test_command_line_tools_docker_backend() {
         };
         let outdir = tempdir().unwrap();
         let request =
-            load_execution_context_with_inputs(specification_path, inputs, Some(outdir.path()))
+            create_execution_request_with_inputs(specification_path, inputs, Some(outdir.path()))
                 .unwrap();
 
         let config = Config::default();

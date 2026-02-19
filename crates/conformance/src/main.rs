@@ -1,10 +1,7 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
-    backend::{
-        EngineStatus, docker::DockerBackend, evaluate_exitcodes, execute, load_execution_context,
-        load_execution_context_with_inputs,
-    },
-    input::InputObject,
+    backend::{EngineStatus, docker::DockerBackend, evaluate_exitcodes, execute},
+    request::{InputObject, create_execution_request, create_execution_request_with_inputs},
 };
 use crankshaft::config::backend::docker::Config;
 use std::{
@@ -45,9 +42,9 @@ async fn main() -> anyhow::Result<()> {
     let config = Config::default();
     let backend = DockerBackend::new(config).await?;
     let request = if let Some(job_path) = job_path {
-        load_execution_context(spec_path, job_path, Some(outdir))?
+        create_execution_request(spec_path, job_path, Some(outdir))?
     } else {
-        load_execution_context_with_inputs(spec_path, InputObject::default(), Some(outdir))?
+        create_execution_request_with_inputs(spec_path, InputObject::default(), Some(outdir))?
     };
 
     let cancellation_token = CancellationToken::new();

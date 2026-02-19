@@ -1,23 +1,15 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string, extract_input_name},
+    io::json::to_string_dump,
     io::{directory::move_dir, file::move_file},
-    serialize::to_string_dump,
 };
 use anyhow::Context;
-use crankshaft::engine::{
-    Task,
-    task::{
-        Input,
-        input::{self, Contents},
-    },
-};
 use cwl_core::{
     OneOrMany,
     files::{Dirent, FileOrDirectory},
     inputs::DefaultValue,
     requirements::{InitialWorkDirRequirement, ListingItems, WorkDirItems},
 };
-use dircpy::copy_dir;
 use std::{
     collections::HashMap,
     fs,
@@ -281,62 +273,6 @@ fn stage_files(
     }
 
     Ok(mounts)
-}
-
-pub fn mount_workdir_item(
-    mount: WorkDirMount,
-    outdir: &Path,
-    use_container: bool,
-    task: &mut Task,
-) -> anyhow::Result<()> {
-    if mount.target.starts_with(outdir) {
-        if let Some(parent) = mount.target.parent()
-            && !parent.exists()
-        {
-            fs::create_dir_all(parent).with_context(|| {
-                format!("Could not create parent directories for {:?}", mount.target)
-            })?;
-        }
-        match (mount.ty, mount.source) {
-            (MountType::File, Source::File(path)) => {
-                fs::copy(&path, &mount.target).with_context(|| {
-                    format!("Could not copy from {path:?} to {:?}", mount.target)
-                })?;
-            }
-            (MountType::File, Source::Contents(items)) => {
-                fs::write(&mount.target, &items)
-                    .with_context(|| format!("Could not write to {:?}", mount.target))?;
-            }
-            (MountType::Directory, Source::File(path)) => copy_dir(&path, &mount.target)
-                .with_context(|| format!("Could not copy from {path:?} to {:?}", mount.target))?,
-            (MountType::Directory, Source::Contents(_)) => {
-                fs::create_dir_all(&mount.target).with_context(|| {
-                    format!("Could not create parent directories for {:?}", mount.target)
-                })?;
-            }
-        };
-    } else if use_container {
-        task.add_input(
-            Input::builder()
-                .path(mount.target.to_string_lossy())
-                .contents(match mount.source {
-                    Source::File(path) => Contents::Path(path),
-                    Source::Contents(data) => Contents::Literal(data),
-                })
-                .ty(match mount.ty {
-                    MountType::File => input::Type::File,
-                    MountType::Directory => input::Type::Directory,
-                })
-                .read_only(mount.readonly)
-                .build(),
-        );
-    } else {
-        anyhow::bail!(
-            "Workdir item target {:?} is outside of working directory and container is not used, can not stage",
-            mount.target
-        );
-    }
-    Ok(())
 }
 
 fn update_inputs(

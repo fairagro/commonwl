@@ -1,0 +1,286 @@
+use crate::{
+    environment::env::build_environment,
+    requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
+    schema::schema_def::replace_schema_definitions,
+};
+use anyhow::Context;
+use cwl_core::{ExtractFromEnum, documents::CWLDocument, load_cwl_file};
+use indexmap::IndexMap;
+use serde::Deserialize;
+use std::{
+    collections::{HashMap, HashSet},
+    env,
+    path::{Path, PathBuf},
+};
+
+#[derive(Debug, Clone)]
+pub struct ExecutionRequest {
+    pub specification: CWLDocument,
+    pub inputs: HashMap<String, serde_yaml::Value>,
+    pub working_dir: PathBuf,
+    pub out_dir: PathBuf,
+    pub requirements: Vec<ProcessRequirements>,
+    pub hints: Vec<ProcessHints>,
+    pub environment: IndexMap<String, String>,
+}
+
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct InputObject {
+    pub inputs: HashMap<String, serde_yaml::Value>,
+    pub requirements: Vec<ProcessRequirements>,
+    pub hints: Vec<ProcessHints>,
+}
+impl InputObject {
+    pub fn get_requirement<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.requirements.iter().find_map(|req| T::get(req))
+    }
+
+    pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        let maybe_req = self.requirements.iter().find_map(|req| T::get(req));
+        let maybe_hint = self.hints.iter().find_map(|hint| {
+            if let ProcessHints::Requirement(inner) = hint {
+                T::get(inner)
+            } else {
+                None
+            }
+        });
+        maybe_req.or(maybe_hint)
+    }
+
+    pub fn has_requirement<T>(&self) -> bool
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.get_requirement::<T>().is_some()
+    }
+
+    pub fn has_requirement_or_hint<T>(&self) -> bool
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.get_requirement_or_hint::<T>().is_some()
+    }
+}
+
+/// Load an execution context from a CWL specification file and an inputs file.
+pub fn create_execution_request(
+    specification_path: impl AsRef<Path> + std::fmt::Debug,
+    inputs_path: impl AsRef<Path> + std::fmt::Debug,
+    outputs_path: Option<&Path>,
+) -> anyhow::Result<ExecutionRequest> {
+    let working_dir = env::current_dir()?;
+    let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
+
+    let inputs = load_input_file_from_file(inputs_path, base_path)?;
+    create_execution_request_with_inputs(specification_path, inputs, outputs_path)
+}
+
+/// Load an execution context from a CWL specification file and an already built inputs object (if inputs come as arguments, for example).
+pub fn create_execution_request_with_inputs(
+    specification_path: impl AsRef<Path> + std::fmt::Debug,
+    inputs: InputObject,
+    outputs_path: Option<&Path>,
+) -> anyhow::Result<ExecutionRequest> {
+    let doc = load_cwl_file(&specification_path, true)?;
+
+    let working_dir = env::current_dir()?;
+    let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
+
+    create_execution_request_from_document(doc, inputs, base_path, outputs_path)
+}
+
+/// Load an execution context from a CWL Document and an inputs object (if coming from workflow step for example).
+pub fn create_execution_request_from_document(
+    mut specification: CWLDocument,
+    inputs: InputObject,
+    base_path: impl AsRef<Path>,
+    outputs_path: Option<&Path>,
+) -> anyhow::Result<ExecutionRequest> {
+    let environment = build_environment(&inputs);
+    let requirements = collect_requirements(&specification, &inputs);
+    let hints = collect_hints(&specification, &inputs);
+
+    replace_schema_definitions(&mut specification, &requirements)?;
+
+    let ctx = ExecutionRequest {
+        requirements,
+        hints,
+        specification,
+        inputs: inputs.inputs,
+        working_dir: base_path.as_ref().to_path_buf(),
+        out_dir: outputs_path.unwrap_or(base_path.as_ref()).to_path_buf(),
+        environment,
+    };
+
+    Ok(ctx)
+}
+
+pub fn load_input_file_from_file(
+    path: impl AsRef<Path> + std::fmt::Debug,
+    base_path: impl AsRef<Path>,
+) -> anyhow::Result<InputObject> {
+    let content = std::fs::read_to_string(path.as_ref())
+        .with_context(|| format!("Could not read input file {path:?}"))?;
+    let mut values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
+
+    //calculate path relativity
+    let diff_path = pathdiff::diff_paths(
+        path.as_ref().parent().unwrap_or(Path::new(".")),
+        base_path.as_ref(),
+    )
+    .unwrap_or(PathBuf::from(path.as_ref()));
+
+    for item in values.values_mut() {
+        adjust_path_to_base(item, &diff_path, &mut HashSet::new());
+    }
+
+    let mut input_object = InputObject::default();
+
+    //trying to get inputs:
+    if let Some(req_raw) = values.remove("cwl:requirements") {
+        let reqs: Vec<ProcessRequirements> = serde_yaml::from_value(req_raw)?;
+        input_object.requirements = reqs;
+    }
+    if let Some(hints_raw) = values.remove("cwl:hints") {
+        let hints: Vec<ProcessHints> = serde_yaml::from_value(hints_raw)?;
+        input_object.hints = hints;
+    }
+
+    //move inputs off scope here
+    input_object.inputs = values;
+
+    Ok(input_object)
+}
+
+fn adjust_path_to_base(
+    value: &mut serde_yaml::Value,
+    diff_path: &Path,
+    visited: &mut HashSet<*const serde_yaml::Value>,
+) {
+    let ptr = value as *const _;
+    if !visited.insert(ptr) {
+        return; // already visited → break cycle
+    }
+
+    match value {
+        serde_yaml::Value::Sequence(values) => {
+            for v in values {
+                adjust_path_to_base(v, diff_path, visited);
+            }
+        }
+        serde_yaml::Value::Mapping(mapping) => {
+            for (_, v) in mapping.iter_mut() {
+                adjust_path_to_base(v, diff_path, visited);
+            }
+
+            if let Some(path_val) = mapping.get("path").and_then(|v| v.as_str()) {
+                let mut p = PathBuf::from(path_val);
+                if !p.is_absolute() {
+                    p = diff_path.join(p);
+                }
+                mapping.insert("path".into(), p.to_string_lossy().to_string().into());
+            }
+
+            if let Some(path_val) = mapping.get("location").and_then(|v| v.as_str()) {
+                let mut p = PathBuf::from(path_val);
+                if !p.is_absolute() {
+                    p = diff_path.join(p);
+                }
+                mapping.insert("location".into(), p.to_string_lossy().to_string().into());
+                //insert to path also if none
+                if mapping.get("path").is_none() {
+                    mapping.insert("path".into(), p.to_string_lossy().to_string().into());
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_execution_context() {
+        let spec_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+
+        let ctx = create_execution_request(&spec_path, inputs_path, None);
+        assert!(ctx.is_ok());
+
+        let ctx = ctx.unwrap();
+        assert_eq!(ctx.inputs.len(), 1);
+        assert_eq!(ctx.working_dir, spec_path.parent().unwrap());
+    }
+
+    #[test]
+    fn test_load_input_file_same_base() {
+        let tool_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+
+        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
+        assert!(inputs.is_ok());
+
+        let inputs = inputs.unwrap();
+        let file1_loc = inputs
+            .inputs
+            .get("file1")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get("location")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(file1_loc, "hello.txt");
+    }
+
+    #[test]
+    fn test_load_input_file_different_base() {
+        let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+
+        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
+        assert!(inputs.is_ok());
+
+        let inputs = inputs.unwrap();
+        let file1_loc = inputs
+            .inputs
+            .get("file1")
+            .unwrap()
+            .as_mapping()
+            .unwrap()
+            .get("location")
+            .unwrap()
+            .as_str()
+            .unwrap();
+        assert_eq!(file1_loc, "../hello.txt");
+    }
+
+    #[test]
+    fn test_load_input_file_requirements() {
+        let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
+        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/env-job4.yaml");
+
+        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
+        assert!(inputs.is_ok());
+
+        let inputs = inputs.unwrap();
+        assert_eq!(inputs.requirements.len(), 1);
+    }
+}

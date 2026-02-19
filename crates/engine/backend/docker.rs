@@ -1,9 +1,8 @@
 use crate::{
+    backend::mount::{mount_input, mount_workdir_item},
     backend::{TaskBackend, TaskExecutionRequest, TaskExecutionResult},
     docker::build_container,
     expression::{do_eval, do_eval_to_string},
-    input::mount_input,
-    workdir::mount_workdir_item,
 };
 use crankshaft::{
     config::backend::docker::Config,
@@ -260,7 +259,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::backend::{execute, load_execution_context};
+    use crate::{backend::execute, request::create_execution_request};
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -283,7 +282,7 @@ mod tests {
         let backend = DockerBackend::new(config).await.unwrap();
         let tmpdir = tempdir().unwrap();
         let request =
-            load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = execute(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
@@ -306,7 +305,7 @@ mod tests {
         let backend = DockerBackend::new(config).await.unwrap();
         let tmpdir = tempdir().unwrap();
         let request =
-            load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = execute(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
@@ -325,7 +324,7 @@ mod tests {
         let backend = DockerBackend::new(config).await.unwrap();
         let tmpdir = tempdir().unwrap();
         let request =
-            load_execution_context(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = execute(backend, &request, cancellation_token).await;
 

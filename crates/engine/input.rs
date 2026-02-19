@@ -1,160 +1,17 @@
 use crate::{
     command::to_str,
-    format::FormatValidator,
-    input::validation::{validate_command_input, validate_input_type},
     io::{directory::locate_dir, file::locate_file},
-    requirements::{ProcessHints, ProcessRequirements},
-};
-use anyhow::Context;
-use crankshaft::engine::{
-    Task,
-    task::{
-        Input,
-        input::{self, Contents},
-    },
+    schema::format_validation::FormatValidator,
+    schema::validation::{validate_command_input, validate_input_type},
 };
 use cwl_core::{
-    ExtractFromEnum, OneOrMany,
+    OneOrMany,
     documents::{CWLDocument, CommandLineTool},
     files::{FileOrDirectory, LoadListingEnum},
     inputs::{CommandInputParameterType, DefaultValue, OperationInputParameter},
     requirements::LoadListingRequirement,
 };
-use serde::Deserialize;
-use std::{
-    collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
-};
-use url::Url;
-
-pub mod file_system;
-pub mod validation;
-
-#[derive(Deserialize, Debug, Clone, Default)]
-pub struct InputObject {
-    pub inputs: HashMap<String, serde_yaml::Value>,
-    pub requirements: Vec<ProcessRequirements>,
-    pub hints: Vec<ProcessHints>,
-}
-impl InputObject {
-    pub fn get_requirement<T>(&self) -> Option<&T>
-    where
-        T: ExtractFromEnum<ProcessRequirements>,
-    {
-        self.requirements.iter().find_map(|req| T::get(req))
-    }
-
-    pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
-    where
-        T: ExtractFromEnum<ProcessRequirements>,
-    {
-        let maybe_req = self.requirements.iter().find_map(|req| T::get(req));
-        let maybe_hint = self.hints.iter().find_map(|hint| {
-            if let ProcessHints::Requirement(inner) = hint {
-                T::get(inner)
-            } else {
-                None
-            }
-        });
-        maybe_req.or(maybe_hint)
-    }
-
-    pub fn has_requirement<T>(&self) -> bool
-    where
-        T: ExtractFromEnum<ProcessRequirements>,
-    {
-        self.get_requirement::<T>().is_some()
-    }
-
-    pub fn has_requirement_or_hint<T>(&self) -> bool
-    where
-        T: ExtractFromEnum<ProcessRequirements>,
-    {
-        self.get_requirement_or_hint::<T>().is_some()
-    }
-}
-
-pub fn load_input_file_from_file(
-    path: impl AsRef<Path> + std::fmt::Debug,
-    base_path: impl AsRef<Path>,
-) -> anyhow::Result<InputObject> {
-    let content = std::fs::read_to_string(path.as_ref())
-        .with_context(|| format!("Could not read input file {path:?}"))?;
-    let mut values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
-
-    //calculate path relativity
-    let diff_path = pathdiff::diff_paths(
-        path.as_ref().parent().unwrap_or(Path::new(".")),
-        base_path.as_ref(),
-    )
-    .unwrap_or(PathBuf::from(path.as_ref()));
-
-    for item in values.values_mut() {
-        adjust_path_to_base(item, &diff_path, &mut HashSet::new());
-    }
-
-    let mut input_object = InputObject::default();
-
-    //trying to get inputs:
-    if let Some(req_raw) = values.remove("cwl:requirements") {
-        let reqs: Vec<ProcessRequirements> = serde_yaml::from_value(req_raw)?;
-        input_object.requirements = reqs;
-    }
-    if let Some(hints_raw) = values.remove("cwl:hints") {
-        let hints: Vec<ProcessHints> = serde_yaml::from_value(hints_raw)?;
-        input_object.hints = hints;
-    }
-
-    //move inputs off scope here
-    input_object.inputs = values;
-
-    Ok(input_object)
-}
-
-fn adjust_path_to_base(
-    value: &mut serde_yaml::Value,
-    diff_path: &Path,
-    visited: &mut HashSet<*const serde_yaml::Value>,
-) {
-    let ptr = value as *const _;
-    if !visited.insert(ptr) {
-        return; // already visited → break cycle
-    }
-
-    match value {
-        serde_yaml::Value::Sequence(values) => {
-            for v in values {
-                adjust_path_to_base(v, diff_path, visited);
-            }
-        }
-        serde_yaml::Value::Mapping(mapping) => {
-            for (_, v) in mapping.iter_mut() {
-                adjust_path_to_base(v, diff_path, visited);
-            }
-
-            if let Some(path_val) = mapping.get("path").and_then(|v| v.as_str()) {
-                let mut p = PathBuf::from(path_val);
-                if !p.is_absolute() {
-                    p = diff_path.join(p);
-                }
-                mapping.insert("path".into(), p.to_string_lossy().to_string().into());
-            }
-
-            if let Some(path_val) = mapping.get("location").and_then(|v| v.as_str()) {
-                let mut p = PathBuf::from(path_val);
-                if !p.is_absolute() {
-                    p = diff_path.join(p);
-                }
-                mapping.insert("location".into(), p.to_string_lossy().to_string().into());
-                //insert to path also if none
-                if mapping.get("path").is_none() {
-                    mapping.insert("path".into(), p.to_string_lossy().to_string().into());
-                }
-            }
-        }
-        _ => {}
-    }
-}
+use std::{collections::HashMap, path::Path};
 
 pub fn collect_inputs(
     doc: &CWLDocument,
@@ -283,46 +140,51 @@ pub fn get_stdin(tool: &CommandLineTool, inputs: &HashMap<String, DefaultValue>)
     None
 }
 
-pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
-    let ty = match input {
-        FileOrDirectory::File(_) => input::Type::File,
-        FileOrDirectory::Directory(_) => input::Type::Directory,
-    };
-    if let Some(path) = input.path()
-        && let Some(location) = input.location()
-    {
-        task.add_input(
-            Input::builder()
-                .contents(Contents::Url(Url::parse(location)?))
-                .path(path)
-                .ty(ty)
-                .build(),
-        );
-    } else if let FileOrDirectory::File(file) = &input
-        && let Some(contents) = &file.contents
-        && let Some(path) = &file.path
-    {
-        //make content checksum
-        task.add_input(
-            Input::builder()
-                .contents(Contents::Literal(contents.as_bytes().to_vec()))
-                .path(path)
-                .ty(ty)
-                .build(),
-        );
-    } else if let FileOrDirectory::Directory(dir) = &input
-        && let Some(listing) = &dir.listing
-    {
-        for item in listing {
-            mount_input(task, item)?;
-        }
+//flattens inputs of any type to a list of file or directory
+pub fn flatten_inputs(
+    inputs: &HashMap<String, DefaultValue>,
+) -> anyhow::Result<Vec<FileOrDirectory>> {
+    let mut flattened = vec![];
+    for input in inputs.values() {
+        flatten_inputs_impl(input, &mut flattened);
     }
+    Ok(flattened)
+}
 
-    Ok(())
+fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) {
+    match dv {
+        DefaultValue::FileOrDirectory(fod) => {
+            flattened.push(fod.clone());
+            if let FileOrDirectory::File(f) = fod
+                && let Some(secondary_files) = &f.secondary_files
+            {
+                flattened.extend(secondary_files.clone());
+            }
+        }
+        DefaultValue::Any(v) => match v {
+            serde_yaml::Value::Sequence(values) => {
+                for v in values {
+                    if let Ok(dv) = serde_yaml::from_value(v.clone()) {
+                        flatten_inputs_impl(&dv, flattened);
+                    }
+                }
+            }
+            serde_yaml::Value::Mapping(mapping) => {
+                for v in mapping.values() {
+                    if let Ok(dv) = serde_yaml::from_value(v.clone()) {
+                        flatten_inputs_impl(&dv, flattened);
+                    }
+                }
+            }
+            _ => {}
+        },
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::request::load_input_file_from_file;
+
     use super::*;
     use cwl_core::{documents::CommandLineTool, load_cwl_file};
     use std::collections::HashMap;
@@ -349,68 +211,6 @@ mod tests {
         assert!(inputs.is_ok());
 
         assert_eq!(inputs.unwrap().len(), 2);
-    }
-
-    #[test]
-    fn test_load_input_file_same_base() {
-        let tool_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
-        let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
-
-        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
-        assert!(inputs.is_ok());
-
-        let inputs = inputs.unwrap();
-        let file1_loc = inputs
-            .inputs
-            .get("file1")
-            .unwrap()
-            .as_mapping()
-            .unwrap()
-            .get("location")
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(file1_loc, "hello.txt");
-    }
-
-    #[test]
-    fn test_load_input_file_different_base() {
-        let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
-        let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
-
-        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
-        assert!(inputs.is_ok());
-
-        let inputs = inputs.unwrap();
-        let file1_loc = inputs
-            .inputs
-            .get("file1")
-            .unwrap()
-            .as_mapping()
-            .unwrap()
-            .get("location")
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(file1_loc, "../hello.txt");
-    }
-
-    #[test]
-    fn test_load_input_file_requirements() {
-        let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
-        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/env-job4.yaml");
-
-        let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
-        assert!(inputs.is_ok());
-
-        let inputs = inputs.unwrap();
-        assert_eq!(inputs.requirements.len(), 1);
     }
 
     #[test]

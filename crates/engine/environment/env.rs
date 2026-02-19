@@ -1,6 +1,6 @@
 use crate::{
     expression::{EvaluationContext, do_eval},
-    input::InputObject,
+    request::InputObject,
 };
 use anyhow::Context;
 use cwl_core::requirements::EnvVarRequirement;

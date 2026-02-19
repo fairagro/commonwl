@@ -1,0 +1,107 @@
+use crate::environment::workdir::{MountType, Source, WorkDirMount};
+use anyhow::Context;
+use crankshaft::engine::{
+    Task,
+    task::{
+        Input,
+        input::{self, Contents},
+    },
+};
+use cwl_core::files::FileOrDirectory;
+use dircpy::copy_dir;
+use std::{fs, path::Path};
+use url::Url;
+
+pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
+    let ty = match input {
+        FileOrDirectory::File(_) => input::Type::File,
+        FileOrDirectory::Directory(_) => input::Type::Directory,
+    };
+    if let Some(path) = input.path()
+        && let Some(location) = input.location()
+    {
+        task.add_input(
+            Input::builder()
+                .contents(Contents::Url(Url::parse(location)?))
+                .path(path)
+                .ty(ty)
+                .build(),
+        );
+    } else if let FileOrDirectory::File(file) = &input
+        && let Some(contents) = &file.contents
+        && let Some(path) = &file.path
+    {
+        //make content checksum
+        task.add_input(
+            Input::builder()
+                .contents(Contents::Literal(contents.as_bytes().to_vec()))
+                .path(path)
+                .ty(ty)
+                .build(),
+        );
+    } else if let FileOrDirectory::Directory(dir) = &input
+        && let Some(listing) = &dir.listing
+    {
+        for item in listing {
+            mount_input(task, item)?;
+        }
+    }
+
+    Ok(())
+}
+
+pub fn mount_workdir_item(
+    mount: WorkDirMount,
+    outdir: &Path,
+    use_container: bool,
+    task: &mut Task,
+) -> anyhow::Result<()> {
+    if mount.target.starts_with(outdir) {
+        if let Some(parent) = mount.target.parent()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent).with_context(|| {
+                format!("Could not create parent directories for {:?}", mount.target)
+            })?;
+        }
+        match (mount.ty, mount.source) {
+            (MountType::File, Source::File(path)) => {
+                fs::copy(&path, &mount.target).with_context(|| {
+                    format!("Could not copy from {path:?} to {:?}", mount.target)
+                })?;
+            }
+            (MountType::File, Source::Contents(items)) => {
+                fs::write(&mount.target, &items)
+                    .with_context(|| format!("Could not write to {:?}", mount.target))?;
+            }
+            (MountType::Directory, Source::File(path)) => copy_dir(&path, &mount.target)
+                .with_context(|| format!("Could not copy from {path:?} to {:?}", mount.target))?,
+            (MountType::Directory, Source::Contents(_)) => {
+                fs::create_dir_all(&mount.target).with_context(|| {
+                    format!("Could not create parent directories for {:?}", mount.target)
+                })?;
+            }
+        };
+    } else if use_container {
+        task.add_input(
+            Input::builder()
+                .path(mount.target.to_string_lossy())
+                .contents(match mount.source {
+                    Source::File(path) => Contents::Path(path),
+                    Source::Contents(data) => Contents::Literal(data),
+                })
+                .ty(match mount.ty {
+                    MountType::File => input::Type::File,
+                    MountType::Directory => input::Type::Directory,
+                })
+                .read_only(mount.readonly)
+                .build(),
+        );
+    } else {
+        anyhow::bail!(
+            "Workdir item target {:?} is outside of working directory and container is not used, can not stage",
+            mount.target
+        );
+    }
+    Ok(())
+}

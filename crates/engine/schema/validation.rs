@@ -7,8 +7,8 @@ use cwl_core::{
 use tracing::error;
 
 use crate::{
-    format::FormatValidator,
-    schema_val::{
+    schema::format_validation::FormatValidator,
+    schema::validation_types::{
         ValidationArraySchema, ValidationEnumSchema, ValidationRecordSchema, ValidationSchema,
         ValidationType,
     },

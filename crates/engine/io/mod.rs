@@ -1,7 +1,9 @@
 use std::path::{Path, PathBuf};
 use url::Url;
+
 pub mod directory;
 pub mod file;
+pub mod json;
 
 pub fn get_location(path: &str, work_dir: &Path) -> String {
     let path = urlencoding::decode(path)

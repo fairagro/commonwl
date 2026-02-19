@@ -1,7 +1,7 @@
 use crate::{
-    context::Runtime,
+    environment::runtime::Runtime,
     expression::{self, EvaluationContext, do_eval},
-    input::validation::validate_command_input,
+    schema::validation::validate_command_input,
 };
 use cwl_core::{
     IntegerOrExpression, OneOrMany,
