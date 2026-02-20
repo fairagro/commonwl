@@ -219,7 +219,11 @@ mod tests {
 
         assert_eq!(inputs.unwrap().len(), 2);
     }
-
+    fn strip_ids(val: &str) -> String {
+        // Matches segments like "stg21d5f9d2" - adjust regex to your ID format
+        let re = regex::Regex::new(r"-[a-z0-9]{8,}").unwrap();
+        re.replace_all(val, "-<ID>").to_string()
+    }
     #[test]
     fn test_get_stdin() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -244,7 +248,7 @@ mod tests {
         let CWLDocument::CommandLineTool(tool) = doc else {
             panic!("Oh no!")
         };
-        let stdin = get_stdin(&tool, &inputs);
-        assert_eq!(stdin, Some("./file1/hello.txt".into()));
+        let stdin = get_stdin(&tool, &inputs).unwrap();
+        assert_eq!(strip_ids(&stdin), "./file1-<ID>/hello.txt");
     }
 }
