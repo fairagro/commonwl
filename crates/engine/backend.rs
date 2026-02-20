@@ -152,6 +152,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         completed_outputs.insert(k.clone(), v.clone());
     }
 
+    let mut scatter_meta: HashMap<String, (ScatterMethod, Vec<usize>)> = HashMap::new();
     for wave in waves {
         let mut handles = Vec::new();
 
@@ -188,7 +189,18 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                     .as_ref()
                     .unwrap_or(&ScatterMethod::Dotproduct);
                 let scatter_inputs = scatter::gather_inputs(&scatter_keys, &inputs)?;
+                let dims: Vec<usize> = scatter_inputs.iter().map(|v| v.len()).collect();
                 let jobs = scatter::gather_jobs(&scatter_inputs, &scatter_keys, method)?;
+
+                //no jobs -> we add empty output arrays
+                if jobs.is_empty() {
+                    for output in &step.out {
+                        let key = format!("{}/{}", step_id_clone, output.id());
+                        let empty_result = scatter::empty(method, &dims);
+                        completed_outputs.insert(key, DefaultValue::Any(empty_result));
+                    }
+                    continue;
+                }
 
                 for job in jobs {
                     let mut sub_inputs = inputs.clone();
@@ -205,6 +217,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                         token_clone.clone(),
                     )?);
                 }
+                scatter_meta.insert(step_id_clone.clone(), (*method, dims));
             } else {
                 handles.push(execute_step(
                     step,
@@ -223,11 +236,16 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let (step_id, exec_result) = join_result
                 .context("Step task panicked")?
                 .context("Step execution failed")?;
-
             for (output_name, value) in exec_result.outputs {
                 let key = format!("{}/{}", step_id, output_name);
                 if scattered_step_ids.contains(&step_id) && sfr.is_some() {
                     scatter_accum.entry(key).or_default().push(value);
+                } else if sfr.is_some() {
+                    //if no value was produces we add an empty vec
+                    scatter_accum
+                        .entry(key)
+                        .or_default()
+                        .push(DefaultValue::Any(serde_yaml::Value::Sequence(vec![])));
                 } else {
                     completed_outputs.insert(key, value);
                 }
@@ -237,8 +255,24 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         if sfr.is_some() {
             // For scattered steps, we need to aggregate outputs into arrays
             for (key, values) in scatter_accum {
-                let values = serde_yaml::to_value(values)?;
-                completed_outputs.insert(key, DefaultValue::Any(values));
+                let step_id = key.split('/').next().unwrap().to_string();
+                let aggregated = if let Some((method, dims)) = scatter_meta.get(&step_id) {
+                    match method {
+                        ScatterMethod::NestedCrossproduct => {
+                            let raw: Vec<serde_yaml::Value> = values
+                                .into_iter()
+                                .map(serde_yaml::to_value)
+                                .collect::<Result<_, _>>()?;
+                            scatter::nest_results(raw, dims)
+                        }
+                        // flat and dotproduct both produce a flat array
+                        _ => serde_yaml::to_value(values)?,
+                    }
+                } else {
+                    serde_yaml::to_value(values)?
+                };
+
+                completed_outputs.insert(key, DefaultValue::Any(aggregated));
             }
         }
     }

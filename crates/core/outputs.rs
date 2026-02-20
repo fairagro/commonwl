@@ -470,6 +470,16 @@ pub enum StringOrWorkflowStepOutput {
     WorkflowStepOutput(WorkflowStepOutput),
 }
 
+impl StringOrWorkflowStepOutput {
+    pub fn id(&self) -> String {
+        match self {
+            Self::String(s) => s,
+            Self::WorkflowStepOutput(wfs) => wfs.id.as_ref().unwrap(),
+        }
+        .to_string()
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStepOutput {

@@ -88,3 +88,38 @@ pub fn gather_inputs(
         })
         .collect::<anyhow::Result<Vec<Vec<serde_yaml::Value>>>>()
 }
+
+pub fn nest_results(flat: Vec<serde_yaml::Value>, dims: &[usize]) -> serde_yaml::Value {
+    fn chunk(flat: &[serde_yaml::Value], dims: &[usize]) -> serde_yaml::Value {
+        if dims.len() == 1 {
+            serde_yaml::Value::Sequence(flat.to_vec())
+        } else {
+            let inner_size: usize = dims[1..].iter().product();
+            let chunks = flat
+                .chunks(inner_size)
+                .map(|c| chunk(c, &dims[1..]))
+                .collect();
+            serde_yaml::Value::Sequence(chunks)
+        }
+    }
+    chunk(&flat, dims)
+}
+
+pub fn empty(method: &ScatterMethod, dims: &[usize]) -> serde_yaml::Value {
+    match method {
+        ScatterMethod::Dotproduct | ScatterMethod::FlatCrossproduct => {
+            serde_yaml::Value::Sequence(vec![])
+        }
+        ScatterMethod::NestedCrossproduct => {
+            fn build_empty(dims: &[usize]) -> serde_yaml::Value {
+                if dims.len() == 1 {
+                    serde_yaml::Value::Sequence(vec![])
+                } else {
+                    let inner = (0..dims[0]).map(|_| build_empty(&dims[1..])).collect();
+                    serde_yaml::Value::Sequence(inner)
+                }
+            }
+            build_empty(dims)
+        }
+    }
+}
