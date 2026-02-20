@@ -169,16 +169,17 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let backend_clone = backend.clone();
             let token_clone = token.clone();
             let mut step_inputs = HashMap::new();
-            for item in &step.r#in {
-                if let Some(sources) = &item.source {
+            for workflow_step_input in &step.r#in {
+                if let Some(sources) = &workflow_step_input.source {
                     //handle multiple input feature requirement
                     if mir.is_some() {
                         let mut data = vec![];
                         for s in sources.as_many() {
                             let val = completed_outputs.get(&s);
+
                             //handle link merge
                             if let Some(val) = val {
-                                match item.link_merge {
+                                match workflow_step_input.link_merge {
                                     None | Some(LinkMergeMethod::MergeNested) => {
                                         data.push(val.clone());
                                     }
@@ -206,12 +207,20 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                             }
                         }
                         let yaml_value = serde_yaml::to_value(data)?;
-                        step_inputs.insert(item.id.clone().unwrap(), yaml_value);
+                        step_inputs.insert(workflow_step_input.id.clone().unwrap(), yaml_value);
                     } else {
+                        //no multiple feature input requirement branch
                         for source in &sources.as_many() {
                             if let Some(value) = completed_outputs.get(source) {
                                 let yaml_value = serde_yaml::to_value(value)?;
-                                step_inputs.insert(item.id.clone().unwrap(), yaml_value);
+                                let yaml_value = match workflow_step_input.link_merge {
+                                    None | Some(LinkMergeMethod::MergeFlattened) => yaml_value,
+                                    Some(LinkMergeMethod::MergeNested) => {
+                                        serde_yaml::Value::Sequence(vec![yaml_value])
+                                    }
+                                };
+                                step_inputs
+                                    .insert(workflow_step_input.id.clone().unwrap(), yaml_value);
                             }
                         }
                     }
