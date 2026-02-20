@@ -192,6 +192,12 @@ fn add_schema_defs_to_inputs_impl(
             {
                 let new_type: InputType = serde_yaml::from_value(def.clone())?;
                 *r#type = new_type;
+            } else if s.contains('#')
+                && let Some(ar) = s.split_once('#')
+                && let Some(def) = defs.get(&format!("#{}", ar.1))
+            {
+                let new_type: InputType = serde_yaml::from_value(def.clone())?;
+                *r#type = new_type;
             }
         }
         _ => {}

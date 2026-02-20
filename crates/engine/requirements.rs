@@ -160,6 +160,17 @@ pub enum ProcessHints {
     Any(serde_yaml::Value),
 }
 
+impl From<WorkflowHints> for ProcessHints {
+    fn from(value: WorkflowHints) -> Self {
+        match value {
+            WorkflowHints::Requirement(workflow_requirements) => {
+                ProcessHints::Requirement(workflow_requirements.into())
+            }
+            WorkflowHints::Any(value) => ProcessHints::Any(value),
+        }
+    }
+}
+
 pub fn collect_requirements(
     specification: &CWLDocument,
     inputs: &InputObject,

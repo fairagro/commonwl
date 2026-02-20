@@ -16,7 +16,7 @@ use crate::{
     scatter,
     schema::format_validation::get_format_validator,
     tree::build_execution_tree,
-    workflow::collect_workflow_step_inputs,
+    workflow::build_step_input_object,
 };
 use anyhow::Context;
 use cwl_core::{
@@ -131,8 +131,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         panic!("Not a Workflow");
     };
 
-    let llr = wf.get_requirement_or_hint::<LoadListingRequirement>();
-    let sfr = wf.get_requirement_or_hint::<ScatterFeatureRequirement>();
+    let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
+    let sfr = request.get_requirement_or_hint::<ScatterFeatureRequirement>();
     let mir = wf.get_requirement_or_hint::<MultipleInputFeatureRequirement>();
 
     let inputs = collect_inputs(
@@ -169,11 +169,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let step_id_clone = step.id.clone().unwrap();
             let backend_clone = backend.clone();
             let token_clone = token.clone();
-            let step_inputs = collect_workflow_step_inputs(&completed_outputs, &step.r#in, mir)?;
-            let inputs = InputObject {
-                inputs: step_inputs,
-                ..Default::default()
-            };
+            let inputs = build_step_input_object(step, &completed_outputs, mir)?;
             let outdir_clone = Some(&*request.out_dir);
             let working_dir_clone = request.working_dir.clone();
             info!("Starting execution of step {}", step_id_clone);
