@@ -1,6 +1,6 @@
 use crate::{
     environment::env::build_environment,
-    requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements},
+    requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements, merge},
     schema::schema_def::replace_schema_definitions,
 };
 use anyhow::Context;
@@ -22,6 +22,44 @@ pub struct ExecutionRequest {
     pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ProcessHints>,
     pub environment: IndexMap<String, String>,
+}
+
+impl ExecutionRequest {
+    pub fn get_requirement<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.requirements.iter().find_map(|req| T::get(req))
+    }
+
+    pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        let maybe_req = self.requirements.iter().find_map(|req| T::get(req));
+        let maybe_hint = self.hints.iter().find_map(|hint| {
+            if let ProcessHints::Requirement(inner) = hint {
+                T::get(inner)
+            } else {
+                None
+            }
+        });
+        maybe_req.or(maybe_hint)
+    }
+
+    pub fn has_requirement<T>(&self) -> bool
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.get_requirement::<T>().is_some()
+    }
+
+    pub fn has_requirement_or_hint<T>(&self) -> bool
+    where
+        T: ExtractFromEnum<ProcessRequirements>,
+    {
+        self.get_requirement_or_hint::<T>().is_some()
+    }
 }
 
 #[derive(Deserialize, Debug, Clone, Default)]
@@ -78,7 +116,7 @@ pub fn create_execution_request(
     let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
 
     let inputs = load_input_file_from_file(inputs_path, base_path)?;
-    create_execution_request_with_inputs(specification_path, inputs, outputs_path)
+    create_execution_request_with_inputs(specification_path, inputs, outputs_path, None)
 }
 
 /// Load an execution context from a CWL specification file and an already built inputs object (if inputs come as arguments, for example).
@@ -86,13 +124,14 @@ pub fn create_execution_request_with_inputs(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs: InputObject,
     outputs_path: Option<&Path>,
+    parent: Option<&ExecutionRequest>,
 ) -> anyhow::Result<ExecutionRequest> {
     let doc = load_cwl_file(&specification_path, true)?;
 
     let working_dir = env::current_dir()?;
     let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
 
-    create_execution_request_from_document(doc, inputs, base_path, outputs_path)
+    create_execution_request_from_document(doc, inputs, base_path, outputs_path, parent)
 }
 
 /// Load an execution context from a CWL Document and an inputs object (if coming from workflow step for example).
@@ -101,10 +140,22 @@ pub fn create_execution_request_from_document(
     inputs: InputObject,
     base_path: impl AsRef<Path>,
     outputs_path: Option<&Path>,
+    parent: Option<&ExecutionRequest>,
 ) -> anyhow::Result<ExecutionRequest> {
     let environment = build_environment(&inputs);
-    let requirements = collect_requirements(&specification, &inputs);
-    let hints = collect_hints(&specification, &inputs);
+
+    let mut requirements = collect_requirements(&specification, &inputs);
+    let mut hints = collect_hints(&specification, &inputs);
+    if let Some(parent) = parent {
+        //get parent requirements and only add if not already set
+        let mut wf_reqs = collect_requirements(&parent.specification, &InputObject::default());
+        merge(&mut wf_reqs, &requirements);
+        requirements = wf_reqs;
+
+        let mut wf_hints = collect_hints(&parent.specification, &InputObject::default());
+        merge(&mut wf_hints, &hints);
+        hints = wf_hints;
+    }
 
     replace_schema_definitions(&mut specification, &requirements)?;
 

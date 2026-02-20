@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     let request = if let Some(job_path) = job_path {
         create_execution_request(spec_path, job_path, Some(outdir))?
     } else {
-        create_execution_request_with_inputs(spec_path, InputObject::default(), Some(outdir))?
+        create_execution_request_with_inputs(spec_path, InputObject::default(), Some(outdir), None)?
     };
 
     let cancellation_token = CancellationToken::new();

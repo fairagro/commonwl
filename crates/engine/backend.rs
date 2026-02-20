@@ -172,8 +172,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let step_inputs = collect_workflow_step_inputs(&completed_outputs, &step.r#in, mir)?;
             let inputs = InputObject {
                 inputs: step_inputs,
-                requirements: request.requirements.clone(),
-                hints: request.hints.clone(),
+                ..Default::default()
             };
             let outdir_clone = Some(&*request.out_dir);
             let working_dir_clone = request.working_dir.clone();
@@ -215,6 +214,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                         outdir_clone,
                         sub_inputs,
                         token_clone.clone(),
+                        request,
                     )?);
                 }
                 scatter_meta.insert(step_id_clone.clone(), (*method, dims));
@@ -226,6 +226,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                     outdir_clone,
                     inputs,
                     token_clone,
+                    request,
                 )?);
             }
         }
@@ -305,13 +306,19 @@ fn execute_step<T: TaskBackend + Clone + Send + 'static>(
     outdir: Option<&Path>,
     inputs: InputObject,
     token: CancellationToken,
+    request: &ExecutionRequest,
 ) -> anyhow::Result<JoinHandle<anyhow::Result<(String, ExecutionResult)>>> {
     let step_id_clone = step.id.clone().unwrap();
     match &step.run {
         StringOrDocument::String(s) => {
             let specification_path = working_dir.join(s);
 
-            let request = create_execution_request_with_inputs(specification_path, inputs, outdir)?;
+            let request = create_execution_request_with_inputs(
+                specification_path,
+                inputs,
+                outdir,
+                Some(request),
+            )?;
             let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
                 tokio::spawn(async move {
                     let result = execute(backend, &request, token).await?;
@@ -325,6 +332,7 @@ fn execute_step<T: TaskBackend + Clone + Send + 'static>(
                 inputs,
                 working_dir,
                 outdir,
+                Some(request),
             )?;
             let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
                 tokio::spawn(async move {
@@ -345,27 +353,13 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
 
     //get neccessary requirements
-    let ijsr = request
-        .specification
-        .get_requirement_or_hint::<InlineJavascriptRequirement>();
-    let dr = request
-        .specification
-        .get_requirement_or_hint::<DockerRequirement>();
-    let rr = request
-        .specification
-        .get_requirement_or_hint::<ResourceRequirement>();
-    let iwdr = request
-        .specification
-        .get_requirement_or_hint::<InitialWorkDirRequirement>();
-    let evr = request
-        .specification
-        .get_requirement_or_hint::<EnvVarRequirement>();
-    let ttl = request
-        .specification
-        .get_requirement_or_hint::<ToolTimeLimit>();
-    let llr = request
-        .specification
-        .get_requirement_or_hint::<LoadListingRequirement>();
+    let ijsr = request.get_requirement_or_hint::<InlineJavascriptRequirement>();
+    let dr = request.get_requirement_or_hint::<DockerRequirement>();
+    let rr = request.get_requirement_or_hint::<ResourceRequirement>();
+    let iwdr = request.get_requirement_or_hint::<InitialWorkDirRequirement>();
+    let evr = request.get_requirement_or_hint::<EnvVarRequirement>();
+    let ttl = request.get_requirement_or_hint::<ToolTimeLimit>();
+    let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
 
     let outdir = tempdir()?;
     let tmpdir = tempdir()?;

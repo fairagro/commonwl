@@ -36,7 +36,6 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.inputs.iter().map(|i| i.clone().into()).collect(),
         }
     }
-
     pub fn get_requirement<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,

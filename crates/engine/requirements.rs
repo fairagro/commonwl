@@ -256,7 +256,7 @@ pub fn collect_hints(specification: &CWLDocument, inputs: &InputObject) -> Vec<P
     hints
 }
 
-fn merge<T: Clone>(dst: &mut Vec<T>, src: &[T]) {
+pub(crate) fn merge<T: Clone>(dst: &mut Vec<T>, src: &[T]) {
     for req in src {
         if let Some(r) = dst.iter_mut().find(|r| same_variant::<T>(r, req)) {
             *r = req.clone();
