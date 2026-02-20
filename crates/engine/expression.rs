@@ -129,7 +129,6 @@ fn simple_expression_eval(
             .set(key, value, true, &mut context)
             .map_err(|e| anyhow::anyhow!("{e}"))?;
     }
-
     let result = context
         .eval(Source::from_bytes(expression))
         .map_err(|e| anyhow::anyhow!("{e}"))?;

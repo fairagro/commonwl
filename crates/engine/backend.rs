@@ -133,6 +133,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
 
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
     let sfr = request.get_requirement_or_hint::<ScatterFeatureRequirement>();
+    let ijsr = request.get_requirement_or_hint::<InlineJavascriptRequirement>();
     let mir = wf.get_requirement_or_hint::<MultipleInputFeatureRequirement>();
 
     let inputs = collect_inputs(
@@ -143,6 +144,13 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         llr,
         Some(&fv),
     )?;
+
+    let eval_context = &mut EvaluationContext {
+        workdir: Some(&request.working_dir),
+        ijsr,
+        inputs: Some(&inputs.clone()),
+        ..Default::default()
+    };
 
     let waves = build_execution_tree(wf)?;
     let mut completed_outputs: HashMap<String, DefaultValue> = HashMap::new();
@@ -169,7 +177,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let step_id_clone = step.id.clone().unwrap();
             let backend_clone = backend.clone();
             let token_clone = token.clone();
-            let inputs = build_step_input_object(step, &completed_outputs, mir)?;
+            let inputs = build_step_input_object(step, &completed_outputs, mir, eval_context)?;
             let outdir_clone = Some(&*request.out_dir);
             let working_dir_clone = request.working_dir.clone();
             info!("Starting execution of step {}", step_id_clone);
@@ -178,6 +186,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             if let Some(scatter) = &step.scatter
                 && sfr.is_some()
             {
+                info!("{step_id_clone} is a scattered Job");
                 let scatter_keys = scatter.as_many();
                 let method = step
                     .scatter_method
