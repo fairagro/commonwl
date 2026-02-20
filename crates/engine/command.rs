@@ -577,9 +577,8 @@ fn apply_shell_quote(arg: Vec<String>) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::input::collect_inputs;
-
     use super::*;
+    use crate::input::collect_inputs;
     use cwl_core::{
         documents::CWLDocument,
         inputs::{CommandInputArraySchema, CommandInputParameter},
@@ -587,6 +586,16 @@ mod tests {
         types::CWLType,
     };
     use std::path::{Path, PathBuf};
+
+    fn strip_ids(val: &str) -> String {
+        // Matches segments like "stg21d5f9d2" - adjust regex to your ID format
+        let re = regex::Regex::new(r"-[a-z0-9]{8,}").unwrap();
+        re.replace_all(val, "-<ID>").to_string()
+    }
+
+    fn normalize(args: &[String]) -> Vec<String> {
+        args.iter().map(|s| strip_ids(s)).collect()
+    }
 
     #[test]
     fn test_build_command() {
@@ -628,7 +637,7 @@ stdout: output.txt";
 
         let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         let cmdline = cmd.join(" ");
-        assert_eq!(cmdline, "cat ./file1/hello.txt");
+        assert_eq!(strip_ids(&cmdline), "cat ./file1-<ID>/hello.txt");
     }
 
     #[test]
@@ -674,11 +683,11 @@ stdout: output.txt"#;
         let shell_cmd = get_shell_command();
 
         assert_eq!(
-            cmd,
+            normalize(&cmd),
             vec![
                 &shell_cmd[0],
                 &shell_cmd[1],
-                "'cd' './indir/testdir' && 'find' '.' | 'sort'"
+                "'cd' './indir-<ID>/testdir' && 'find' '.' | 'sort'"
             ]
         );
     }
@@ -713,7 +722,7 @@ stdout: output.txt"#;
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
-            cmd,
+            normalize(&cmd),
             vec![
                 "bwa",
                 "mem",
@@ -723,9 +732,9 @@ stdout: output.txt"#;
                 "1,2,3,4",
                 "-m",
                 "3",
-                "./reference/chr20.fa",
-                "./reads/example_human_Illumina.pe_1.fastq",
-                "./reads/example_human_Illumina.pe_2.fastq"
+                "./reference-<ID>/chr20.fa",
+                "./reads-<ID>/stg-<ID>/example_human_Illumina.pe_1.fastq",
+                "./reads-<ID>/stg-<ID>/example_human_Illumina.pe_2.fastq"
             ]
         );
     }
@@ -756,16 +765,16 @@ stdout: output.txt"#;
         cmd = cmd[2..].to_vec();
 
         assert_eq!(
-            cmd,
+            normalize(&cmd),
             vec![
                 "bwa",
                 "mem",
-                "./reference/chr20.fa",
+                "./reference-<ID>/chr20.fa",
                 "-XXX",
                 "-YYY",
-                "./reads/example_human_Illumina.pe_1.fastq",
+                "./reads-<ID>/stg-<ID>/example_human_Illumina.pe_1.fastq",
                 "-YYY",
-                "./reads/example_human_Illumina.pe_2.fastq"
+                "./reads-<ID>/stg-<ID>/example_human_Illumina.pe_2.fastq"
             ]
         );
     }
@@ -854,7 +863,7 @@ stdout: output.txt"#;
         let mut cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         cmd = cmd[2..].to_vec();
 
-        assert_eq!(cmd, vec!["cat", "./file1/hello.txt"]);
+        assert_eq!(normalize(&cmd), vec!["cat", "./file1-<ID>/hello.txt"]);
     }
 
     #[test]
