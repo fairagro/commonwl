@@ -23,10 +23,11 @@ use cwl_core::{
     documents::{CWLDocument, ScatterMethod, StringOrDocument, WorkflowStep},
     files::FileOrDirectory,
     inputs::DefaultValue,
+    outputs::LinkMergeMethod,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
-        InlineJavascriptRequirement, LoadListingRequirement, ResourceRequirement,
-        ScatterFeatureRequirement, ToolTimeLimit,
+        InlineJavascriptRequirement, LoadListingRequirement, MultipleInputFeatureRequirement,
+        ResourceRequirement, ScatterFeatureRequirement, ToolTimeLimit,
     },
 };
 use futures_util::{
@@ -132,6 +133,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
 
     let llr = wf.get_requirement_or_hint::<LoadListingRequirement>();
     let sfr = wf.get_requirement_or_hint::<ScatterFeatureRequirement>();
+    let mir = wf.get_requirement_or_hint::<MultipleInputFeatureRequirement>();
 
     let inputs = collect_inputs(
         &request.specification,
@@ -169,10 +171,48 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let mut step_inputs = HashMap::new();
             for item in &step.r#in {
                 if let Some(sources) = &item.source {
-                    for source in &sources.as_many() {
-                        if let Some(value) = completed_outputs.get(source) {
-                            let yaml_value = serde_yaml::to_value(value)?;
-                            step_inputs.insert(item.id.clone().unwrap(), yaml_value);
+                    //handle multiple input feature requirement
+                    if mir.is_some() {
+                        let mut data = vec![];
+                        for s in sources.as_many() {
+                            let val = completed_outputs.get(&s);
+                            //handle link merge
+                            if let Some(val) = val {
+                                match item.link_merge {
+                                    None | Some(LinkMergeMethod::MergeNested) => {
+                                        data.push(val.clone());
+                                    }
+                                    Some(LinkMergeMethod::MergeFlattened) => {
+                                        if let DefaultValue::Any(serde_yaml::Value::Sequence(arr)) =
+                                            &val
+                                        {
+                                            let dv_arr = arr
+                                                .iter()
+                                                .filter_map(|i| {
+                                                    serde_yaml::from_value::<DefaultValue>(
+                                                        i.clone(),
+                                                    )
+                                                    .ok()
+                                                })
+                                                .collect::<Vec<_>>();
+                                            data.extend(dv_arr);
+                                        } else {
+                                            anyhow::bail!("Input needs to be of type array: {s}")
+                                        }
+                                    }
+                                }
+                            } else {
+                                anyhow::bail!("Could not find input {s}")
+                            }
+                        }
+                        let yaml_value = serde_yaml::to_value(data)?;
+                        step_inputs.insert(item.id.clone().unwrap(), yaml_value);
+                    } else {
+                        for source in &sources.as_many() {
+                            if let Some(value) = completed_outputs.get(source) {
+                                let yaml_value = serde_yaml::to_value(value)?;
+                                step_inputs.insert(item.id.clone().unwrap(), yaml_value);
+                            }
                         }
                     }
                 }

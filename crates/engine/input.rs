@@ -58,7 +58,12 @@ pub fn collect_inputs(
         }
         let load_listing = input.load_listing.or_else(|| llr.map(|r| r.load_listing));
         let load_contents = input.load_contents.unwrap_or_default();
-        let stage_dir = stage_dir.join(input.id.as_ref().unwrap());
+        let subdir = format!(
+            "{}-stg{}",
+            input.id.as_ref().unwrap(),
+            &uuid::Uuid::new_v4().to_string()[..8]
+        );
+        let stage_dir = stage_dir.join(subdir);
         load_input(
             &mut value,
             work_dir,
@@ -89,7 +94,9 @@ fn load_input(
         DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
             for item in vec {
                 let mut dv = serde_yaml::from_value(item.clone())?;
-                load_input(&mut dv, work_dir, stage_dir, load_listing, load_contents)?;
+                let stage_dir =
+                    stage_dir.join(format!("stg-{}", &uuid::Uuid::new_v4().to_string()[..8]));
+                load_input(&mut dv, work_dir, &stage_dir, load_listing, load_contents)?;
                 *item = serde_yaml::to_value(&dv)?;
             }
         }
