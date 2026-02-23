@@ -1,14 +1,12 @@
-use std::collections::HashMap;
-
-use cwl_core::{
-    documents::WorkflowStep, inputs::DefaultValue, outputs::LinkMergeMethod,
-    requirements::MultipleInputFeatureRequirement,
-};
-
 use crate::{
     expression::{EvaluationContext, do_eval},
     request::InputObject,
 };
+use cwl_core::{
+    documents::WorkflowStep, inputs::DefaultValue, outputs::LinkMergeMethod,
+    requirements::MultipleInputFeatureRequirement,
+};
+use std::collections::HashMap;
 
 pub fn build_step_input_object(
     step: &WorkflowStep,
@@ -48,7 +46,7 @@ fn collect_workflow_step_inputs(
 
     for workflow_step_input in &step.r#in {
         let step_input_id = workflow_step_input.id.as_ref().unwrap();
-        if let Some(sources) = &workflow_step_input.source {
+        let mut value = if let Some(sources) = &workflow_step_input.source {
             //handle multiple input feature requirement
             if mir.is_some() {
                 let mut data = vec![];
@@ -80,75 +78,62 @@ fn collect_workflow_step_inputs(
                     }
                 }
 
-                //handle value from
-                if let Some(value_from) = &workflow_step_input.value_from {
-                    for item in &mut data {
-                        let current_value = serde_json::to_value(&item)?;
-                        let eval_context = eval_context.clone().with_context(&current_value);
-                        let value = do_eval(value_from, &eval_context)?;
-                        *item = serde_yaml::from_value(value)?;
-                    }
-                }
-
-                let yaml_value = serde_yaml::to_value(data)?;
-                inputs.insert(step_input_id.clone(), yaml_value);
+                serde_yaml::to_value(data)?
             } else {
                 //no multiple feature input requirement branch
-                for source in &sources.as_many() {
-                    if let Some(value) = completed_outputs.get(source) {
-                        let yaml_value = serde_yaml::to_value(value)?;
-                        let yaml_value = match workflow_step_input.link_merge {
-                            None | Some(LinkMergeMethod::MergeFlattened) => yaml_value,
-                            Some(LinkMergeMethod::MergeNested) => {
-                                serde_yaml::Value::Sequence(vec![yaml_value])
-                            }
-                        };
+                let source = sources.as_one();
+                if let Some(value) = completed_outputs.get(source) {
+                    let yaml_value = serde_yaml::to_value(value)?;
 
-                        //handle value from
-                        if let Some(value_from) = &workflow_step_input.value_from {
-                            let value = if let Some(scatter) = &step.scatter
-                                && scatter.as_many().contains(step_input_id)
-                            {
-                                //item is array, get it!
-                                let serde_yaml::Value::Sequence(vals) = &yaml_value else {
-                                    anyhow::bail!("Expected array for scattered input")
-                                };
-                                //apply value from
-                                let transformed = vals
-                                    .iter()
-                                    .map(|v| {
-                                        let current_value = serde_json::to_value(v)?;
-                                        let eval_context =
-                                            eval_context.clone().with_context(&current_value);
-                                        do_eval(value_from, &eval_context)
-                                    })
-                                    .collect::<anyhow::Result<Vec<_>>>()?;
-                                serde_yaml::to_value(transformed)?
-                                //insert array converted back to value
-                            } else {
-                                let current_value = serde_json::to_value(&yaml_value)?;
-                                let eval_context =
-                                    eval_context.clone().with_context(&current_value);
-                                do_eval(value_from, &eval_context)?
-                            };
-                            inputs.insert(step_input_id.clone(), value);
-                        } else {
-                            inputs.insert(step_input_id.clone(), yaml_value);
+                    match workflow_step_input.link_merge {
+                        None | Some(LinkMergeMethod::MergeFlattened) => yaml_value,
+                        Some(LinkMergeMethod::MergeNested) => {
+                            serde_yaml::Value::Sequence(vec![yaml_value])
                         }
                     }
+                } else {
+                    serde_yaml::Value::Null
                 }
             }
-        }
+        } else {
+            serde_yaml::Value::Null
+        };
 
         //handle input defaults
         if let Some(default) = &workflow_step_input.default
-            && (!inputs.contains_key(step_input_id)
-                || matches!(inputs.get(step_input_id), Some(serde_yaml::Value::Null)))
+            && value == serde_yaml::Value::Null
         {
             //use step default
-            let yaml_value = serde_yaml::to_value(default)?;
-            inputs.insert(step_input_id.clone(), yaml_value);
+            value = serde_yaml::to_value(default)?;
         }
+
+        //handle value_from
+        if let Some(value_from) = &workflow_step_input.value_from {
+            if let Some(scatter) = &step.scatter
+                && scatter.as_many().contains(step_input_id)
+            {
+                //item is array, get it!
+                let serde_yaml::Value::Sequence(vals) = &value else {
+                    anyhow::bail!("Expected array for scattered input")
+                };
+                //apply value from
+                let transformed = vals
+                    .iter()
+                    .map(|v| {
+                        let current_value = serde_json::to_value(v)?;
+                        let eval_context = eval_context.clone().with_context(&current_value);
+                        do_eval(value_from, &eval_context)
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                value = serde_yaml::to_value(transformed)?
+            } else {
+                let current_value = serde_json::to_value(value)?;
+                let eval_context = eval_context.clone().with_context(&current_value);
+                value = do_eval(value_from, &eval_context)?;
+            }
+        }
+
+        inputs.insert(step_input_id.to_string(), value);
     }
 
     Ok(inputs)
