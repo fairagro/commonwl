@@ -8,7 +8,10 @@ use crate::{
     expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
     io::file::collect_secondary_files_for_inputs,
-    output::{OutputCollectionContext, collect_command_outputs, collect_expression_outputs},
+    output::{
+        OutputCollectionContext, collect_command_outputs, collect_expression_outputs,
+        collect_workflow_outputs,
+    },
     request::{
         ExecutionRequest, InputObject, create_execution_request_from_document,
         create_execution_request_with_inputs,
@@ -20,7 +23,7 @@ use crate::{
 };
 use anyhow::Context;
 use cwl_core::{
-    OneOrMany, docstring,
+    docstring,
     documents::{CWLDocument, ScatterMethod, StringOrDocument, WorkflowStep},
     files::FileOrDirectory,
     inputs::DefaultValue,
@@ -145,6 +148,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         Some(&fv),
     )?;
 
+    let collection_dir = tempdir()?;
+
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
         ijsr,
@@ -178,8 +183,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let backend_clone = backend.clone();
             let token_clone = token.clone();
             let inputs = build_step_input_object(step, &completed_outputs, mir, eval_context)?;
-            let outdir_clone = Some(&*request.out_dir);
             let working_dir_clone = request.working_dir.clone();
+            let step_outdir = collection_dir.path().join(&step_id_clone);
             info!("Starting execution of step {}", step_id_clone);
 
             //decide if we need to scatter this step
@@ -216,7 +221,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                         step,
                         backend_clone.clone(),
                         &working_dir_clone,
-                        outdir_clone,
+                        Some(&step_outdir),
                         sub_inputs,
                         token_clone.clone(),
                         request,
@@ -228,7 +233,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                     step,
                     backend_clone,
                     &working_dir_clone,
-                    outdir_clone,
+                    Some(&step_outdir),
                     inputs,
                     token_clone,
                     request,
@@ -282,20 +287,16 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             }
         }
     }
+    let cc = OutputCollectionContext {
+        source_dir: collection_dir.path(),
+        tmp_dir: Path::new(""), //not used
+        dest_dir: &request.out_dir,
+        workdir: Path::new(""), //not used
+        eval_context,
+        validator: &fv,
+    };
+    let outputs = collect_workflow_outputs(&wf.outputs, completed_outputs, &cc)?;
 
-    let mut outputs = HashMap::new();
-    for output in &wf.outputs {
-        if let Some(output_source) = &output.output_source {
-            match output_source {
-                OneOrMany::One(item) => {
-                    if let Some(value) = completed_outputs.get(item) {
-                        outputs.insert(output.id.clone().unwrap(), value.clone());
-                    }
-                }
-                OneOrMany::Many(_items) => {}
-            }
-        }
-    }
     Ok(ExecutionResult {
         exit_status: NonEmpty::new(ExitStatus::default()),
         stdout: String::new(),

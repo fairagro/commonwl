@@ -13,6 +13,7 @@ use cwl_core::{
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
         CommandOutputSchema, CommandOutputType, ExpressionToolOutputParameter, OutputType,
+        WorkflowOutputParameter,
     },
     types::{CWLType, SecondaryFileSchema},
 };
@@ -250,7 +251,7 @@ fn validate_file(
         }
     } else if let Some(dest_path) = &path
         && let Some(contents) = &file.contents
-    {   
+    {
         //create the literal file
         let parent = dest_path.parent().unwrap();
         if !parent.exists() {
@@ -650,6 +651,31 @@ pub fn collect_expression_outputs(
             let format = output.format.as_ref().map(|f| f.as_one().to_string());
             validate_output_item_recurse(&mut value, format.as_ref(), context)?;
             output_map.insert(output_id, value);
+        }
+    }
+    Ok(output_map)
+}
+
+pub fn collect_workflow_outputs(
+    outputs: &[WorkflowOutputParameter],
+    values: HashMap<String, DefaultValue>,
+    context: &OutputCollectionContext,
+) -> anyhow::Result<HashMap<String, DefaultValue>> {
+    let mut output_map = HashMap::new();
+    for output in outputs {
+        if let Some(output_source) = &output.output_source {
+            match output_source {
+                OneOrMany::One(item) => {
+                    if let Some(value) = values.get(item) {
+                        let format = output.format.as_ref().map(|f| f.as_one().to_string());
+
+                        let mut value = value.clone();
+                        validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+                        output_map.insert(output.id.clone().unwrap(), value.clone());
+                    }
+                }
+                OneOrMany::Many(_items) => {}
+            }
         }
     }
     Ok(output_map)

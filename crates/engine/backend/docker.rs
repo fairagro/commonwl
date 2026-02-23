@@ -32,6 +32,7 @@ use std::{
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 use url::Url;
+use uuid::Uuid;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
 const CONTAINER_TMPDIR: &str = "/mnt/task/tmp";
@@ -170,7 +171,9 @@ impl TaskBackend for DockerBackend {
             let stderr = do_eval_to_string(stderr, request.eval_context);
             request.outdir.join(stderr)
         } else {
-            request.tmpdir.join("stderr")
+            request
+                .tmpdir
+                .join(format!("stderr_{}", &Uuid::new_v4().to_string()[..8]))
         };
         task.add_output(
             Output::builder()
@@ -186,7 +189,9 @@ impl TaskBackend for DockerBackend {
             let stdout = do_eval_to_string(stdout, request.eval_context);
             request.outdir.join(stdout)
         } else {
-            request.tmpdir.join("stdout")
+            request
+                .tmpdir
+                .join(format!("stdout_{}", &Uuid::new_v4().to_string()[..8]))
         };
         task.add_output(
             Output::builder()
