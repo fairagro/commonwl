@@ -174,6 +174,23 @@ impl Directory {
         }
     }
 
+    pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
+        let path_as_str = path.to_string_lossy();
+        let FilePathMetaData {
+            basename,
+            nameroot: _,
+            nameext: _,
+            dirname: _,
+        } = get_path_metadata(path);
+
+        let dir = Directory::builder()
+            .location(format!("file://{}", &path_as_str))
+            .path(path_as_str)
+            .maybe_basename(basename)
+            .build();
+        Ok(dir)
+    }
+
     pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> anyhow::Result<()> {
         self.dry_validation();
         let Some(path) = &self.path else {

@@ -185,12 +185,20 @@ fn handle_secondary_files(
         let Some(secondary_file) = handle_secondary_file_schema(path, item, context)? else {
             continue;
         };
-        match secondary_file {
-            PathOrFile::Path(secondary_path) => {
-                let file = File::new_from_path(&secondary_path)?;
-                secondaries.push(FileOrDirectory::File(file));
+        for item in secondary_file {
+            match item {
+                PathOrFile::Path(secondary_path) => {
+                    if secondary_path.is_file() {
+                        let file = File::new_from_path(&secondary_path)?;
+                        secondaries.push(FileOrDirectory::File(file));
+                    } else if secondary_path.is_dir() {
+                        let mut dir = Directory::new_from_path(&secondary_path)?;
+                        dir.load_listing(LoadListingEnum::DeepListing)?;
+                        secondaries.push(FileOrDirectory::Directory(dir));
+                    }
+                }
+                PathOrFile::File(fod) => secondaries.push(*fod),
             }
-            PathOrFile::File(vec) => secondaries.extend(vec),
         }
     }
     Ok(secondaries)

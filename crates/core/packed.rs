@@ -19,7 +19,13 @@ pub struct PackedCWL {
 
 impl PackedCWL {
     pub fn unpack(self, root_entity: Option<&str>) -> anyhow::Result<CWLDocument> {
-        let needle = root_entity.unwrap_or("main");
+        let needle = root_entity.unwrap_or_else(|| {
+            if self.graph.len() == 1 {
+                self.graph[0].get_id().map_or("main", |v| v)
+            } else {
+                "main"
+            }
+        });
 
         //get main entity
         let main = self

@@ -17,7 +17,14 @@ pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
     } else {
         fs::read_to_string(&path).with_context(|| format!("CWL File {path:?}"))?
     };
-    serde_yaml::from_str::<CWLDocument>(&contents).map_err(|e| e.into())
+
+    if contents.contains("$graph") {
+        let packed = serde_yaml::from_str::<PackedCWL>(&contents)
+            .context("Could not parse to packed CWL")?;
+        packed.unpack(None)
+    } else {
+        serde_yaml::from_str::<CWLDocument>(&contents).map_err(|e| e.into())
+    }
 }
 
 fn load_cwl_from_url(path: &Path, preprocess: bool) -> anyhow::Result<CWLDocument> {

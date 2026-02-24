@@ -224,30 +224,30 @@ pub fn handle_secondary_files(
     for schema in secondary_files.as_many() {
         let result = handle_secondary_file_schema(location_path, &schema, &context)?;
 
-        if let Some(item) = result {
-            match item {
-                PathOrFile::Path(item) => {
-                    if item.is_file() {
-                        let mut sec_file = File {
-                            location: Some(item.to_string_lossy().into_owned()),
-                            ..Default::default()
-                        };
-                        //fill metadata
-                        locate_file(&mut sec_file, work_dir, stage_dir, false)?;
-                        sec_files.push(FileOrDirectory::File(sec_file));
-                    } else if item.is_dir() {
-                        let mut sec_dir = Directory {
-                            location: Some(item.to_string_lossy().into_owned()),
-                            ..Default::default()
-                        };
-                        //fill metadata
-                        locate_dir(&mut sec_dir, work_dir, stage_dir, None)?;
-                        sec_files.push(FileOrDirectory::Directory(sec_dir));
+        if let Some(mut items) = result {
+            for item in &mut items {
+                match item {
+                    PathOrFile::Path(item) => {
+                        if item.is_file() {
+                            let mut sec_file = File {
+                                location: Some(item.to_string_lossy().into_owned()),
+                                ..Default::default()
+                            };
+                            //fill metadata
+                            locate_file(&mut sec_file, work_dir, stage_dir, false)?;
+                            sec_files.push(FileOrDirectory::File(sec_file));
+                        } else if item.is_dir() {
+                            let mut sec_dir = Directory {
+                                location: Some(item.to_string_lossy().into_owned()),
+                                ..Default::default()
+                            };
+                            //fill metadata
+                            locate_dir(&mut sec_dir, work_dir, stage_dir, None)?;
+                            sec_files.push(FileOrDirectory::Directory(sec_dir));
+                        }
                     }
-                }
-                PathOrFile::File(mut vec) => {
-                    for item in &mut vec {
-                        match item {
+                    PathOrFile::File(item) => {
+                        match &mut **item {
                             FileOrDirectory::File(file) => {
                                 locate_file(file, work_dir, stage_dir, false)?
                             }
@@ -255,7 +255,7 @@ pub fn handle_secondary_files(
                                 locate_dir(dir, work_dir, stage_dir, None)?
                             }
                         }
-                        sec_files.push(item.clone());
+                        sec_files.push(*item.clone());
                     }
                 }
             }
@@ -267,39 +267,26 @@ pub fn handle_secondary_files(
     Ok(())
 }
 
+#[derive(Debug)]
 pub(crate) enum PathOrFile {
     Path(PathBuf),
-    File(Vec<FileOrDirectory>),
+    File(Box<FileOrDirectory>),
 }
 
 pub(crate) fn handle_secondary_file_schema(
     path: impl AsRef<Path>,
     item: &SecondaryFileSchema,
     context: &EvaluationContext,
-) -> anyhow::Result<Option<PathOrFile>> {
-    let pattern_value = if let Ok(pattern_value) = do_eval(&item.pattern, context) {
-        pattern_value
-    } else {
-        serde_yaml::Value::String(item.pattern.clone())
-    };
-    let value = serde_yaml::from_value(pattern_value)?;
-    let pattern = match value {
-        DefaultValue::Any(serde_yaml::Value::String(s)) => s,
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
-            let values = vec
-                .iter()
-                .filter_map(|v| serde_yaml::from_value::<DefaultValue>(v.clone()).ok())
-                .filter_map(|v| match v {
-                    DefaultValue::FileOrDirectory(f) => Some(f),
-                    _ => None,
-                })
-                .collect::<Vec<_>>();
-            return Ok(Some(PathOrFile::File(values)));
-        }
-        DefaultValue::FileOrDirectory(fod) => return Ok(Some(PathOrFile::File(vec![fod]))),
-        _ => return Ok(None),
-    };
+) -> anyhow::Result<Option<Vec<PathOrFile>>> {
+    if let Ok(pattern_value) = do_eval(&item.pattern, context)
+        && pattern_value != item.pattern
+    {
+        //we got a filename, list of filenames, fod or list of fod
+        let dv: DefaultValue = serde_yaml::from_value(pattern_value)?;
+        return handle_secondary_file_from_expression(dv, path);
+    }
 
+    let pattern = item.pattern.clone();
     let mut secondary_path_str = path.as_ref().as_os_str().to_owned();
     if let Some(new_ext) = pattern.strip_prefix("^.") {
         let mut pathbuf = PathBuf::from(&secondary_path_str);
@@ -324,7 +311,34 @@ pub(crate) fn handle_secondary_file_schema(
         return Ok(None);
     }
 
-    Ok(Some(PathOrFile::Path(PathBuf::from(secondary_path_str))))
+    Ok(Some(vec![PathOrFile::Path(PathBuf::from(
+        secondary_path_str,
+    ))]))
+}
+
+fn handle_secondary_file_from_expression(
+    dv: DefaultValue,
+    path: impl AsRef<Path>,
+) -> anyhow::Result<Option<Vec<PathOrFile>>> {
+    match dv {
+        DefaultValue::FileOrDirectory(fod) => Ok(Some(vec![PathOrFile::File(Box::new(fod))])),
+        DefaultValue::Any(serde_yaml::Value::String(filename)) => {
+            let parent = path.as_ref().parent().unwrap();
+            Ok(Some(vec![PathOrFile::Path(parent.join(filename))]))
+        }
+        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+            let mut values = vec![];
+            for item in vec {
+                let dv: DefaultValue = serde_yaml::from_value(item)?;
+                let res = handle_secondary_file_from_expression(dv, path.as_ref())?;
+                if let Some(res) = res {
+                    values.extend(res);
+                }
+            }
+            Ok(Some(values))
+        }
+        _ => Ok(None),
+    }
 }
 
 #[cfg(test)]
