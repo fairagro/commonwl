@@ -154,7 +154,10 @@ fn stage_dirent(
     //get entryname
     let entryname = dirent.clone().entryname.unwrap();
     let entryname = do_eval_to_string(&entryname, context);
-
+    if entryname.starts_with("../") {
+        //illegal
+        anyhow::bail!("dirent.entryname must not start with ../")
+    }
     //relocate used inputs
     update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
 

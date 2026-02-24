@@ -107,6 +107,11 @@ fn collect_workflow_step_inputs(
             value = serde_yaml::to_value(default)?;
         }
 
+        //handle load_contets
+        if let Some(load_contents) = &workflow_step_input.load_contents {
+            
+        }
+
         //handle value_from
         if let Some(value_from) = &workflow_step_input.value_from {
             if let Some(scatter) = &step.scatter
