@@ -1,18 +1,47 @@
 use anyhow::Context;
+use url::Url;
 
-use crate::documents::CWLDocument;
-use std::{fs, path::Path};
+use crate::{documents::CWLDocument, packed::PackedCWL};
+use std::{env, fs, path::Path};
 
 pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
     path: P,
     preprocess: bool,
 ) -> anyhow::Result<CWLDocument> {
+    if path.as_ref().to_string_lossy().contains("#") {
+        return load_cwl_from_url(path.as_ref(), preprocess);
+    }
+
     let contents = if preprocess {
         preprocess_cwl_file(&path)?
     } else {
         fs::read_to_string(&path).with_context(|| format!("CWL File {path:?}"))?
     };
     serde_yaml::from_str::<CWLDocument>(&contents).map_err(|e| e.into())
+}
+
+fn load_cwl_from_url(path: &Path, preprocess: bool) -> anyhow::Result<CWLDocument> {
+    let working_dir = env::current_dir()?;
+    let absolute_path = if path.is_absolute() {
+        path
+    } else {
+        &working_dir.join(path)
+    };
+    let path_url = format!("file://{}", absolute_path.to_string_lossy());
+
+    let url = Url::parse(&path_url).map_err(|_| anyhow::anyhow!("Could not parse url"))?;
+
+    if let Some(fragment) = url.fragment() {
+        let path = Path::new(url.path());
+        let contents = if preprocess {
+            preprocess_cwl_file(path)?
+        } else {
+            fs::read_to_string(path).with_context(|| format!("CWL File {path:?}"))?
+        };
+        let pack = serde_yaml::from_str::<PackedCWL>(&contents).map_err(|e| anyhow::anyhow!(e))?;
+        return pack.unpack(Some(fragment));
+    }
+    anyhow::bail!("Packed CWL could not be loaded. Can not guess fragment")
 }
 
 pub fn preprocess_cwl_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<String> {

@@ -10,6 +10,7 @@ use crate::{
     files::{FileOrDirectory, LoadListingEnum},
 };
 use bon::Builder;
+use salad::Identifiable;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
@@ -139,7 +140,7 @@ impl DefaultValue {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -181,7 +182,7 @@ pub struct CommandInputParameter {
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -230,7 +231,7 @@ impl Default for OneOrMany<InputType> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -679,7 +680,7 @@ pub struct CommandLineBinding {
     pub shell_quote: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStepInput {
     #[serde(skip_serializing_if = "Option::is_none")]

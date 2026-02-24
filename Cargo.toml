@@ -4,6 +4,8 @@ members = [
     "crates/conformance",
     "crates/core",
     "crates/engine",
+    "crates/salad",
+    "crates/salad_derive",
 ]
 
 resolver = "3"
@@ -15,7 +17,7 @@ repository = "https://github.com/fairagro/commonwl"
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-anyhow = "1.0.100"
+anyhow = "1.0.102"
 cwl_core = { path = "crates/core" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.143"
@@ -25,3 +27,4 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 tokio = { version = "1.49.0", features = ["full"] }
 tokio-util = "0.7.18"
+url = "2.5.8"

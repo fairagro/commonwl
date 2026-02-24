@@ -11,6 +11,7 @@ pub mod documents;
 pub mod files;
 pub mod inputs;
 pub mod outputs;
+pub mod packed;
 pub mod requirements;
 pub mod types;
 

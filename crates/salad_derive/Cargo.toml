@@ -1,0 +1,15 @@
+[package]
+name = "salad_derive"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+syn = "2.0.117"
+quote = "1.0.44"
+proc-macro2 = "1.0.106"
+
+[lib]
+path = "lib.rs"
+proc-macro = true

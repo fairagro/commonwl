@@ -11,6 +11,8 @@ bon = "3.8.1"
 sha1.workspace = true
 serde.workspace = true
 serde_yaml.workspace = true
+salad = { path = "../salad", features = ["derive"] }
+url.workspace = true
 
 [lib]
 path = "lib.rs"

@@ -5,6 +5,7 @@ use crate::deserialize::{
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{OneOrMany, files::LoadListingEnum};
 use bon::Builder;
+use salad::Identifiable;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone)]
@@ -58,7 +59,7 @@ impl From<CommandOutputType> for CommandOutputParameterType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -91,7 +92,7 @@ pub struct CommandOutputParameter {
 
 make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -130,7 +131,7 @@ pub struct WorkflowOutputParameter {
 
 make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -160,7 +161,7 @@ pub struct OperationOutputParameter {
 
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionToolOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -480,7 +481,7 @@ impl StringOrWorkflowStepOutput {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStepOutput {
     #[serde(skip_serializing_if = "Option::is_none")]

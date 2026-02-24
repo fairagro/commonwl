@@ -1,0 +1,16 @@
+[package]
+name = "salad"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+salad_derive = { path = "../salad_derive", optional = true }
+
+[lib]
+path = "lib.rs"
+
+[features]
+default = []
+derive = ["salad_derive"]
