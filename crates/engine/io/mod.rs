@@ -1,4 +1,8 @@
-use std::path::{Path, PathBuf};
+use cwl_core::{files::FileOrDirectory, inputs::DefaultValue};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use url::Url;
 
 pub mod directory;
@@ -36,6 +40,43 @@ pub fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<Path
     };
 
     Ok(path.to_path_buf())
+}
+
+pub fn load_file_contents(dv: &mut DefaultValue) -> anyhow::Result<()> {
+    match dv {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+            let location = file.location.as_ref().unwrap();
+
+            if let Some(size) = &file.size
+                && size.as_i64() < 64 * 1024
+            {
+                file.contents = Some(fs::read_to_string(
+                    location.strip_prefix("file://").unwrap(),
+                )?);
+            } else {
+                anyhow::bail!(
+                    "Can not load file contents if file is larger than {} bytes.",
+                    64 * 1024
+                )
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+            for item in vec {
+                let mut dv: DefaultValue = serde_yaml::from_value(item.clone())?;
+                load_file_contents(&mut dv)?;
+                *item = serde_yaml::to_value(dv)?;
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            for item in map.values_mut() {
+                let mut dv: DefaultValue = serde_yaml::from_value(item.clone())?;
+                load_file_contents(&mut dv)?;
+                *item = serde_yaml::to_value(dv)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
 }
 
 #[cfg(test)]

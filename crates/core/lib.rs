@@ -110,6 +110,15 @@ impl From<u64> for Integer {
     }
 }
 
+impl Integer {
+    pub fn as_i64(&self) -> i64 {
+        match self {
+            Self::Int(i) => *i as i64,
+            Self::Long(l) => *l,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {

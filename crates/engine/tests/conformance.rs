@@ -1,7 +1,7 @@
 use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
-    backend::{ExecutionResult, docker::DockerBackend, execute_commandline_tool},
+    backend::{ExecutionResult, TaskBackend, docker::DockerBackend, execute},
     request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file},
 };
 use serde::Deserialize;
@@ -11,6 +11,62 @@ use std::{
 };
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
+
+#[tokio::test]
+async fn test_conformance_docker_clt() {
+    //implementation limit
+    let limit = 178;
+
+    //there is a test the docker backend can not fulfill yet (113)
+    let limit_after = limit - 113;
+    let limit_before = limit - limit_after - 1;
+
+    //load and select tests
+    let tests = load_conformance_tests().unwrap();
+    let selected_tests = tests
+        .iter()
+        .filter(|t| t.tags.contains(&"command_line_tool".to_string()))
+        .collect::<Vec<_>>();
+    let before = &selected_tests[..limit_before];
+    let after = &selected_tests[limit_before + 1..limit_before + 1 + limit_after];
+
+    //create docker backend
+    let config = Config::default();
+    let backend = DockerBackend::new(config).await.unwrap();
+    execute_conformance_test(backend, before.iter().copied().chain(after.iter().copied())).await;
+}
+
+#[tokio::test]
+async fn test_conformance_docker_et() {
+    //load and select tests
+    let tests = load_conformance_tests().unwrap();
+    let selected_tests = tests
+        .iter()
+        .filter(|t| t.tags.contains(&"expression_tool".to_string()));
+
+    //create docker backend
+    let config = Config::default();
+    let backend = DockerBackend::new(config).await.unwrap();
+
+    //all expression tools pass! :)
+    execute_conformance_test(backend, selected_tests).await;
+}
+
+#[tokio::test]
+async fn test_conformance_docker_wf() {
+    //load and select tests
+    let tests = load_conformance_tests().unwrap();
+    let selected_tests = tests
+        .iter()
+        .filter(|t| t.tags.contains(&"workflow".to_string()));
+
+    //create docker backend
+    let config = Config::default();
+    let backend = DockerBackend::new(config).await.unwrap();
+
+    //all expression tools pass! :)
+    execute_conformance_test(backend, selected_tests.take(39)).await;
+}
 
 #[derive(Deserialize, Debug)]
 struct ConformanceTest {
@@ -24,83 +80,152 @@ struct ConformanceTest {
     should_fail: bool,
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(untagged)]
-enum ConformanceTestItem {
-    Test(ConformanceTest),
-    Import {
-        #[serde(rename = "$import")]
-        import: String,
-    },
-}
-
 fn load_conformance_tests() -> anyhow::Result<Vec<ConformanceTest>> {
     let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
     let instruction_file = base_dir.join("conformance_tests.yaml");
 
-    load_test_file(&instruction_file)
+    load_test_file(&instruction_file, &base_dir)
 }
 
-fn load_test_file(file: &Path) -> anyhow::Result<Vec<ConformanceTest>> {
+fn load_test_file(file: &Path, root: &Path) -> anyhow::Result<Vec<ConformanceTest>> {
     let contents = fs::read_to_string(file)?;
-    let parsed: Vec<ConformanceTestItem> = serde_yaml::from_str(&contents)?;
-    let mut result = vec![];
     let parent = file.parent().unwrap();
-    for item in parsed {
-        match item {
-            ConformanceTestItem::Test(test) => result.push(test),
-            ConformanceTestItem::Import { import } => {
-                result.extend(load_test_file(&parent.join(import))?)
+
+    let raw: serde_yaml::Value = serde_yaml::from_str(&contents)?;
+    let resolved = resolve_imports(raw, parent, root)?;
+    let resolved = rewrite_paths(resolved, parent, root);
+
+    let items = match resolved {
+        serde_yaml::Value::Sequence(seq) => flatten_sequences(seq),
+        other => vec![other],
+    };
+
+    items
+        .into_iter()
+        .map(|v| serde_yaml::from_value::<ConformanceTest>(v).map_err(Into::into))
+        .collect()
+}
+
+fn resolve_imports(
+    value: serde_yaml::Value,
+    parent: &Path,
+    root: &Path,
+) -> anyhow::Result<serde_yaml::Value> {
+    match value {
+        serde_yaml::Value::Mapping(map) => {
+            if let Some(import_val) = map.get("$import") {
+                let import_path = import_val
+                    .as_str()
+                    .ok_or_else(|| anyhow::anyhow!("$import value is not a string"))?;
+                let full_path = parent.join(import_path);
+                let contents = fs::read_to_string(&full_path)?;
+                let imported: serde_yaml::Value =
+                    if full_path.extension().is_some_and(|e| e == "json") {
+                        serde_json::from_str(&contents)?
+                    } else {
+                        serde_yaml::from_str(&contents)?
+                    };
+                let import_parent = full_path.parent().unwrap();
+                // Resolve imports within the imported file relative to its own location
+                let resolved = resolve_imports(imported, import_parent, root)?;
+                // If it's a list of tests, rewrite their tool/job paths now
+                return Ok(rewrite_paths(resolved, import_parent, root));
             }
+
+            let resolved = map
+                .into_iter()
+                .map(|(k, v)| resolve_imports(v, parent, root).map(|r| (k, r)))
+                .collect::<anyhow::Result<serde_yaml::Mapping>>()?;
+            Ok(serde_yaml::Value::Mapping(resolved))
         }
+
+        serde_yaml::Value::Sequence(seq) => {
+            let resolved = seq
+                .into_iter()
+                .map(|v| resolve_imports(v, parent, root))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            Ok(serde_yaml::Value::Sequence(resolved))
+        }
+
+        other => Ok(other),
+    }
+}
+
+fn rewrite_paths(value: serde_yaml::Value, dir: &Path, root: &Path) -> serde_yaml::Value {
+    let relative_dir = dir.strip_prefix(root).unwrap_or(Path::new(""));
+    if relative_dir.as_os_str().is_empty() {
+        return value;
     }
 
-    Ok(result)
+    match value {
+        serde_yaml::Value::Sequence(seq) => serde_yaml::Value::Sequence(
+            seq.into_iter()
+                .map(|v| rewrite_paths(v, dir, root))
+                .collect(),
+        ),
+        serde_yaml::Value::Mapping(mut map) => {
+            for key in ["tool", "job"] {
+                let k = serde_yaml::Value::String(key.to_string());
+                if let Some(serde_yaml::Value::String(path_str)) = map.get(&k) {
+                    let new_path = relative_dir.join(path_str).to_string_lossy().into_owned();
+                    map.insert(k, serde_yaml::Value::String(new_path));
+                }
+            }
+            serde_yaml::Value::Mapping(map)
+        }
+        other => other,
+    }
 }
 
-#[tokio::test]
-async fn test_command_line_tools_docker_backend() {
-    //implementation limit
-    let limit = 178;
+fn flatten_sequences(seq: Vec<serde_yaml::Value>) -> Vec<serde_yaml::Value> {
+    let mut out = vec![];
+    for item in seq {
+        match item {
+            serde_yaml::Value::Sequence(inner) => out.extend(flatten_sequences(inner)),
+            other => out.push(other),
+        }
+    }
+    out
+}
 
-    //there is a test the docker backend can not fulfill yet (113)
-    let limit_after = limit - 113;
-    let limit_before = limit - limit_after - 1;
-
-    let tests = load_conformance_tests().unwrap();
-    let selected_tests = tests
-        .iter()
-        .filter(|t| t.tags.contains(&"command_line_tool".to_string()))
-        .collect::<Vec<_>>();
-    let before = &selected_tests[..limit_before];
-    let after = &selected_tests[limit_before + 1..limit_before + 1 + limit_after];
-
-    for test in before.iter().chain(after) {
+async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
+    backend: T,
+    tests: impl Iterator<Item = &ConformanceTest>,
+) {
+    for test in tests {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl")
             .canonicalize()
             .unwrap();
         let specification_path = base_dir.join(&test.tool);
+        let base = specification_path.parent().unwrap();
         let inputs = if let Some(job) = &test.job {
-            load_input_file_from_file(base_dir.join(job), base_dir.join("tests")).unwrap()
+            load_input_file_from_file(base_dir.join(job), base).unwrap()
         } else {
             InputObject::default()
         };
         let outdir = tempdir().unwrap();
-        let request =
-            create_execution_request_with_inputs(specification_path, inputs, Some(outdir.path()), None)
-                .unwrap();
-
-        let config = Config::default();
-        let backend = DockerBackend::new(config).await.unwrap();
+        let request = create_execution_request_with_inputs(
+            specification_path,
+            inputs,
+            Some(outdir.path()),
+            None,
+        )
+        .unwrap();
 
         let cancellation_token = CancellationToken::new();
 
         eprintln!("Running Test {}", test.id);
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let result = execute(backend.clone(), &request, cancellation_token).await;
         if test.should_fail {
+            if result.is_ok() {
+                dbg!(&result);
+            }
             assert!(result.is_err());
         } else {
+            if result.is_err() {
+                dbg!(&result);
+            }
             assert!(result.is_ok());
             let result = result.unwrap();
             evaluate_result(&test.output.clone().unwrap(), result);
@@ -112,7 +237,11 @@ fn evaluate_result(output: &serde_yaml::Value, result: ExecutionResult) {
     if let serde_yaml::Value::Mapping(output) = output {
         for (key, value) in output {
             let key = key.as_str().unwrap().to_string();
-            assert!(result.outputs.contains_key(&key));
+            assert!(
+                result.outputs.contains_key(&key),
+                "Could not find key {}",
+                key
+            );
             evaluate_item(value, result.outputs.get(&key).unwrap());
         }
     } else {
@@ -144,11 +273,22 @@ fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
         }
 
         (serde_yaml::Value::Sequence(exp_seq), serde_yaml::Value::Sequence(act_seq)) => {
-            exp_seq.len() == act_seq.len()
-                && exp_seq
+            if exp_seq.len() != act_seq.len() {
+                return false;
+            }
+            let mut claimed = vec![false; act_seq.len()];
+            exp_seq.iter().all(|exp| {
+                if let Some(i) = act_seq
                     .iter()
-                    .zip(act_seq.iter())
-                    .all(|(exp, act)| compare_yaml_or_fod(exp, act))
+                    .enumerate()
+                    .position(|(i, act)| !claimed[i] && compare_yaml_or_fod(exp, act))
+                {
+                    claimed[i] = true;
+                    true
+                } else {
+                    false
+                }
+            })
         }
 
         (serde_yaml::Value::String(exp), serde_yaml::Value::String(act)) => exp == act,

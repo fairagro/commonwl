@@ -1,5 +1,6 @@
 use crate::{
     expression::{EvaluationContext, do_eval},
+    io::load_file_contents,
     request::InputObject,
 };
 use cwl_core::{
@@ -108,8 +109,12 @@ fn collect_workflow_step_inputs(
         }
 
         //handle load_contets
-        if let Some(load_contents) = &workflow_step_input.load_contents {
-            
+        if let Some(load_contents) = &workflow_step_input.load_contents
+            && *load_contents
+        {
+            let mut dv: DefaultValue = serde_yaml::from_value(value)?;
+            load_file_contents(&mut dv)?;
+            value = serde_yaml::to_value(dv)?;
         }
 
         //handle value_from
