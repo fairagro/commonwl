@@ -79,6 +79,34 @@ pub fn load_file_contents(dv: &mut DefaultValue) -> anyhow::Result<()> {
     Ok(())
 }
 
+pub fn unique_path(dest: &Path) -> PathBuf {
+    if !dest.exists() {
+        return dest.to_path_buf();
+    }
+
+    let stem = dest.file_stem().unwrap_or_default();
+    let ext = dest.extension();
+    let parent = dest.parent().unwrap();
+
+    let mut counter = 2;
+    loop {
+        let new_name = match ext {
+            Some(ext) => format!(
+                "{}_{}.{}",
+                stem.to_string_lossy(),
+                counter,
+                ext.to_string_lossy()
+            ),
+            None => format!("{}_{}", stem.to_string_lossy(), counter),
+        };
+        let candidate = parent.join(&new_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

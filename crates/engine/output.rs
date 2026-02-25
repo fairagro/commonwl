@@ -1,8 +1,10 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
-    io::file::{PathOrFile, handle_secondary_file_schema},
-    schema::format_validation::FormatValidator,
-    schema::validation::validate_input_type,
+    io::{
+        file::{PathOrFile, handle_secondary_file_schema},
+        unique_path,
+    },
+    schema::{format_validation::FormatValidator, validation::validate_input_type},
 };
 use anyhow::Context;
 use cwl_core::{
@@ -226,7 +228,8 @@ fn validate_file(
     context: &OutputCollectionContext,
     base_path: &Path,
 ) -> anyhow::Result<()> {
-    let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref());
+    let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref())
+        .map(|p| unique_path(&p));
     let dirname = path.as_ref().and_then(|p| p.parent());
 
     if let Some(source_path) = &file.path
@@ -307,7 +310,8 @@ fn validate_dir(
     context: &OutputCollectionContext,
     base_path: &Path,
 ) -> anyhow::Result<()> {
-    let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref());
+    let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
+        .map(|p| unique_path(&p));
 
     let mut base_path = base_path.to_path_buf();
 
