@@ -380,21 +380,16 @@ pub(crate) fn generate_arg(
 
     if let Some(value_from) = &binding.value_from {
         let json_value = serde_json::to_value(value)?;
-        let result = if let Ok(result) = expression::do_eval(
+        let result = expression::do_eval(
             value_from,
             &EvaluationContext {
                 context: Some(&json_value),
                 runtime: Some(runtime),
                 inputs,
                 ijsr,
-                ..Default::default() //EvaluationContext { context: (), inputs, runtime: (), ijsr, workdir: () }workdir: path_mapper.map(|m| m.base_dir()),
+                ..Default::default()
             },
-        ) {
-            result
-        } else {
-            //default to value_from unevaluated
-            serde_yaml::Value::String(value_from.to_string())
-        };
+        )?;
         value = serde_yaml::from_value(result)?;
     }
 
@@ -491,6 +486,8 @@ fn use_value_from(
             return Ok(vec![]);
         }
         value = dv
+    } else {
+        anyhow::bail!("Expression evaluation failed!")
     }
 
     let values = match value {

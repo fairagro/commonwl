@@ -1,4 +1,4 @@
-use cwl_core::documents::ScatterMethod;
+use cwl_core::{documents::ScatterMethod, inputs::DefaultValue};
 use std::collections::HashMap;
 
 use crate::request::InputObject;
@@ -81,7 +81,7 @@ pub fn gather_inputs(
                 .inputs
                 .get(k)
                 .and_then(|v| match v {
-                    serde_yaml::Value::Sequence(arr) => Some(arr.clone()),
+                    DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => Some(arr.clone()),
                     _ => None,
                 })
                 .ok_or_else(|| anyhow::anyhow!("Input {k} must be of type array to scatter!"))

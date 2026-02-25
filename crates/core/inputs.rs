@@ -2,6 +2,7 @@ use crate::deserialize::{
     FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
     deserialize_with_type_dsl, make_shorthand_impl,
 };
+use crate::files::File;
 use crate::outputs::{LinkMergeMethod, PickValueMethod};
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{IntegerOrExpression, files};
@@ -135,6 +136,13 @@ impl DefaultValue {
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::Any(serde_yaml::Value::String(s)) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn as_file(&self) -> Option<&File> {
+        match self {
+            Self::FileOrDirectory(FileOrDirectory::File(f)) => Some(f),
             _ => None,
         }
     }

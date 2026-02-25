@@ -20,7 +20,7 @@ pub fn collect_raw_inputs(
     ))
 }
 
-fn input_object(step: &WorkflowStep, inputs: HashMap<String, serde_yaml::Value>) -> InputObject {
+fn input_object(step: &WorkflowStep, inputs: HashMap<String, DefaultValue>) -> InputObject {
     InputObject {
         inputs,
         requirements: step
@@ -44,16 +44,17 @@ fn collect_workflow_step_inputs(
     completed_outputs: &HashMap<String, DefaultValue>,
     step: &WorkflowStep,
     mir: Option<&MultipleInputFeatureRequirement>,
-) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
-    let mut inputs = HashMap::new();
+) -> anyhow::Result<HashMap<String, DefaultValue>> {
+    let mut inputs: HashMap<String, DefaultValue> = HashMap::with_capacity(step.r#in.len());
 
     for workflow_step_input in &step.r#in {
         let step_input_id = workflow_step_input.id.as_ref().unwrap();
-        let mut value = if let Some(sources) = &workflow_step_input.source {
+        let mut value: DefaultValue = if let Some(sources) = &workflow_step_input.source {
             //handle multiple input feature requirement
             if mir.is_some() {
-                let mut data = vec![];
-                for s in sources.as_many() {
+                let sources = sources.as_many();
+                let mut data = Vec::with_capacity(sources.len());
+                for s in sources {
                     let val = completed_outputs.get(&s);
 
                     //handle link merge
@@ -81,42 +82,39 @@ fn collect_workflow_step_inputs(
                     }
                 }
 
-                serde_yaml::to_value(data)?
+                DefaultValue::Any(serde_yaml::to_value(data)?) //sequence
             } else {
                 //no multiple feature input requirement branch
                 let source = sources.as_one();
                 if let Some(value) = completed_outputs.get(source) {
-                    let yaml_value = serde_yaml::to_value(value)?;
-
                     match workflow_step_input.link_merge {
-                        None | Some(LinkMergeMethod::MergeFlattened) => yaml_value,
+                        None | Some(LinkMergeMethod::MergeFlattened) => value.clone(),
                         Some(LinkMergeMethod::MergeNested) => {
-                            serde_yaml::Value::Sequence(vec![yaml_value])
+                            let yaml_value = serde_yaml::to_value(value)?;
+                            DefaultValue::Any(serde_yaml::Value::Sequence(vec![yaml_value]))
                         }
                     }
                 } else {
-                    serde_yaml::Value::Null
+                    DefaultValue::Any(serde_yaml::Value::Null)
                 }
             }
         } else {
-            serde_yaml::Value::Null
+            DefaultValue::Any(serde_yaml::Value::Null)
         };
 
         //handle input defaults
         if let Some(default) = &workflow_step_input.default
-            && value == serde_yaml::Value::Null
+            && value == DefaultValue::Any(serde_yaml::Value::Null)
         {
             //use step default
-            value = serde_yaml::to_value(default)?;
+            value = default.clone();
         }
 
         //handle load_contets
         if let Some(load_contents) = &workflow_step_input.load_contents
             && *load_contents
         {
-            let mut dv: DefaultValue = serde_yaml::from_value(value)?;
-            load_file_contents(&mut dv)?;
-            value = serde_yaml::to_value(dv)?;
+            load_file_contents(&mut value)?;
         }
 
         inputs.insert(step_input_id.to_string(), value);
@@ -130,28 +128,23 @@ pub fn eval_inputs(
     raw_inputs: InputObject,
     eval_context: &EvaluationContext,
 ) -> anyhow::Result<InputObject> {
-    let mut transformed = HashMap::new();
-    let inputs = raw_inputs
-        .inputs
-        .clone()
-        .into_iter()
-        .map(|(k, v)| Ok((k, serde_yaml::from_value::<DefaultValue>(v.clone())?)))
-        .collect::<anyhow::Result<HashMap<_, _>>>()?;
+    let mut transformed = HashMap::with_capacity(step.r#in.len());
+    let inputs = &raw_inputs.inputs;
     for workflow_step_input in &step.r#in {
         let step_input_id = workflow_step_input.id.as_ref().unwrap();
         let mut value = raw_inputs
             .inputs
             .get(step_input_id)
             .cloned()
-            .unwrap_or(serde_yaml::Value::Null);
+            .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null));
         //handle value_from
         if let Some(value_from) = &workflow_step_input.value_from {
             let current_value = serde_json::to_value(value)?;
             let eval_context = eval_context
                 .clone()
                 .with_context(&current_value)
-                .with_inputs(&inputs);
-            value = do_eval(value_from, &eval_context)?;
+                .with_inputs(inputs);
+            value = serde_yaml::from_value(do_eval(value_from, &eval_context)?)?;
         }
         transformed.insert(step_input_id.clone(), value);
     }

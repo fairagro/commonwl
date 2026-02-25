@@ -4,7 +4,7 @@ use crate::{
     schema::schema_def::replace_schema_definitions,
 };
 use anyhow::Context;
-use cwl_core::{ExtractFromEnum, documents::CWLDocument, load_cwl_file};
+use cwl_core::{ExtractFromEnum, documents::CWLDocument, inputs::DefaultValue, load_cwl_file};
 use indexmap::IndexMap;
 use serde::Deserialize;
 use std::{
@@ -16,7 +16,7 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct ExecutionRequest {
     pub specification: CWLDocument,
-    pub inputs: HashMap<String, serde_yaml::Value>,
+    pub inputs: HashMap<String, DefaultValue>,
     pub working_dir: PathBuf,
     pub out_dir: PathBuf,
     pub requirements: Vec<ProcessRequirements>,
@@ -64,7 +64,7 @@ impl ExecutionRequest {
 
 #[derive(Deserialize, Debug, Clone, Default)]
 pub struct InputObject {
-    pub inputs: HashMap<String, serde_yaml::Value>,
+    pub inputs: HashMap<String, DefaultValue>,
     pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ProcessHints>,
 }
@@ -204,6 +204,11 @@ pub fn load_input_file_from_file(
     }
 
     //move inputs off scope here
+    let values = values
+        .into_iter()
+        .map(|(k, v)| Ok((k, serde_yaml::from_value::<DefaultValue>(v)?)))
+        .collect::<Result<HashMap<_, _>, serde_yaml::Error>>()?;
+
     input_object.inputs = values;
 
     Ok(input_object)
@@ -284,17 +289,8 @@ mod tests {
         assert!(inputs.is_ok());
 
         let inputs = inputs.unwrap();
-        let file1_loc = inputs
-            .inputs
-            .get("file1")
-            .unwrap()
-            .as_mapping()
-            .unwrap()
-            .get("location")
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(file1_loc, "hello.txt");
+        let file1 = inputs.inputs.get("file1").unwrap().as_file().unwrap();
+        assert_eq!(file1.location.clone().unwrap(), "hello.txt");
     }
 
     #[test]
@@ -308,17 +304,8 @@ mod tests {
         assert!(inputs.is_ok());
 
         let inputs = inputs.unwrap();
-        let file1_loc = inputs
-            .inputs
-            .get("file1")
-            .unwrap()
-            .as_mapping()
-            .unwrap()
-            .get("location")
-            .unwrap()
-            .as_str()
-            .unwrap();
-        assert_eq!(file1_loc, "../hello.txt");
+        let file1 = inputs.inputs.get("file1").unwrap().as_file().unwrap();
+        assert_eq!(file1.location.clone().unwrap(), "../hello.txt");
     }
 
     #[test]

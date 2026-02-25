@@ -214,7 +214,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                 for job in jobs {
                     let mut sub_inputs = inputs.clone();
                     for (k, v) in job {
-                        sub_inputs.inputs.insert(k, v);
+                        //convert to default value (inner values we extracted before as vec!)
+                        sub_inputs.inputs.insert(k, serde_yaml::from_value(v)?);
                     }
 
                     let step_inputs = eval_inputs(step, sub_inputs, eval_context)?;

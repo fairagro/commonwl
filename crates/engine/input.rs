@@ -15,7 +15,7 @@ use std::{collections::HashMap, path::Path};
 
 pub fn collect_inputs(
     doc: &CWLDocument,
-    inputs: &HashMap<String, serde_yaml::Value>,
+    inputs: &HashMap<String, DefaultValue>,
     work_dir: &Path,
     stage_dir: &Path,
     llr: Option<&LoadListingRequirement>,
@@ -114,14 +114,14 @@ fn load_input(
 
 pub(crate) fn get_input_value(
     input: &OperationInputParameter,
-    inputs: &HashMap<String, serde_yaml::Value>,
+    inputs: &HashMap<String, DefaultValue>,
 ) -> anyhow::Result<DefaultValue> {
     let value = inputs.get(&input.id.clone().unwrap_or_default());
     Ok(
         if let Some(value) = value
             && !value.is_null()
         {
-            serde_yaml::from_value::<DefaultValue>(value.clone())?
+            value.clone()
         } else if let Some(default) = &input.default {
             default.clone()
         } else {
@@ -202,7 +202,7 @@ mod tests {
             "../../testdata/cwl/tests/anon_enum_inside_array.cwl"
         ))
         .unwrap();
-        let inputs_values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(include_str!(
+        let inputs_values: HashMap<String, DefaultValue> = serde_yaml::from_str(include_str!(
             "../../testdata/cwl/tests/anon_enum_inside_array.yml"
         ))
         .unwrap();

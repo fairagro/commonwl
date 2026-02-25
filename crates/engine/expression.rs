@@ -5,7 +5,14 @@ use cwl_core::{
     inputs::DefaultValue,
     requirements::{ExpressionLibItem, InlineJavascriptRequirement},
 };
-use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
+use regex::Regex;
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    ops::Range,
+    path::Path,
+    str::FromStr,
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct EvaluationContext<'a> {
@@ -431,6 +438,26 @@ pub fn extract_input_name(expr: &str) -> Option<String> {
     })
 }
 
+pub fn scan_input_usage(expr: &str) -> HashSet<String> {
+    let mut set = HashSet::new();
+
+    let patterns = [
+        r#"\binputs\.([a-zA-Z_][a-zA-Z0-9_]*)\b"#,
+        r#"\binputs\[\s*['\"]([^'\"]+)['\"]\s*\]"#,
+        r#"\binputs\?\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\b"#,
+        r#"\binputs\?\.\s*\[\s*['\"]([^'\"]+)['\"]\s*\]"#,
+    ];
+
+    for pat in patterns {
+        let re = Regex::new(pat).unwrap();
+        for cap in re.captures_iter(expr) {
+            set.insert(cap[1].to_string());
+        }
+    }
+
+    set
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -532,5 +559,19 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.as_str().unwrap(), r"'\val'");
+    }
+
+    #[test]
+    fn test_scan_input_usage() {
+        let text = r#"$(inputs.a)
+inputs["b"]
+inputs?.c
+inputs?.["d"]
+$(inputs.x + inputs.y)"#;
+        let result = scan_input_usage(text);
+        assert_eq!(
+            result,
+            HashSet::from(["a", "b", "c", "d", "x", "y"].map(|i| i.to_string()))
+        )
     }
 }
