@@ -63,7 +63,6 @@ pub fn locate_file(
         }
 
         file.dirname = dirname;
-
         //We set them before!
         let path =
             file.dirname.clone().unwrap() + MAIN_SEPARATOR_STR + file.basename.as_ref().unwrap();

@@ -136,8 +136,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
 
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
     let ijsr = request.get_requirement_or_hint::<InlineJavascriptRequirement>();
+    let sfr = request.get_requirement_or_hint::<ScatterFeatureRequirement>();
     //we don't want to inherit those requirements from parent here!
-    let sfr = wf.get_requirement_or_hint::<ScatterFeatureRequirement>();
     let mir = wf.get_requirement_or_hint::<MultipleInputFeatureRequirement>();
 
     let inputs = collect_inputs(
@@ -165,6 +165,8 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     for (k, v) in &inputs {
         completed_outputs.insert(k.clone(), v.clone());
     }
+
+    let has_scatter_steps = wf.steps.iter().any(|i| i.scatter.is_some());
 
     let mut scatter_meta: HashMap<String, (ScatterMethod, Vec<usize>)> = HashMap::new();
     for wave in waves {
@@ -256,7 +258,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                 let key = format!("{}/{}", step_id, output_name);
                 if scattered_step_ids.contains(&step_id) && sfr.is_some() {
                     scatter_accum.entry(key).or_default().push(value);
-                } else if sfr.is_some() {
+                } else if sfr.is_some() && has_scatter_steps {
                     //if no value was produces we add an empty vec
                     scatter_accum
                         .entry(key)
@@ -268,7 +270,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             }
         }
 
-        if sfr.is_some() {
+        if sfr.is_some() && has_scatter_steps {
             // For scattered steps, we need to aggregate outputs into arrays
             for (key, values) in scatter_accum {
                 let step_id = key.split('/').next().unwrap().to_string();

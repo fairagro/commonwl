@@ -317,7 +317,6 @@ fn validate_dir(
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
         .map(|p| if copy { unique_path(&p) } else { p });
 
-    let mut base_path = base_path.to_path_buf();
 
     if let Some(source_path) = &dir.path
         && let Some(dest_path) = &path
@@ -342,18 +341,20 @@ fn validate_dir(
             copy_dir(&source_path, dest_path)
                 .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
         }
-        base_path = dest_path.to_path_buf();
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
         fs::create_dir_all(dest_path)?;
     }
 
+    let copy = dir.path.is_none();
+
     dir.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
     dir.location = dir.path.as_ref().and_then(|p| format!("file://{p}").into());
-
+    
+    let base_path = path.unwrap();
     if let Some(listing) = &mut dir.listing {
         for item in listing {
-            validate_output_item(item, None, context, &base_path, false)?;
+            validate_output_item(item, None, context, &base_path, copy)?;
         }
     }
 
