@@ -212,10 +212,11 @@ fn validate_output_item(
     format: Option<&String>,
     context: &OutputCollectionContext,
     base_path: &Path,
+    copy: bool, // indicates whether we need to copy file and dir
 ) -> anyhow::Result<()> {
     match item {
-        FileOrDirectory::File(file) => validate_file(file, format, context, base_path)?,
-        FileOrDirectory::Directory(dir) => validate_dir(dir, context, base_path)?,
+        FileOrDirectory::File(file) => validate_file(file, format, context, base_path, copy)?,
+        FileOrDirectory::Directory(dir) => validate_dir(dir, context, base_path, copy)?,
     };
 
     Ok(())
@@ -227,9 +228,10 @@ fn validate_file(
     format: Option<&String>,
     context: &OutputCollectionContext,
     base_path: &Path,
+    copy: bool,
 ) -> anyhow::Result<()> {
     let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref())
-        .map(|p| unique_path(&p));
+        .map(|p| if copy { unique_path(&p) } else { p });
     let dirname = path.as_ref().and_then(|p| p.parent());
 
     if let Some(source_path) = &file.path
@@ -252,9 +254,10 @@ fn validate_file(
             fs::create_dir_all(parent)?;
         }
 
-        fs::copy(&source_path, dest_path)
-            .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
-
+        if copy {
+            fs::copy(&source_path, dest_path)
+                .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+        }
         if file.size.is_none() || file.checksum.is_none() {
             let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
             file.checksum = checksum;
@@ -297,7 +300,7 @@ fn validate_file(
 
     if let Some(secondary_files) = &mut file.secondary_files {
         for item in secondary_files {
-            validate_output_item(item, None, context, base_path)?;
+            validate_output_item(item, None, context, base_path, true)?;
         }
     }
 
@@ -309,9 +312,10 @@ fn validate_dir(
     dir: &mut Directory,
     context: &OutputCollectionContext,
     base_path: &Path,
+    copy: bool,
 ) -> anyhow::Result<()> {
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
-        .map(|p| unique_path(&p));
+        .map(|p| if copy { unique_path(&p) } else { p });
 
     let mut base_path = base_path.to_path_buf();
 
@@ -334,9 +338,10 @@ fn validate_dir(
         if !parent.exists() {
             fs::create_dir_all(parent)?;
         }
-
-        copy_dir(&source_path, dest_path)
-            .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+        if copy {
+            copy_dir(&source_path, dest_path)
+                .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+        }
         base_path = dest_path.to_path_buf();
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
@@ -348,7 +353,7 @@ fn validate_dir(
 
     if let Some(listing) = &mut dir.listing {
         for item in listing {
-            validate_output_item(item, None, context, &base_path)?;
+            validate_output_item(item, None, context, &base_path, false)?;
         }
     }
 
@@ -519,7 +524,7 @@ fn validate_output_item_recurse(
 ) -> anyhow::Result<()> {
     match item {
         DefaultValue::FileOrDirectory(fod) => {
-            validate_output_item(fod, format, context, context.dest_dir)?
+            validate_output_item(fod, format, context, context.dest_dir, true)?
         }
         DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
             for item in map.values_mut() {
