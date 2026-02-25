@@ -65,7 +65,7 @@ async fn test_conformance_docker_wf() {
     let backend = DockerBackend::new(config).await.unwrap();
 
     //all expression tools pass! :)
-    execute_conformance_test(backend, selected_tests.take(44)).await;
+    execute_conformance_test(backend, selected_tests.take(45)).await;
 }
 
 #[derive(Deserialize, Debug)]

@@ -1,5 +1,4 @@
 use crate::{
-    OneOrMany,
     documents::{
         CWLDocument, CommandLineTool, ExpressionTool, Operation, StringOrDocument, Workflow,
         WorkflowStep,
@@ -68,22 +67,11 @@ fn unpack_workflow(wf: &mut Workflow, graph: &[CWLDocument]) {
         unpack_identifiable(output, &base_id);
 
         if let Some(output_source) = &mut output.output_source {
-            match output_source {
-                OneOrMany::One(src) => {
-                    *src = src
-                        .strip_prefix(&format!("{base_id}/"))
-                        .unwrap_or(src)
-                        .to_string()
-                }
-                OneOrMany::Many(items) => {
-                    for src in items {
-                        *src = src
-                            .strip_prefix(&format!("{base_id}/"))
-                            .unwrap_or(src)
-                            .to_string();
-                    }
-                }
-            }
+            *output_source = output_source.clone().map(|src| {
+                src.strip_prefix(&format!("{base_id}/"))
+                    .unwrap_or(&src)
+                    .to_string()
+            });
         }
     }
 }
@@ -161,6 +149,13 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
 
     for input in &mut step.r#in {
         unpack_identifiable(input, &step_id);
+        if let Some(source) = &mut input.source {
+            *source = source.clone().map(|src| {
+                src.strip_prefix(&format!("{base_id}/"))
+                    .unwrap_or(&src)
+                    .to_string()
+            })
+        }
     }
 
     for output in &mut step.out {
