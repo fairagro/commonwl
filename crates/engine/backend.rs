@@ -19,7 +19,7 @@ use crate::{
     scatter,
     schema::format_validation::get_format_validator,
     tree::build_execution_tree,
-    workflow::build_step_input_object,
+    workflow::{collect_raw_inputs, eval_inputs},
 };
 use anyhow::Context;
 use cwl_core::{
@@ -182,7 +182,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
             let step_id_clone = step.id.clone().unwrap();
             let backend_clone = backend.clone();
             let token_clone = token.clone();
-            let inputs = build_step_input_object(step, &completed_outputs, mir, eval_context)?;
+            let inputs = collect_raw_inputs(step, &completed_outputs, mir)?;
             let working_dir_clone = request.working_dir.clone();
             let step_outdir = collection_dir.path().join(&step_id_clone);
             info!("Starting execution of step {}", step_id_clone);
@@ -217,24 +217,26 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                         sub_inputs.inputs.insert(k, v);
                     }
 
+                    let step_inputs = eval_inputs(step, sub_inputs, eval_context)?;
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
                         &working_dir_clone,
                         Some(&step_outdir),
-                        sub_inputs,
+                        step_inputs,
                         token_clone.clone(),
                         request,
                     )?);
                 }
                 scatter_meta.insert(step_id_clone.clone(), (*method, dims));
             } else {
+                let step_inputs = eval_inputs(step, inputs, eval_context)?;
                 handles.push(execute_step(
                     step,
                     backend_clone,
                     &working_dir_clone,
                     Some(&step_outdir),
-                    inputs,
+                    step_inputs,
                     token_clone,
                     request,
                 )?);

@@ -9,15 +9,20 @@ use cwl_core::{
 };
 use std::collections::HashMap;
 
-pub fn build_step_input_object(
+pub fn collect_raw_inputs(
     step: &WorkflowStep,
     completed_outputs: &HashMap<String, DefaultValue>,
     mir: Option<&MultipleInputFeatureRequirement>,
-    eval_context: &EvaluationContext,
 ) -> anyhow::Result<InputObject> {
-    let step_inputs = collect_workflow_step_inputs(completed_outputs, step, mir, eval_context)?;
-    let inputs = InputObject {
-        inputs: step_inputs,
+    Ok(input_object(
+        step,
+        collect_workflow_step_inputs(completed_outputs, step, mir)?,
+    ))
+}
+
+fn input_object(step: &WorkflowStep, inputs: HashMap<String, serde_yaml::Value>) -> InputObject {
+    InputObject {
+        inputs,
         requirements: step
             .requirements
             .clone()
@@ -32,16 +37,13 @@ pub fn build_step_input_object(
             .into_iter()
             .map(Into::into)
             .collect(),
-    };
-
-    Ok(inputs)
+    }
 }
 
 fn collect_workflow_step_inputs(
     completed_outputs: &HashMap<String, DefaultValue>,
     step: &WorkflowStep,
     mir: Option<&MultipleInputFeatureRequirement>,
-    eval_context: &EvaluationContext,
 ) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
     let mut inputs = HashMap::new();
 
@@ -117,34 +119,44 @@ fn collect_workflow_step_inputs(
             value = serde_yaml::to_value(dv)?;
         }
 
-        //handle value_from
-        if let Some(value_from) = &workflow_step_input.value_from {
-            if let Some(scatter) = &step.scatter
-                && scatter.as_many().contains(step_input_id)
-            {
-                //item is array, get it!
-                let serde_yaml::Value::Sequence(vals) = &value else {
-                    anyhow::bail!("Expected array for scattered input")
-                };
-                //apply value from
-                let transformed = vals
-                    .iter()
-                    .map(|v| {
-                        let current_value = serde_json::to_value(v)?;
-                        let eval_context = eval_context.clone().with_context(&current_value);
-                        do_eval(value_from, &eval_context)
-                    })
-                    .collect::<anyhow::Result<Vec<_>>>()?;
-                value = serde_yaml::to_value(transformed)?
-            } else {
-                let current_value = serde_json::to_value(value)?;
-                let eval_context = eval_context.clone().with_context(&current_value);
-                value = do_eval(value_from, &eval_context)?;
-            }
-        }
-
         inputs.insert(step_input_id.to_string(), value);
     }
 
     Ok(inputs)
+}
+
+pub fn eval_inputs(
+    step: &WorkflowStep,
+    raw_inputs: InputObject,
+    eval_context: &EvaluationContext,
+) -> anyhow::Result<InputObject> {
+    let mut transformed = HashMap::new();
+    let inputs = raw_inputs
+        .inputs
+        .clone()
+        .into_iter()
+        .map(|(k, v)| Ok((k, serde_yaml::from_value::<DefaultValue>(v.clone())?)))
+        .collect::<anyhow::Result<HashMap<_, _>>>()?;
+    for workflow_step_input in &step.r#in {
+        let step_input_id = workflow_step_input.id.as_ref().unwrap();
+        let mut value = raw_inputs
+            .inputs
+            .get(step_input_id)
+            .cloned()
+            .unwrap_or(serde_yaml::Value::Null);
+        //handle value_from
+        if let Some(value_from) = &workflow_step_input.value_from {
+            let current_value = serde_json::to_value(value)?;
+            let eval_context = eval_context
+                .clone()
+                .with_context(&current_value)
+                .with_inputs(&inputs);
+            value = do_eval(value_from, &eval_context)?;
+        }
+        transformed.insert(step_input_id.clone(), value);
+    }
+    Ok(InputObject {
+        inputs: transformed,
+        ..raw_inputs
+    })
 }
