@@ -62,9 +62,7 @@ pub fn locate_file(
             file.nameext = nameext;
         }
 
-        if file.dirname.is_none() {
-            file.dirname = dirname;
-        }
+        file.dirname = dirname;
 
         //We set them before!
         let path =

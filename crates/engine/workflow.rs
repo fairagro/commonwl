@@ -81,8 +81,18 @@ fn collect_workflow_step_inputs(
                         anyhow::bail!("Could not find input {s}")
                     }
                 }
-
-                DefaultValue::Any(serde_yaml::to_value(data)?) //sequence
+                //according to spec :
+                //If both linkMerge and pickValue are null or not specified, and there is only a single element in the source,
+                //then the input parameter takes the scalar value from the single input link (it is not wrapped in a single-list).
+                if workflow_step_input.link_merge.is_none()
+                    && workflow_step_input.pick_value.is_none()
+                    && data.len() == 1
+                {
+                    data[0].clone()
+                } else {
+                    //sequence
+                    DefaultValue::Any(serde_yaml::to_value(data)?)
+                } 
             } else {
                 //no multiple feature input requirement branch
                 let source = sources.as_one();

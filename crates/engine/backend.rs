@@ -135,15 +135,16 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     };
 
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
-    let sfr = request.get_requirement_or_hint::<ScatterFeatureRequirement>();
     let ijsr = request.get_requirement_or_hint::<InlineJavascriptRequirement>();
+    //we don't want to inherit those requirements from parent here!
+    let sfr = wf.get_requirement_or_hint::<ScatterFeatureRequirement>();
     let mir = wf.get_requirement_or_hint::<MultipleInputFeatureRequirement>();
 
     let inputs = collect_inputs(
         &request.specification,
         &request.inputs,
         &request.working_dir,
-        &request.working_dir, //?
+        Path::new("."),
         llr,
         Some(&fv),
     )?;
@@ -197,6 +198,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                     .scatter_method
                     .as_ref()
                     .unwrap_or(&ScatterMethod::Dotproduct);
+
                 let scatter_inputs = scatter::gather_inputs(&scatter_keys, &inputs)?;
                 let dims: Vec<usize> = scatter_inputs.iter().map(|v| v.len()).collect();
                 let jobs = scatter::gather_jobs(&scatter_inputs, &scatter_keys, method)?;
@@ -387,7 +389,6 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
         llr,
         Some(&fv),
     )?;
-
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
         ijsr,
