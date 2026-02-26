@@ -49,7 +49,7 @@ use std::{
 use tempfile::tempdir;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{debug, info};
 
 pub mod docker;
 pub mod mount;
@@ -257,6 +257,9 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                                 .collect::<HashMap<_, _>>();
                             //spawn the "Null-Job"
                             let step_id = step_id_clone.clone();
+                            debug!(
+                                "Scatter step skipped because when evaluated to false in {step_id_clone}"
+                            );
                             handles.push(tokio::spawn(async move {
                                 Ok((
                                     step_id,
@@ -288,6 +291,10 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                         anyhow::bail!("Condition {when} did not evaluate to boolean");
                     };
                     if !result {
+                        debug!(
+                            "Step skipped because when evaluated to false in {}",
+                            step_id_clone
+                        );
                         continue;
                     }
                 }
@@ -314,12 +321,6 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                 let key = format!("{}/{}", step_id, output_name);
                 if scattered_step_ids.contains(&step_id) && sfr.is_some() {
                     scatter_accum.entry(key).or_default().push(value);
-                } else if sfr.is_some() && has_scatter_steps {
-                    //if no value was produces we add an empty vec
-                    scatter_accum
-                        .entry(key)
-                        .or_default()
-                        .push(DefaultValue::Any(serde_yaml::Value::Sequence(vec![])));
                 } else {
                     completed_outputs.insert(key, value);
                 }

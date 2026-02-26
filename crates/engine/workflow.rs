@@ -67,7 +67,7 @@ fn collect_workflow_step_inputs(
                 let link_merge = workflow_step_input
                     .link_merge
                     .unwrap_or(LinkMergeMethod::MergeNested);
-                let data = handle_link_merge(step_input_id, link_merge, resolved)?;
+                let data = handle_link_merge(link_merge, resolved)?;
                 //according to spec :
                 //If both linkMerge and pickValue are null or not specified, and there is only a single element in the source,
                 //then the input parameter takes the scalar value from the single input link (it is not wrapped in a single-list).
@@ -152,7 +152,6 @@ pub fn eval_inputs(
 }
 
 pub(crate) fn handle_link_merge(
-    id: &str,
     link_merge: LinkMergeMethod,
     values: Vec<DefaultValue>,
 ) -> anyhow::Result<Vec<DefaultValue>> {
@@ -168,9 +167,7 @@ pub(crate) fn handle_link_merge(
                             flattened.push(serde_yaml::from_value(item)?);
                         }
                     }
-                    other => anyhow::bail!(
-                        "{id}: `merge_flattened` requires array values, got {other:?}"
-                    ),
+                    other => flattened.push(other),
                 }
             }
             Ok(flattened)

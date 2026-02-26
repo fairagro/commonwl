@@ -670,7 +670,6 @@ pub fn collect_workflow_outputs(
                                 other => vec![other],
                             };
                             let merged = handle_link_merge(
-                                &output_id,
                                 output.link_merge.unwrap_or(LinkMergeMethod::MergeNested),
                                 items,
                             )?;
@@ -707,7 +706,6 @@ pub fn collect_workflow_outputs(
                             })
                             .collect::<Vec<_>>();
                         let merged = handle_link_merge(
-                            &output_id,
                             output.link_merge.unwrap_or(LinkMergeMethod::MergeNested),
                             resolved,
                         )?;
