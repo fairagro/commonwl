@@ -2,7 +2,7 @@ use crate::{
     command::to_str,
     io::{directory::locate_dir, file::locate_file},
     schema::format_validation::FormatValidator,
-    schema::validation::{validate_command_input, validate_input_type},
+    schema::validation::{validate_command_input, validate_type},
 };
 use cwl_core::{
     OneOrMany,
@@ -41,11 +41,11 @@ pub fn collect_inputs(
 
             _ => match &input.r#type {
                 OneOrMany::One(item) => {
-                    validate_input_type(&item.clone().into(), &value, format, fv)
+                    validate_type(&item.clone().into(), &value, format, fv)
                 }
                 OneOrMany::Many(items) => items
                     .iter()
-                    .any(|i| validate_input_type(&i.clone().into(), &value, format, fv)),
+                    .any(|i| validate_type(&i.clone().into(), &value, format, fv)),
             },
         };
         //error if validity can not be confirmed

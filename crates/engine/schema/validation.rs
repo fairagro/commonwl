@@ -23,14 +23,14 @@ pub fn validate_command_input(
     match schema {
         CommandInputParameterType::Stdin => !value.is_null(), // for stdin we accept any existing value
         CommandInputParameterType::CommandInputType(one_or_many) => match one_or_many {
-            OneOrMany::One(item) => validate_input_type(
+            OneOrMany::One(item) => validate_type(
                 &Into::<InputType>::into(item.clone()).into(),
                 value,
                 format,
                 fv,
             ),
             OneOrMany::Many(items) => items.iter().any(|i| {
-                validate_input_type(
+                validate_type(
                     &Into::<InputType>::into(i.clone()).into(),
                     value,
                     format,
@@ -41,7 +41,7 @@ pub fn validate_command_input(
     }
 }
 
-pub fn validate_input_type(
+pub fn validate_type(
     r#type: &ValidationType,
     value: &DefaultValue,
     format: Option<&String>,
@@ -137,7 +137,7 @@ fn validate_record_schema(
             let key = serde_yaml::Value::String(f.name.clone());
             if let Some(field_value) = mapping.get(&key) {
                 match &f.r#type {
-                    OneOrMany::One(item) => validate_input_type(
+                    OneOrMany::One(item) => validate_type(
                         item,
                         &serde_yaml::from_value(field_value.clone())
                             .expect("DefaultValue violates itself"),
@@ -145,7 +145,7 @@ fn validate_record_schema(
                         fv,
                     ),
                     OneOrMany::Many(items) => items.iter().any(|item| {
-                        validate_input_type(
+                        validate_type(
                             item,
                             &serde_yaml::from_value(field_value.clone())
                                 .expect("DefaultValue violates itself"),
@@ -181,10 +181,10 @@ fn validate_array_schema(
             let item_value: DefaultValue =
                 serde_yaml::from_value(item.clone()).expect("DefaultValue violates itself");
             match &schema.items {
-                OneOrMany::One(t) => validate_input_type(t, &item_value, format, fv),
+                OneOrMany::One(t) => validate_type(t, &item_value, format, fv),
                 OneOrMany::Many(ts) => ts
                     .iter()
-                    .any(|t| validate_input_type(t, &item_value, format, fv)),
+                    .any(|t| validate_type(t, &item_value, format, fv)),
             }
         })
     } else {

@@ -4,7 +4,7 @@ use crate::{
         file::{PathOrFile, handle_secondary_file_schema},
         unique_path,
     },
-    schema::{format_validation::FormatValidator, validation::validate_input_type},
+    schema::{format_validation::FormatValidator, validation::validate_type},
 };
 use anyhow::Context;
 use cwl_core::{
@@ -26,7 +26,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
 };
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 #[derive(Debug)]
 pub struct OutputCollectionContext<'a> {
@@ -317,7 +317,6 @@ fn validate_dir(
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
         .map(|p| if copy { unique_path(&p) } else { p });
 
-
     if let Some(source_path) = &dir.path
         && let Some(dest_path) = &path
     {
@@ -350,7 +349,7 @@ fn validate_dir(
 
     dir.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
     dir.location = dir.path.as_ref().and_then(|p| format!("file://{p}").into());
-    
+
     let base_path = path.unwrap();
     if let Some(listing) = &mut dir.listing {
         for item in listing {
@@ -402,14 +401,14 @@ fn collect_output_item(
     //validate output to schema
     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
         let valid = match r#type {
-            OneOrMany::One(r#type) => validate_input_type(
+            OneOrMany::One(r#type) => validate_type(
                 &Into::<OutputType>::into(r#type.clone()).into(),
                 &value,
                 None,
                 None,
             ),
             OneOrMany::Many(items) => items.iter().any(|t| {
-                validate_input_type(
+                validate_type(
                     &Into::<OutputType>::into(t.clone()).into(),
                     &value,
                     None,
@@ -645,14 +644,14 @@ pub fn collect_expression_outputs(
 
             //validate output to schema
             let valid = match &output.r#type {
-                OneOrMany::One(r#type) => validate_input_type(
+                OneOrMany::One(r#type) => validate_type(
                     &Into::<OutputType>::into(r#type.clone()).into(),
                     &value,
                     None,
                     None,
                 ),
                 OneOrMany::Many(items) => items.iter().any(|t| {
-                    validate_input_type(
+                    validate_type(
                         &Into::<OutputType>::into(t.clone()).into(),
                         &value,
                         None,
@@ -660,8 +659,9 @@ pub fn collect_expression_outputs(
                     )
                 }),
             };
+            //outputs are considered valid, hinting when something invalid was given
             if !valid {
-                anyhow::bail!(
+                warn!(
                     "Output value {value:?} does not match output type {:?}",
                     output.r#type
                 )
