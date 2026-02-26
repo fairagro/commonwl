@@ -239,6 +239,15 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                     }
 
                     let step_inputs = eval_inputs(step, sub_inputs, eval_context)?;
+                    let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
+                    if let Some(when) = &step.when {
+                        let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
+                            anyhow::bail!("Condition {when} did not evaluate to boolean");
+                        };
+                        if !result {
+                            continue;
+                        }
+                    }
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
@@ -252,6 +261,16 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                 scatter_meta.insert(step_id_clone.clone(), (*method, dims));
             } else {
                 let step_inputs = eval_inputs(step, inputs, eval_context)?;
+                let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
+                if let Some(when) = &step.when {
+                    let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
+                        anyhow::bail!("Condition {when} did not evaluate to boolean");
+                    };
+                    if !result {
+                        continue;
+                    }
+                }
+
                 handles.push(execute_step(
                     step,
                     backend_clone,
