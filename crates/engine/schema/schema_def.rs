@@ -281,7 +281,11 @@ fn extract_schema_definitions(
                 && let Some(serde_yaml::Value::String(name)) =
                     type_map.get(serde_yaml::Value::String("name".to_string()))
             {
-                schemas.insert(format!("#{}", name), type_def.clone());
+                let mut type_def = type_def.clone();
+                //validate names
+                validate_field_name(&mut type_def);
+
+                schemas.insert(format!("#{}", name), type_def);
             }
         }
     }
@@ -325,4 +329,25 @@ fn replace_schema_references(
         _ => {}
     }
     Ok(())
+}
+
+fn validate_field_name(schema: &mut serde_yaml::Value) {
+    if let serde_yaml::Value::Mapping(record) = schema {
+        //sanitize name
+        if let Some(serde_yaml::Value::String(name)) = record.get_mut("name")
+            && short_name(name) != name
+        {
+            *name = short_name(name).into();
+        }
+
+        if let Some(serde_yaml::Value::Sequence(fields)) = record.get_mut("fields") {
+            for field in fields {
+                validate_field_name(field);
+            }
+        }
+    }
+}
+
+fn short_name(name: &str) -> &str {
+    name.rsplit(['/', '#']).next().unwrap_or(name)
 }
