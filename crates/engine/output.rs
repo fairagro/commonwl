@@ -5,6 +5,7 @@ use crate::{
         unique_path,
     },
     schema::{format_validation::FormatValidator, validation::validate_type},
+    workflow::{handle_link_merge, handle_pick_value},
 };
 use anyhow::Context;
 use cwl_core::{
@@ -14,8 +15,8 @@ use cwl_core::{
     inputs::DefaultValue,
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
-        CommandOutputSchema, CommandOutputType, ExpressionToolOutputParameter, OutputType,
-        PickValueMethod, WorkflowOutputParameter,
+        CommandOutputSchema, CommandOutputType, ExpressionToolOutputParameter, LinkMergeMethod,
+        OutputType, WorkflowOutputParameter,
     },
     types::{CWLType, SecondaryFileSchema},
 };
@@ -659,7 +660,25 @@ pub fn collect_workflow_outputs(
             match output_source {
                 OneOrMany::One(item) => {
                     if let Some(value) = values.get(item) {
-                        let mut value = value.clone();
+                        let mut value = if let Some(pick_value) = output.pick_value {
+                            // scatter+when produces an array under a single source — filter its elements
+                            let items = match value.clone() {
+                                DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => arr
+                                    .into_iter()
+                                    .map(|v| serde_yaml::from_value(v).map_err(Into::into))
+                                    .collect::<anyhow::Result<Vec<DefaultValue>>>()?,
+                                other => vec![other],
+                            };
+                            let merged = handle_link_merge(
+                                &output_id,
+                                output.link_merge.unwrap_or(LinkMergeMethod::MergeNested),
+                                items,
+                            )?;
+                            handle_pick_value(&output_id, pick_value, merged)?
+                        } else {
+                            value.clone()
+                        };
+
                         let format = output.format.as_ref().map(|f| f.as_one().to_string());
                         validate_output_item_recurse(&mut value, format.as_ref(), context)?;
                         if let CommandOutputParameterType::CommandOutputType(r#type) =
@@ -678,52 +697,21 @@ pub fn collect_workflow_outputs(
                 }
                 OneOrMany::Many(items) => {
                     if let Some(pick_value) = output.pick_value {
-                        let mut value = match pick_value {
-                            PickValueMethod::FirstNonNull => {
-                                let mut return_value = None;
-                                for item in items {
-                                    if let Some(value) = values.get(item)
-                                        && !value.is_null()
-                                    {
-                                        return_value = Some(value);
-                                        break;
-                                    }
-                                }
-                                //check if at least one item is entered
-                                if return_value.is_none() {
-                                    anyhow::bail!(
-                                        "No output for {output_id}, pick value `FirstNonNull` requires at least one value"
-                                    );
-                                }
-                                return_value.cloned().unwrap()
-                            }
-                            PickValueMethod::TheOnlyNonNull => {
-                                let items = items
-                                    .iter()
-                                    .filter_map(|i| values.get(i))
-                                    .filter(|i| !i.is_null())
-                                    .collect::<Vec<_>>();
-                                if items.len() != 1 {
-                                    anyhow::bail!(
-                                        "Output {output_id}: pick value `TheOnlyNonNull` requires exactly one non null value"
-                                    );
-                                }
-
-                                items[0].clone()
-                            }
-                            PickValueMethod::AllNonNull => {
-                                let mut data = vec![];
-                                for item in items {
-                                    if let Some(value) = values.get(item)
-                                        && !value.is_null()
-                                    {
-                                        data.push(value);
-                                    }
-                                }
-                                DefaultValue::Any(serde_yaml::to_value(data)?)
-                            }
-                        };
-
+                        let resolved = items
+                            .iter()
+                            .map(|item| {
+                                values
+                                    .get(item)
+                                    .cloned()
+                                    .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))
+                            })
+                            .collect::<Vec<_>>();
+                        let merged = handle_link_merge(
+                            &output_id,
+                            output.link_merge.unwrap_or(LinkMergeMethod::MergeNested),
+                            resolved,
+                        )?;
+                        let mut value = handle_pick_value(&output_id, pick_value, merged)?;
                         let format = output.format.as_ref().map(|f| f.as_one().to_string());
                         validate_output_item_recurse(&mut value, format.as_ref(), context)?;
                         if let CommandOutputParameterType::CommandOutputType(r#type) =

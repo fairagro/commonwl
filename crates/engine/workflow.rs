@@ -4,7 +4,9 @@ use crate::{
     request::InputObject,
 };
 use cwl_core::{
-    documents::WorkflowStep, inputs::DefaultValue, outputs::LinkMergeMethod,
+    documents::WorkflowStep,
+    inputs::DefaultValue,
+    outputs::{LinkMergeMethod, PickValueMethod},
     requirements::MultipleInputFeatureRequirement,
 };
 use std::collections::HashMap;
@@ -53,34 +55,19 @@ fn collect_workflow_step_inputs(
             //handle multiple input feature requirement
             if mir.is_some() {
                 let sources = sources.as_many();
-                let mut data = Vec::with_capacity(sources.len());
-                for s in sources {
-                    let val = completed_outputs.get(&s);
-
-                    //handle link merge
-                    if let Some(val) = val {
-                        match workflow_step_input.link_merge {
-                            None | Some(LinkMergeMethod::MergeNested) => {
-                                data.push(val.clone());
-                            }
-                            Some(LinkMergeMethod::MergeFlattened) => {
-                                if let DefaultValue::Any(serde_yaml::Value::Sequence(arr)) = &val {
-                                    let dv_arr = arr
-                                        .iter()
-                                        .filter_map(|i| {
-                                            serde_yaml::from_value::<DefaultValue>(i.clone()).ok()
-                                        })
-                                        .collect::<Vec<_>>();
-                                    data.extend(dv_arr);
-                                } else {
-                                    anyhow::bail!("Input needs to be of type array: {s}")
-                                }
-                            }
-                        }
-                    } else {
-                        anyhow::bail!("Could not find input {s}")
-                    }
-                }
+                let resolved = sources
+                    .iter()
+                    .map(|s| {
+                        completed_outputs
+                            .get(s)
+                            .cloned()
+                            .ok_or_else(|| anyhow::anyhow!("Could not find input {s}"))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                let link_merge = workflow_step_input
+                    .link_merge
+                    .unwrap_or(LinkMergeMethod::MergeNested);
+                let data = handle_link_merge(step_input_id, link_merge, resolved)?;
                 //according to spec :
                 //If both linkMerge and pickValue are null or not specified, and there is only a single element in the source,
                 //then the input parameter takes the scalar value from the single input link (it is not wrapped in a single-list).
@@ -92,7 +79,7 @@ fn collect_workflow_step_inputs(
                 } else {
                     //sequence
                     DefaultValue::Any(serde_yaml::to_value(data)?)
-                } 
+                }
             } else {
                 //no multiple feature input requirement branch
                 let source = sources.as_one();
@@ -162,4 +149,61 @@ pub fn eval_inputs(
         inputs: transformed,
         ..raw_inputs
     })
+}
+
+pub(crate) fn handle_link_merge(
+    id: &str,
+    link_merge: LinkMergeMethod,
+    values: Vec<DefaultValue>,
+) -> anyhow::Result<Vec<DefaultValue>> {
+    match link_merge {
+        LinkMergeMethod::MergeNested => Ok(values),
+        LinkMergeMethod::MergeFlattened => {
+            let mut flattened = vec![];
+            for value in values {
+                match value {
+                    DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+                        for item in arr {
+                            flattened.push(serde_yaml::from_value(item)?);
+                        }
+                    }
+                    other => anyhow::bail!(
+                        "{id}: `merge_flattened` requires array values, got {other:?}"
+                    ),
+                }
+            }
+            Ok(flattened)
+        }
+    }
+}
+
+pub(crate) fn handle_pick_value(
+    output_id: &str,
+    pick_value: PickValueMethod,
+    values: Vec<DefaultValue>,
+) -> anyhow::Result<DefaultValue> {
+    match pick_value {
+        PickValueMethod::AllNonNull => {
+            let filtered = values.into_iter().filter(|v| !v.is_null()).collect::<Vec<_>>();
+            Ok(DefaultValue::Any(serde_yaml::to_value(filtered)?))
+        }
+        PickValueMethod::FirstNonNull => {
+            values
+                .into_iter()
+                .find(|v| !v.is_null())
+                .ok_or_else(|| anyhow::anyhow!(
+                    "No output for {output_id}, pick value `FirstNonNull` requires at least one non-null value"
+                ))
+        }
+        PickValueMethod::TheOnlyNonNull => {
+            let non_null: Vec<_> = values.into_iter().filter(|v| !v.is_null()).collect();
+            if non_null.len() != 1 {
+                anyhow::bail!(
+                    "Output {output_id}: pick value `TheOnlyNonNull` requires exactly one non-null value, found {}",
+                    non_null.len()
+                );
+            }
+            Ok(non_null.into_iter().next().unwrap())
+        }
+    }
 }
