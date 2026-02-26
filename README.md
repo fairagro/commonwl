@@ -28,7 +28,7 @@ The CWL Engine features high conformance to the specification, passing all Tests
 | TES     |   🧾  | -   |
 | Slurm   |   🧾  | -   |
 
-✔️: Fully operational - 🏗️ Under Construction - 🧾 Planned
+✔️: Fully operational - 🏗️: Under Construction - 🧾: Planned
 
 ## License
 This work is dual-licensed under Apache 2.0 and MIT . You can choose between one of them if you use this work. 
