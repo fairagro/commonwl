@@ -239,8 +239,8 @@ fn evaluate_result(output: &serde_yaml::Value, result: ExecutionResult) {
             let key = key.as_str().unwrap().to_string();
             assert!(
                 result.outputs.contains_key(&key),
-                "Could not find key {}",
-                key
+                "Could not find key {}, outputs: {:#?}",
+                key, result.outputs
             );
             evaluate_item(value, result.outputs.get(&key).unwrap());
         }
