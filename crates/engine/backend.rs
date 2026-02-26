@@ -308,6 +308,28 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                             "Step skipped because when evaluated to false in {}",
                             step_id_clone
                         );
+                        let null_outputs = step
+                            .out
+                            .iter()
+                            .map(|o| {
+                                (
+                                    o.id().to_string(),
+                                    DefaultValue::Any(serde_yaml::Value::Null),
+                                )
+                            })
+                            .collect::<HashMap<_, _>>();
+                        //spawn the "Null-Job"
+                        let step_id = step_id_clone.clone();
+                        debug!("Step skipped because when evaluated to false in {step_id_clone}");
+                        handles.push(tokio::spawn(async move {
+                            Ok((
+                                step_id,
+                                ExecutionResult {
+                                    outputs: null_outputs,
+                                    ..Default::default()
+                                },
+                            ))
+                        }));
                         continue;
                     }
                 }
