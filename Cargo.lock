@@ -586,7 +586,7 @@ dependencies = [
  "anyhow",
  "clap",
  "commonwl",
- "crankshaft",
+ "crankshaft 0.8.0",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -643,7 +643,19 @@ checksum = "61eff043664040b63ca10d34b214640db752231941b365e7000fb58bbb606d18"
 dependencies = [
  "crankshaft-config",
  "crankshaft-docker",
- "crankshaft-engine",
+ "crankshaft-engine 0.8.0",
+ "crankshaft-events",
+]
+
+[[package]]
+name = "crankshaft"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fe3b288ff149d1e5a10a2b91265bd2b8d54c4a7f4d3684f90e84199ab3b3f53"
+dependencies = [
+ "crankshaft-config",
+ "crankshaft-docker",
+ "crankshaft-engine 0.9.0",
  "crankshaft-events",
 ]
 
@@ -718,6 +730,39 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+ "whoami",
+]
+
+[[package]]
+name = "crankshaft-engine"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78697a87ac1b9c6beac1df23d320c4a64ac5c5aa6d9270a7998130f6ccccddea"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bollard",
+ "bon",
+ "crankshaft-config",
+ "crankshaft-docker",
+ "crankshaft-events",
+ "futures",
+ "growable-bloom-filter",
+ "indexmap 2.13.0",
+ "nix",
+ "nonempty",
+ "rand",
+ "regex",
+ "shlex",
+ "ssh2",
+ "tempfile",
+ "tes",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-metrics",
+ "tokio-util",
+ "tracing",
+ "url",
  "whoami",
 ]
 
@@ -836,7 +881,7 @@ dependencies = [
  "anyhow",
  "boa_engine",
  "bollard",
- "crankshaft",
+ "crankshaft 0.9.0",
  "cwl_core",
  "dircpy",
  "futures-util",
@@ -847,6 +892,7 @@ dependencies = [
  "pathdiff",
  "rdf",
  "regex",
+ "semver 1.0.27",
  "serde",
  "serde_json",
  "serde_yaml",

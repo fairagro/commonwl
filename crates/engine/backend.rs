@@ -1,5 +1,5 @@
 use crate::{
-    command,
+    V1_2_0, command, cwl_version,
     environment::{
         env::handle_environment,
         runtime::{Runtime, build_runtime},
@@ -130,6 +130,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
 ) -> anyhow::Result<ExecutionResult> {
     //create validator
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
+    let cwl_version = cwl_version(&request.specification)?;
 
     let CWLDocument::Workflow(wf) = &request.specification else {
         panic!("Not a Workflow");
@@ -241,6 +242,12 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                     let step_inputs = eval_inputs(step, sub_inputs, eval_context)?;
                     let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
                     if let Some(when) = &step.when {
+                        if cwl_version < V1_2_0 {
+                            anyhow::bail!(
+                                "Conditional execution with when is not supported for CWL version {}",
+                                cwl_version
+                            );
+                        }
                         let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
                             anyhow::bail!("Condition {when} did not evaluate to boolean");
                         };
@@ -287,6 +294,12 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
                 let step_inputs = eval_inputs(step, inputs, eval_context)?;
                 let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
                 if let Some(when) = &step.when {
+                    if cwl_version < V1_2_0 {
+                        anyhow::bail!(
+                            "Conditional execution with when is not supported for CWL version {}",
+                            cwl_version
+                        );
+                    }
                     let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
                         anyhow::bail!("Condition {when} did not evaluate to boolean");
                     };
@@ -421,6 +434,7 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
 ) -> anyhow::Result<ExecutionResult> {
     //create validator
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
+    let cwl_version = cwl_version(&request.specification)?;
 
     //get neccessary requirements
     let ijsr = request.get_requirement_or_hint::<InlineJavascriptRequirement>();
@@ -466,7 +480,7 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     };
 
     //create runtime struct
-    let mut runtime = build_runtime(rr, eval_context);
+    let mut runtime = build_runtime(rr, eval_context, &cwl_version)?;
     runtime.outdir = PathBuf::from(workdir);
     runtime.tmpdir = PathBuf::from(T::TMP_DIR);
 

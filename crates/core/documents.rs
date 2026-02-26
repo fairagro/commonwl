@@ -60,6 +60,15 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.get_requirement_or_hint::<T>(),
         }
     }
+
+    pub fn cwl_version(&self) -> Option<&String> {
+        match self {
+            Self::CommandLineTool(clt) => clt.cwl_version.as_ref(),
+            Self::ExpressionTool(et) => et.cwl_version.as_ref(),
+            Self::Operation(op) => op.cwl_version.as_ref(),
+            Self::Workflow(wf) => wf.cwl_version.as_ref(),
+        }
+    }
 }
 
 impl Identifiable for CWLDocument {
