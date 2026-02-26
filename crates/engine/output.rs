@@ -227,8 +227,14 @@ fn validate_file(
     base_path: &Path,
     copy: bool,
 ) -> anyhow::Result<()> {
-    let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref())
-        .map(|p| if copy { unique_path(&p) } else { p });
+    let path =
+        get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref()).map(|p| {
+            if copy {
+                unique_path(&p, file.path.as_ref())
+            } else {
+                p
+            }
+        });
     let dirname = path.as_ref().and_then(|p| p.parent());
 
     if let Some(source_path) = &file.path
@@ -312,7 +318,7 @@ fn validate_dir(
     copy: bool,
 ) -> anyhow::Result<()> {
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
-        .map(|p| if copy { unique_path(&p) } else { p });
+        .map(|p| if copy { unique_path(&p, None) } else { p });
 
     if let Some(source_path) = &dir.path
         && let Some(dest_path) = &path
@@ -343,7 +349,6 @@ fn validate_dir(
     }
 
     let copy = dir.path.is_none();
-
     dir.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
     dir.location = dir.path.as_ref().and_then(|p| format!("file://{p}").into());
 

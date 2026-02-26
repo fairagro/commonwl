@@ -1,6 +1,6 @@
 use crate::{
-    checksum,
     expression::{EvaluationContext, do_eval},
+    io::checksum,
     io::{directory::locate_dir, get_location, get_relative_path},
 };
 use cwl_core::{

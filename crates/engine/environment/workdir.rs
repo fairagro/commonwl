@@ -10,6 +10,7 @@ use cwl_core::{
     inputs::DefaultValue,
     requirements::{InitialWorkDirRequirement, ListingItems, WorkDirItems},
 };
+use dircpy::copy_dir;
 use std::{
     collections::HashMap,
     fs,
@@ -50,12 +51,26 @@ pub fn stage_work_dir(
             let evaluated = do_eval(expression, context)?;
             let items = &serde_yaml::from_value(evaluated)?;
             update_inputs(expression, inputs, container_workdir, None);
-            stage_item(items, workdir, stagedir, context, container_workdir, inputs)
+            stage_item(
+                items,
+                workdir,
+                stagedir,
+                context,
+                container_workdir,
+                inputs,
+                None,
+            )
         }
         WorkDirItems::ListingItems(items) => match &**items {
-            OneOrMany::One(item) => {
-                stage_item(item, workdir, stagedir, context, container_workdir, inputs)
-            }
+            OneOrMany::One(item) => stage_item(
+                item,
+                workdir,
+                stagedir,
+                context,
+                container_workdir,
+                inputs,
+                None,
+            ),
             OneOrMany::Many(items) => {
                 let mut mounts = vec![];
                 for item in items {
@@ -66,6 +81,7 @@ pub fn stage_work_dir(
                         context,
                         container_workdir,
                         inputs,
+                        None,
                     )?);
                 }
                 Ok(mounts)
@@ -81,6 +97,7 @@ fn stage_item(
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
+    readonly: Option<bool>,
 ) -> anyhow::Result<Vec<WorkDirMount>> {
     match item {
         ListingItems::Expression(expression) => {
@@ -92,7 +109,15 @@ fn stage_item(
             }
             let items = &serde_yaml::from_value(evaluated)?;
             update_inputs(expression, inputs, container_workdir, None);
-            stage_item(items, workdir, stagedir, context, container_workdir, inputs)
+            stage_item(
+                items,
+                workdir,
+                stagedir,
+                context,
+                container_workdir,
+                inputs,
+                readonly,
+            )
         }
         ListingItems::Dirent(dirent) => stage_dirent(
             dirent,
@@ -102,11 +127,19 @@ fn stage_item(
             container_workdir,
             inputs,
         ),
-        ListingItems::FileOrDirectory(fod) => stage_files(fod, workdir, stagedir, None, true),
+        ListingItems::FileOrDirectory(fod) => {
+            stage_files(fod, workdir, stagedir, None, readonly.unwrap_or(true))
+        }
         ListingItems::Vec(items) => {
             let mut mounts = vec![];
             for item in items {
-                mounts.extend(stage_files(item, workdir, stagedir, None, true)?);
+                mounts.extend(stage_files(
+                    item,
+                    workdir,
+                    stagedir,
+                    None,
+                    readonly.unwrap_or(true),
+                )?);
             }
             Ok(mounts)
         }
@@ -128,7 +161,6 @@ fn stage_dirent(
         debug!("Workdir Entry evaluated to null: {dirent:?}");
         return Ok(vec![]);
     }
-
     //probably array of files is given here, why is dirent used in the first place?
     if dirent.entryname.is_none()
         && let Ok(items) =
@@ -143,6 +175,7 @@ fn stage_dirent(
                 context,
                 container_workdir,
                 inputs,
+                dirent.writable.map(|writable| !writable),
             )?);
         }
         return Ok(mounts);
@@ -300,4 +333,26 @@ fn update_inputs(
             }
         }
     }
+}
+
+pub(crate) fn handle_inplace_update(mounts: Vec<WorkDirMount>) -> anyhow::Result<()> {
+    for mount in mounts {
+        if !mount.readonly
+            && let Source::File(src_path) = &mount.source
+        {
+            match mount.ty {
+                MountType::File => {
+                    fs::copy(&mount.target, src_path).with_context(|| {
+                        format!("Could not copy {:?} to {src_path:?}", mount.target)
+                    })?;
+                }
+                MountType::Directory => {
+                    copy_dir(&mount.target, src_path).with_context(|| {
+                        format!("Could not copy {:?} to {src_path:?}", mount.target)
+                    })?;
+                }
+            }
+        }
+    }
+    Ok(())
 }

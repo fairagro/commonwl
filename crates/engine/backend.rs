@@ -3,7 +3,7 @@ use crate::{
     environment::{
         env::handle_environment,
         runtime::{Runtime, build_runtime},
-        workdir::{WorkDirMount, stage_work_dir},
+        workdir::{WorkDirMount, handle_inplace_update, stage_work_dir},
     },
     expression::{EvaluationContext, do_eval},
     input::{collect_inputs, flatten_inputs, get_stdin},
@@ -29,8 +29,9 @@ use cwl_core::{
     inputs::DefaultValue,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
-        InlineJavascriptRequirement, LoadListingRequirement, MultipleInputFeatureRequirement,
-        ResourceRequirement, ScatterFeatureRequirement, ToolTimeLimit,
+        InlineJavascriptRequirement, InplaceUpdateRequirement, LoadListingRequirement,
+        MultipleInputFeatureRequirement, ResourceRequirement, ScatterFeatureRequirement,
+        ToolTimeLimit,
     },
 };
 use futures_util::{
@@ -144,7 +145,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         &request.specification,
         &request.inputs,
         &request.working_dir,
-        Path::new("."),
+        Path::new(""),
         llr,
         Some(&fv),
     )?;
@@ -388,6 +389,7 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     let evr = request.get_requirement_or_hint::<EnvVarRequirement>();
     let ttl = request.get_requirement_or_hint::<ToolTimeLimit>();
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
+    let iur = request.get_requirement_or_hint::<InplaceUpdateRequirement>();
 
     let outdir = tempdir()?;
     let tmpdir = tempdir()?;
@@ -571,7 +573,10 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
                 validator: &fv,
             },
         )?;
-        //evaluate exitstatus based on tool's expected exit codes
+
+        if iur.is_some_and(|i| i.inplace_update) {
+            handle_inplace_update(mounts)?;
+        }
 
         Ok(ExecutionResult {
             exit_status: result.exit_status,
