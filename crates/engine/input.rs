@@ -40,9 +40,7 @@ pub fn collect_inputs(
             }
 
             _ => match &input.r#type {
-                OneOrMany::One(item) => {
-                    validate_type(&item.clone().into(), &value, format, fv)
-                }
+                OneOrMany::One(item) => validate_type(&item.clone().into(), &value, format, fv),
                 OneOrMany::Many(items) => items
                     .iter()
                     .any(|i| validate_type(&i.clone().into(), &value, format, fv)),
@@ -105,6 +103,18 @@ fn load_input(
                 let mut dv = serde_yaml::from_value(item.clone())?;
                 load_input(&mut dv, work_dir, stage_dir, None, false)?;
                 *item = serde_yaml::to_value(&dv)?;
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Number(n)) => {
+            //the spec wants floats with .0 to be represented as integer
+            if let Some(f) = n.as_f64()
+                && f.is_finite()
+                && f.fract() == 0.0
+                && f.abs() <= i64::MAX as f64
+            {
+                *value = DefaultValue::Any(serde_yaml::Value::Number(serde_yaml::Number::from(
+                    f as i64,
+                )));
             }
         }
         _ => {}
