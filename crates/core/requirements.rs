@@ -83,6 +83,7 @@ pub enum WorkflowRequirements {
     ScatterFeatureRequirement(ScatterFeatureRequirement),
     MultipleInputFeatureRequirement(MultipleInputFeatureRequirement),
     StepInputExpressionRequirement(StepInputExpressionRequirement),
+    WorkReuse(WorkReuse)
 }
 
 impl FromShortHand for WorkflowRequirements {}
@@ -102,6 +103,7 @@ impl_conversion_methods!(WorkflowRequirements, SubworkflowFeatureRequirement);
 impl_conversion_methods!(WorkflowRequirements, ScatterFeatureRequirement);
 impl_conversion_methods!(WorkflowRequirements, MultipleInputFeatureRequirement);
 impl_conversion_methods!(WorkflowRequirements, StepInputExpressionRequirement);
+impl_conversion_methods!(WorkflowRequirements, WorkReuse);
 
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

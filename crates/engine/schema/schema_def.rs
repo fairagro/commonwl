@@ -17,7 +17,6 @@ pub fn replace_schema_definitions(
     doc: &mut CWLDocument,
     requirements: &[ProcessRequirements],
 ) -> anyhow::Result<()> {
-    dbg!(&doc);
     let schema_defs = if let Some(sdr) = requirements
         .iter()
         .map(|i| {

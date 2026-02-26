@@ -149,6 +149,7 @@ impl From<WorkflowRequirements> for ProcessRequirements {
             WorkflowRequirements::StepInputExpressionRequirement(r) => {
                 ProcessRequirements::StepInputExpressionRequirement(r)
             }
+            WorkflowRequirements::WorkReuse(r) => ProcessRequirements::WorkReuse(r),
         }
     }
 }
