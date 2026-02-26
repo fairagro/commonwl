@@ -17,6 +17,7 @@ pub fn replace_schema_definitions(
     doc: &mut CWLDocument,
     requirements: &[ProcessRequirements],
 ) -> anyhow::Result<()> {
+    dbg!(&doc);
     let schema_defs = if let Some(sdr) = requirements
         .iter()
         .map(|i| {
@@ -275,18 +276,30 @@ fn extract_schema_definitions(
 ) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
     let mut schemas = HashMap::new();
 
-    if let serde_yaml::Value::Sequence(types) = value {
-        for type_def in types {
-            if let serde_yaml::Value::Mapping(type_map) = type_def
-                && let Some(serde_yaml::Value::String(name)) =
-                    type_map.get(serde_yaml::Value::String("name".to_string()))
-            {
-                let mut type_def = type_def.clone();
-                //validate names
-                validate_field_name(&mut type_def);
+    // Flatten: types can be a Sequence of Mappings, or a Sequence containing
+    // a nested Sequence (when $import resolves a multi-type file)
+    let type_defs: Vec<&serde_yaml::Value> = match value {
+        serde_yaml::Value::Sequence(types) => types
+            .iter()
+            .flat_map(|item| match item {
+                serde_yaml::Value::Sequence(inner) => inner.iter().collect::<Vec<_>>(),
+                other => vec![other],
+            })
+            .collect(),
+        mapping @ serde_yaml::Value::Mapping(_) => vec![mapping],
+        _ => vec![],
+    };
 
-                schemas.insert(format!("#{}", name), type_def);
-            }
+    for type_def in type_defs {
+        if let serde_yaml::Value::Mapping(type_map) = type_def
+            && let Some(serde_yaml::Value::String(name)) =
+                type_map.get(serde_yaml::Value::String("name".to_string()))
+        {
+            let mut type_def = type_def.clone();
+            //validate names
+            validate_field_name(&mut type_def);
+
+            schemas.insert(format!("#{}", name), type_def);
         }
     }
 
