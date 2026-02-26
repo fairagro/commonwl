@@ -162,6 +162,7 @@ pub(crate) fn handle_link_merge(
             let mut flattened = vec![];
             for value in values {
                 match value {
+                    DefaultValue::Any(serde_yaml::Value::Null) => {}
                     DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
                         for item in arr {
                             flattened.push(serde_yaml::from_value(item)?);
