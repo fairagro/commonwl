@@ -118,8 +118,8 @@ pub fn collect_secondary_files_for_inputs(
     for input in doc.get_inputs() {
         let value = values.get_mut(&input.id.unwrap());
         if let Some(value) = value {
-            if let Some(secondary_files) = input.secondary_files {
-                handle_secondary_files_for_input(value, &secondary_files, context, work_dir)?;
+            if let Some(secondary_files) = &input.secondary_files {
+                handle_secondary_files_for_input(value, secondary_files, context, work_dir)?;
             }
 
             //handle record field secondary files
@@ -128,15 +128,24 @@ pub fn collect_secondary_files_for_inputs(
                 && let Some(fields) = &rec.fields
             {
                 for field in fields {
-                    if let Some(sec_files) = &field.secondary_files
-                        && let DefaultValue::Any(yaml_value) = value
+                    if let DefaultValue::Any(yaml_value) = value
                         && let Some(field_value) = yaml_value.get_mut(&field.name)
                     {
                         let mut dv = serde_yaml::from_value(field_value.clone())?;
-                        handle_secondary_files_for_input(&mut dv, sec_files, context, work_dir)?;
+                        if let Some(sec_files) = &field.secondary_files {
+                            handle_secondary_files_for_input(
+                                &mut dv, sec_files, context, work_dir,
+                            )?;
+                        } else {
+                            set_secondary_files_empty(&mut dv)?;
+                        }
                         *field_value = serde_yaml::to_value(dv)?;
                     }
                 }
+            }
+
+            if input.secondary_files.is_none() {
+                set_secondary_files_empty(value)?;
             }
         }
     }
@@ -164,6 +173,32 @@ fn handle_secondary_files_for_input(
             for item in rec.values_mut() {
                 let mut dv = serde_yaml::from_value(item.clone())?;
                 handle_secondary_files_for_input(&mut dv, secondary_files, context, work_dir)?;
+                *item = serde_yaml::to_value(dv)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn set_secondary_files_empty(value: &mut DefaultValue) -> anyhow::Result<()> {
+    match value {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+            if file.secondary_files.is_none() {
+                file.secondary_files = Some(vec![]);
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+            for item in vec {
+                let mut dv = serde_yaml::from_value(item.clone())?;
+                set_secondary_files_empty(&mut dv)?;
+                *item = serde_yaml::to_value(dv)?;
+            }
+        }
+        DefaultValue::Any(serde_yaml::Value::Mapping(rec)) => {
+            for item in rec.values_mut() {
+                let mut dv = serde_yaml::from_value(item.clone())?;
+                set_secondary_files_empty(&mut dv)?;
                 *item = serde_yaml::to_value(dv)?;
             }
         }
@@ -205,7 +240,6 @@ pub fn handle_secondary_files(
         debug!("Only local files are supported for secondary_files right now");
         return Ok(());
     }
-    let location_path = url.path();
 
     let stage_dir = Path::new(file.dirname.as_ref().unwrap());
 
@@ -219,7 +253,7 @@ pub fn handle_secondary_files(
     };
 
     for schema in secondary_files.as_many() {
-        let result = handle_secondary_file_schema(location_path, &schema, &context)?;
+        let result = handle_secondary_file_schema(file, &schema, &context)?;
 
         if let Some(mut items) = result {
             for item in &mut items {
@@ -271,10 +305,14 @@ pub(crate) enum PathOrFile {
 }
 
 pub(crate) fn handle_secondary_file_schema(
-    path: impl AsRef<Path>,
+    file: &File,
     item: &SecondaryFileSchema,
     context: &EvaluationContext,
 ) -> anyhow::Result<Option<Vec<PathOrFile>>> {
+    let location = file.location.as_ref().unwrap();
+    let loc_url = Url::parse(location)?;
+    let path = Path::new(loc_url.path());
+
     if let Ok(pattern_value) = do_eval(&item.pattern, context)
         && pattern_value != item.pattern
     {
@@ -284,7 +322,7 @@ pub(crate) fn handle_secondary_file_schema(
     }
 
     let pattern = item.pattern.clone();
-    let mut secondary_path_str = path.as_ref().as_os_str().to_owned();
+    let mut secondary_path_str = path.as_os_str().to_owned();
     if let Some(new_ext) = pattern.strip_prefix("^.") {
         let mut pathbuf = PathBuf::from(&secondary_path_str);
         pathbuf.set_extension(new_ext);
@@ -296,10 +334,24 @@ pub(crate) fn handle_secondary_file_schema(
     //check required and existent
     let is_required = if let Some(BoolOrExpression::Expression(req_exp)) = &item.required {
         do_eval(req_exp, context)?.as_bool().unwrap_or(false)
+    } else if item.required.is_none() {
+        true
     } else {
         matches!(&item.required, Some(BoolOrExpression::Bool(true)))
     };
+
     let secondary_path = Path::new(&secondary_path_str);
+    //if there are secondary files already we just validate what is there
+    if let Some(sec_files) = &file.secondary_files
+        && is_required
+        && !sec_files.iter().any(|f| {
+            **f.location().as_ref().unwrap()
+                == format!("file://{}", secondary_path.to_string_lossy())
+        })
+    {
+        anyhow::bail!("required secondary file not found {pattern} for {file:?}");
+    }
+
     if !secondary_path.exists() && !context.workdir.unwrap().join(secondary_path).exists() {
         if is_required {
             anyhow::bail!("required secondary file not found {pattern}");

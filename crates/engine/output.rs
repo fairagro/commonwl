@@ -160,15 +160,13 @@ fn evaluate_command_binding(
     if let Some(secondary_files) = secondary_files {
         for item in &mut results {
             if let DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) = item {
-                let path = file.path.clone().unwrap();
-
                 let json_value = serde_json::to_value(&file)?;
                 let eval_context = EvaluationContext {
                     context: Some(&json_value),
                     ..*context.eval_context
                 };
                 file.secondary_files =
-                    handle_secondary_files(Path::new(&path), secondary_files, &eval_context).ok();
+                    handle_secondary_files(file, secondary_files, &eval_context).ok();
             }
         }
     }
@@ -177,14 +175,13 @@ fn evaluate_command_binding(
 }
 
 fn handle_secondary_files(
-    path: &Path,
+    file: &File,
     secondary_files: &OneOrMany<SecondaryFileSchema>,
     context: &EvaluationContext,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     let mut secondaries = vec![];
-
     for item in &secondary_files.as_many() {
-        let Some(secondary_file) = handle_secondary_file_schema(path, item, context)? else {
+        let Some(secondary_file) = handle_secondary_file_schema(file, item, context)? else {
             continue;
         };
         for item in secondary_file {

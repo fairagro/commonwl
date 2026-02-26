@@ -140,7 +140,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     //we don't want to inherit those requirements from parent here!
     let mir = wf.get_requirement_or_hint::<MultipleInputFeatureRequirement>();
 
-    let inputs = collect_inputs(
+    let mut inputs = collect_inputs(
         &request.specification,
         &request.inputs,
         &request.working_dir,
@@ -150,6 +150,21 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     )?;
 
     let collection_dir = tempdir()?;
+
+    let eval_context = &mut EvaluationContext {
+        workdir: Some(&request.working_dir),
+        ijsr,
+        inputs: Some(&inputs.clone()),
+        ..Default::default()
+    };
+
+    //collect secondary files using evalcontrext and reassign inputs
+    collect_secondary_files_for_inputs(
+        &request.specification,
+        &mut inputs,
+        eval_context,
+        &request.working_dir,
+    )?;
 
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
