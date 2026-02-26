@@ -280,6 +280,15 @@ impl From<CommandOutputType> for OutputType {
     }
 }
 
+impl From<OneOrMany<CommandOutputType>> for OneOrMany<OutputType> {
+    fn from(value: OneOrMany<CommandOutputType>) -> Self {
+        match value {
+            OneOrMany::One(t) => OneOrMany::One(t.into()),
+            OneOrMany::Many(v) => OneOrMany::Many(v.into_iter().map(|t| t.into()).collect()),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputRecordSchema {

@@ -15,7 +15,7 @@ use cwl_core::{
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
         CommandOutputSchema, CommandOutputType, ExpressionToolOutputParameter, OutputType,
-        WorkflowOutputParameter,
+        PickValueMethod, WorkflowOutputParameter,
     },
     types::{CWLType, SecondaryFileSchema},
 };
@@ -402,22 +402,7 @@ fn collect_output_item(
 
     //validate output to schema
     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
-        let valid = match r#type {
-            OneOrMany::One(r#type) => validate_type(
-                &Into::<OutputType>::into(r#type.clone()).into(),
-                &value,
-                None,
-                None,
-            ),
-            OneOrMany::Many(items) => items.iter().any(|t| {
-                validate_type(
-                    &Into::<OutputType>::into(t.clone()).into(),
-                    &value,
-                    None,
-                    None,
-                )
-            }),
-        };
+        let valid = validate_output_type(&r#type.clone().into(), &value);
         if !valid {
             anyhow::bail!(
                 "Output value {value:?} does not match output type {:?}",
@@ -645,22 +630,7 @@ pub fn collect_expression_outputs(
             let mut value: DefaultValue = serde_yaml::from_value(result.clone())?;
 
             //validate output to schema
-            let valid = match &output.r#type {
-                OneOrMany::One(r#type) => validate_type(
-                    &Into::<OutputType>::into(r#type.clone()).into(),
-                    &value,
-                    None,
-                    None,
-                ),
-                OneOrMany::Many(items) => items.iter().any(|t| {
-                    validate_type(
-                        &Into::<OutputType>::into(t.clone()).into(),
-                        &value,
-                        None,
-                        None,
-                    )
-                }),
-            };
+            let valid = validate_output_type(&output.r#type, &value);
             //outputs are considered valid, hinting when something invalid was given
             if !valid {
                 warn!(
@@ -682,21 +652,116 @@ pub fn collect_workflow_outputs(
     context: &OutputCollectionContext,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map = HashMap::new();
+
     for output in outputs {
+        let output_id = output.id.clone().unwrap();
         if let Some(output_source) = &output.output_source {
             match output_source {
                 OneOrMany::One(item) => {
                     if let Some(value) = values.get(item) {
-                        let format = output.format.as_ref().map(|f| f.as_one().to_string());
-
                         let mut value = value.clone();
+                        let format = output.format.as_ref().map(|f| f.as_one().to_string());
                         validate_output_item_recurse(&mut value, format.as_ref(), context)?;
-                        output_map.insert(output.id.clone().unwrap(), value.clone());
+                        if let CommandOutputParameterType::CommandOutputType(r#type) =
+                            &output.r#type
+                        {
+                            let valid = validate_output_type(&r#type.clone().into(), &value);
+                            if !valid {
+                                anyhow::bail!(
+                                    "Invalid value for {output_id}. {:?} does not match {value:?}",
+                                    r#type
+                                );
+                            }
+                        }
+                        output_map.insert(output_id.clone(), value);
                     }
                 }
-                OneOrMany::Many(_items) => {}
+                OneOrMany::Many(items) => {
+                    if let Some(pick_value) = output.pick_value {
+                        let mut value = match pick_value {
+                            PickValueMethod::FirstNonNull => {
+                                let mut return_value = None;
+                                for item in items {
+                                    if let Some(value) = values.get(item)
+                                        && !value.is_null()
+                                    {
+                                        return_value = Some(value);
+                                        break;
+                                    }
+                                }
+                                //check if at least one item is entered
+                                if return_value.is_none() {
+                                    anyhow::bail!(
+                                        "No output for {output_id}, pick value `FirstNonNull` requires at least one value"
+                                    );
+                                }
+                                return_value.cloned().unwrap()
+                            }
+                            PickValueMethod::TheOnlyNonNull => {
+                                let items = items
+                                    .iter()
+                                    .filter_map(|i| values.get(i))
+                                    .filter(|i| !i.is_null())
+                                    .collect::<Vec<_>>();
+                                if items.len() != 1 {
+                                    anyhow::bail!(
+                                        "Output {output_id}: pick value `TheOnlyNonNull` requires exactly one non null value"
+                                    );
+                                }
+
+                                items[0].clone()
+                            }
+                            PickValueMethod::AllNonNull => {
+                                let mut data = vec![];
+                                for item in items {
+                                    if let Some(value) = values.get(item)
+                                        && !value.is_null()
+                                    {
+                                        data.push(value);
+                                    }
+                                }
+                                DefaultValue::Any(serde_yaml::to_value(data)?)
+                            }
+                        };
+
+                        let format = output.format.as_ref().map(|f| f.as_one().to_string());
+                        validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+                        if let CommandOutputParameterType::CommandOutputType(r#type) =
+                            &output.r#type
+                        {
+                            let valid = validate_output_type(&r#type.clone().into(), &value);
+                            if !valid {
+                                anyhow::bail!(
+                                    "Invalid value for {output_id}. {:?} does not match {value:?}",
+                                    r#type
+                                );
+                            }
+                        }
+                        output_map.insert(output_id.clone(), value);
+                    }
+                }
             }
         }
     }
     Ok(output_map)
+}
+
+fn validate_output_type(r#type: &OneOrMany<OutputType>, value: &DefaultValue) -> bool {
+    //validate output to schema
+    match r#type {
+        OneOrMany::One(r#type) => validate_type(
+            &Into::<OutputType>::into(r#type.clone()).into(),
+            value,
+            None,
+            None,
+        ),
+        OneOrMany::Many(items) => items.iter().any(|t| {
+            validate_type(
+                &Into::<OutputType>::into(t.clone()).into(),
+                value,
+                None,
+                None,
+            )
+        }),
+    }
 }
