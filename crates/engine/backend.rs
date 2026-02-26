@@ -372,7 +372,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
         eval_context,
         validator: &fv,
     };
-    let outputs = collect_workflow_outputs(&wf.outputs, completed_outputs, &cc)?;
+    let outputs = collect_workflow_outputs(&wf.outputs, completed_outputs, &cc, mir)?;
 
     Ok(ExecutionResult {
         exit_status: NonEmpty::new(ExitStatus::default()),

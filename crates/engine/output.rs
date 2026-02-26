@@ -18,6 +18,7 @@ use cwl_core::{
         CommandOutputSchema, CommandOutputType, ExpressionToolOutputParameter, LinkMergeMethod,
         OutputType, WorkflowOutputParameter,
     },
+    requirements::MultipleInputFeatureRequirement,
     types::{CWLType, SecondaryFileSchema},
 };
 use dircpy::copy_dir;
@@ -651,6 +652,7 @@ pub fn collect_workflow_outputs(
     outputs: &[WorkflowOutputParameter],
     values: HashMap<String, DefaultValue>,
     context: &OutputCollectionContext,
+    mir: Option<&MultipleInputFeatureRequirement>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map = HashMap::new();
 
@@ -695,36 +697,41 @@ pub fn collect_workflow_outputs(
                     }
                 }
                 OneOrMany::Many(items) => {
-                    if let Some(pick_value) = output.pick_value {
-                        let resolved = items
-                            .iter()
-                            .map(|item| {
-                                values
-                                    .get(item)
-                                    .cloned()
-                                    .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))
-                            })
-                            .collect::<Vec<_>>();
-                        let merged = handle_link_merge(
-                            output.link_merge.unwrap_or(LinkMergeMethod::MergeNested),
-                            resolved,
-                        )?;
-                        let mut value = handle_pick_value(&output_id, pick_value, merged)?;
-                        let format = output.format.as_ref().map(|f| f.as_one().to_string());
-                        validate_output_item_recurse(&mut value, format.as_ref(), context)?;
-                        if let CommandOutputParameterType::CommandOutputType(r#type) =
-                            &output.r#type
-                        {
-                            let valid = validate_output_type(&r#type.clone().into(), &value);
-                            if !valid {
-                                anyhow::bail!(
-                                    "Invalid value for {output_id}. {:?} does not match {value:?}",
-                                    r#type
-                                );
-                            }
+                    let resolved = items
+                        .iter()
+                        .map(|item| {
+                            values
+                                .get(item)
+                                .cloned()
+                                .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))
+                        })
+                        .collect::<Vec<_>>();
+                    let merged = handle_link_merge(
+                        output.link_merge.unwrap_or(LinkMergeMethod::MergeNested),
+                        resolved,
+                    )?;
+                    let mut value = if let Some(pick_value) = output.pick_value {
+                        handle_pick_value(&output_id, pick_value, merged)?
+                    } else if mir.is_some() {
+                        DefaultValue::Any(serde_yaml::to_value(merged)?)
+                    } else {
+                        anyhow::bail!(
+                            "Needs to use either pick_value or MultipleInputFeatureRequirement with multiple output_sources"
+                        );
+                    };
+
+                    let format = output.format.as_ref().map(|f| f.as_one().to_string());
+                    validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+                    if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
+                        let valid = validate_output_type(&r#type.clone().into(), &value);
+                        if !valid {
+                            anyhow::bail!(
+                                "Invalid value for {output_id}. {:?} does not match {value:?}",
+                                r#type
+                            );
                         }
-                        output_map.insert(output_id.clone(), value);
                     }
+                    output_map.insert(output_id.clone(), value);
                 }
             }
         }
