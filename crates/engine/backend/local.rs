@@ -23,7 +23,8 @@ use crankshaft::{
 use cwl_core::IntegerOrExpression;
 use nonempty::nonempty;
 use std::{
-    fs, sync::{Arc, Mutex}, time::Duration
+    sync::{Arc, Mutex},
+    time::Duration,
 };
 use tokio_util::sync::CancellationToken;
 use tracing::error;
@@ -78,7 +79,7 @@ impl TaskBackend for LocalBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let mut container = "ubuntu".to_string(); //add config "default-container"
+        let container = "ubuntu".to_string(); //add config "default-container"
         //if let Some(dr) = request.docker {
         //    if let Some(df) = &dr.docker_file
         //        && let Some(dt) = &dr.docker_image_id
@@ -101,8 +102,8 @@ impl TaskBackend for LocalBackend {
         } else {
             &format!("{}/stderr", request.tmpdir.to_string_lossy())
         };
-        
-        let mut args = request
+
+        let args = request
             .command
             .iter()
             .map(|s| s.to_string())
