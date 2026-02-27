@@ -39,7 +39,6 @@ pub fn locate_file(
         let url = Url::parse(&location)?;
         let relative_path = get_relative_path(&url, work_dir)?;
         let designated_path = stage_dir.join(&relative_path);
-
         file.location = Some(location.clone());
 
         //calculate file metadata for designated path
@@ -67,7 +66,6 @@ pub fn locate_file(
         let path =
             file.dirname.clone().unwrap() + MAIN_SEPARATOR_STR + file.basename.as_ref().unwrap();
         file.path = Some(path);
-
         //try getting checksum and size (currently for local files only). Ignores failure (which usually means the file does not exist!)
         if url.scheme() == "file"
             && let Ok(FileMetaData { size, checksum }) =

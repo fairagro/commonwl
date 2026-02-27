@@ -34,6 +34,13 @@ pub fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<Path
         relative_part = relative_part.strip_prefix("/").unwrap_or(relative_part);
     }
 
+    //if # is used in filename... yo! you people, don't do that!
+    let relative_part = if let Some(fragment) = location.fragment() {
+        &format!("{relative_part}#{fragment}")
+    } else {
+        relative_part
+    };
+
     let path = Path::new(relative_part);
     let path = if path.is_absolute() {
         path.strip_prefix(work_dir)?

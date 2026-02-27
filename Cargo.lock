@@ -155,49 +155,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "axum"
-version = "0.8.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
-dependencies = [
- "axum-core",
- "bytes",
- "futures-util",
- "http",
- "http-body",
- "http-body-util",
- "itoa",
- "matchit",
- "memchr",
- "mime",
- "percent-encoding",
- "pin-project-lite",
- "serde_core",
- "sync_wrapper",
- "tower",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "axum-core"
-version = "0.5.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08c78f31d7b1291f7ee735c1c6780ccde7785daae9a9206026862dab7d8792d1"
-dependencies = [
- "bytes",
- "futures-core",
- "http",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
- "sync_wrapper",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -586,7 +543,7 @@ dependencies = [
  "anyhow",
  "clap",
  "commonwl",
- "crankshaft 0.8.0",
+ "crankshaft",
  "serde_json",
  "tokio",
  "tokio-util",
@@ -637,25 +594,13 @@ dependencies = [
 
 [[package]]
 name = "crankshaft"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61eff043664040b63ca10d34b214640db752231941b365e7000fb58bbb606d18"
-dependencies = [
- "crankshaft-config",
- "crankshaft-docker",
- "crankshaft-engine 0.8.0",
- "crankshaft-events",
-]
-
-[[package]]
-name = "crankshaft"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fe3b288ff149d1e5a10a2b91265bd2b8d54c4a7f4d3684f90e84199ab3b3f53"
 dependencies = [
  "crankshaft-config",
  "crankshaft-docker",
- "crankshaft-engine 0.9.0",
+ "crankshaft-engine",
  "crankshaft-events",
 ]
 
@@ -695,42 +640,6 @@ dependencies = [
  "tokio-retry2 0.7.0",
  "tokio-stream",
  "tracing",
-]
-
-[[package]]
-name = "crankshaft-engine"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc5f88003e1d595befc4786d4fcd871c5cf00c0ffa33d3a5b6840e8b4a7807b5"
-dependencies = [
- "anyhow",
- "async-trait",
- "bollard",
- "bon",
- "crankshaft-config",
- "crankshaft-docker",
- "crankshaft-events",
- "futures",
- "growable-bloom-filter",
- "indexmap 2.13.0",
- "nix",
- "nonempty",
- "rand",
- "regex",
- "shlex",
- "ssh2",
- "tar",
- "tempfile",
- "tes",
- "thiserror 2.0.18",
- "tokio",
- "tokio-metrics",
- "tokio-util",
- "tonic",
- "tracing",
- "url",
- "uuid",
- "whoami",
 ]
 
 [[package]]
@@ -881,7 +790,7 @@ dependencies = [
  "anyhow",
  "boa_engine",
  "bollard",
- "crankshaft 0.9.0",
+ "crankshaft",
  "cwl_core",
  "dircpy",
  "futures-util",
@@ -1578,19 +1487,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-timeout"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b90d566bffbce6a75bd8b09a05aa8c2cb1fabb6cb348f8840c9e4c90a0d83b0"
-dependencies = [
- "hyper",
- "hyper-util",
- "pin-project-lite",
- "tokio",
- "tower-service",
-]
-
-[[package]]
 name = "hyper-util"
 version = "0.1.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2000,12 +1896,6 @@ checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
 dependencies = [
  "regex-automata",
 ]
-
-[[package]]
-name = "matchit"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
 
 [[package]]
 name = "memchr"
@@ -3667,35 +3557,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tonic"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb7613188ce9f7df5bfe185db26c5814347d110db17920415cf2fbcad85e7203"
-dependencies = [
- "async-trait",
- "axum",
- "base64",
- "bytes",
- "h2",
- "http",
- "http-body",
- "http-body-util",
- "hyper",
- "hyper-timeout",
- "hyper-util",
- "percent-encoding",
- "pin-project",
- "socket2",
- "sync_wrapper",
- "tokio",
- "tokio-stream",
- "tower",
- "tower-layer",
- "tower-service",
- "tracing",
-]
-
-[[package]]
 name = "tower"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3703,15 +3564,11 @@ checksum = "ebe5ef63511595f1344e2d5cfa636d973292adc0eec1f0ad45fae9f0851ab1d4"
 dependencies = [
  "futures-core",
  "futures-util",
- "indexmap 2.13.0",
  "pin-project-lite",
- "slab",
  "sync_wrapper",
  "tokio",
- "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing",
 ]
 
 [[package]]
@@ -3908,7 +3765,6 @@ checksum = "b672338555252d43fd2240c714dc444b8c6fb0a5c5335e65a07bba7742735ddb"
 dependencies = [
  "getrandom 0.4.1",
  "js-sys",
- "rand",
  "wasm-bindgen",
 ]
 

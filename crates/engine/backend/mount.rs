@@ -9,7 +9,10 @@ use crankshaft::engine::{
 };
 use cwl_core::files::FileOrDirectory;
 use dircpy::copy_dir;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use url::Url;
 
 pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
@@ -20,9 +23,16 @@ pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<(
     if let Some(path) = input.path()
         && let Some(location) = input.location()
     {
+        let contents = if location.starts_with("file://") {
+            let location = location.strip_prefix("file://").unwrap();
+            Contents::Path(PathBuf::from(location))
+        } else {
+            Contents::Url(Url::parse(location)?)
+        };
+
         task.add_input(
             Input::builder()
-                .contents(Contents::Url(Url::parse(location)?))
+                .contents(contents)
                 .path(path)
                 .ty(ty)
                 .build(),
