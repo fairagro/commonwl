@@ -24,7 +24,7 @@ jobs:
       - name: Run Conformance Tests
         continue-on-error: true
         env:
-          VARIANT: ${{ matrix.variant }}
+          BACKEND: ${{ matrix.variant }}
         run: |
           python3 -m venv .venv
           source .venv/bin/activate
