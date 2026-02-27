@@ -29,6 +29,7 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install cwltest
+          mkdir badges
           cargo build --release && cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance --badgedir badges/$BACKEND
           exit 0
       - name: Generate Summary
