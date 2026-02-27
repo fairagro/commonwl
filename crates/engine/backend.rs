@@ -22,6 +22,7 @@ use crate::{
     workflow::{collect_raw_inputs, eval_inputs},
 };
 use anyhow::Context;
+use async_trait::async_trait;
 use cwl_core::{
     docstring,
     documents::{CWLDocument, ScatterMethod, StringOrDocument, WorkflowStep},
@@ -45,6 +46,7 @@ use std::{
     fs,
     path::{Path, PathBuf},
     process::ExitStatus,
+    sync::Arc,
 };
 use tempfile::tempdir;
 use tokio::task::JoinHandle;
@@ -52,21 +54,23 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
 pub mod docker;
+pub mod local;
 pub mod mount;
 
-pub trait TaskBackend {
-    const INPUT_DIR: &str;
-    const WORK_DIR: &str;
-    const TMP_DIR: &str;
-
-    fn run<'a>(
+#[async_trait]
+pub trait TaskBackend: Send + Sync + 'static {
+    async fn run(
         &self,
-        request: &'a TaskExecutionRequest<'a>,
+        request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
-    ) -> impl Future<Output = anyhow::Result<TaskExecutionResult>> + Send;
-}
-#[derive(Debug, Clone, Default)]
+    ) -> anyhow::Result<TaskExecutionResult>;
 
+    fn input_dir(&self) -> String;
+    fn work_dir(&self) -> String;
+    fn tmp_dir(&self) -> String;
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct ExecutionResult {
     pub exit_status: NonEmpty<ExitStatus>,
     pub stdout: String,
@@ -109,8 +113,8 @@ pub struct TaskExecutionResult {
     pub stderr_file: PathBuf,
 }
 
-pub fn execute<T: TaskBackend + Clone + Send + 'static>(
-    backend: T,
+pub fn execute(
+    backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> BoxFuture<'_, anyhow::Result<ExecutionResult>> {
@@ -123,8 +127,8 @@ pub fn execute<T: TaskBackend + Clone + Send + 'static>(
     }
 }
 
-pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
-    backend: T,
+pub async fn execute_workflow(
+    backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
@@ -200,7 +204,7 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
 
         for step in wave {
             let step_id_clone = step.id.clone().unwrap();
-            let backend_clone = backend.clone();
+            let backend_clone = Arc::clone(&backend);
             let token_clone = token.clone();
             let inputs = collect_raw_inputs(step, &completed_outputs, mir)?;
             let working_dir_clone = request.working_dir.clone();
@@ -404,9 +408,9 @@ pub async fn execute_workflow<T: TaskBackend + Clone + Send + 'static>(
     })
 }
 
-fn execute_step<T: TaskBackend + Clone + Send + 'static>(
+fn execute_step(
     step: &WorkflowStep,
-    backend: T,
+    backend: Arc<dyn TaskBackend>,
     working_dir: &Path,
     outdir: Option<&Path>,
     inputs: InputObject,
@@ -449,8 +453,8 @@ fn execute_step<T: TaskBackend + Clone + Send + 'static>(
     }
 }
 
-pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
-    backend: T,
+pub async fn execute_commandline_tool(
+    backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
@@ -471,8 +475,9 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     let outdir = tempdir()?;
     let tmpdir = tempdir()?;
 
+    let default_input_dir = backend.input_dir();
     let stage_dir = match &request.specification {
-        CWLDocument::CommandLineTool(_) => Path::new(T::INPUT_DIR),
+        CWLDocument::CommandLineTool(_) => Path::new(&default_input_dir),
         CWLDocument::ExpressionTool(_) => outdir.path(),
         _ => unreachable!(),
     };
@@ -498,13 +503,13 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
     {
         dr_outdir
     } else {
-        T::WORK_DIR
+        &backend.work_dir()
     };
 
     //create runtime struct
     let mut runtime = build_runtime(rr, eval_context, &cwl_version)?;
     runtime.outdir = PathBuf::from(workdir);
-    runtime.tmpdir = PathBuf::from(T::TMP_DIR);
+    runtime.tmpdir = PathBuf::from(backend.tmp_dir());
 
     eval_context.runtime = Some(&runtime);
 
@@ -623,11 +628,13 @@ pub async fn execute_commandline_tool<T: TaskBackend + Clone + Send + 'static>(
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
         //evaluate stderr/stdout
-        let stdout = fs::read_to_string(&result.stdout_file)?;
+        let stdout = fs::read_to_string(&result.stdout_file)
+            .with_context(|| format!("Could not find stdout file {:?}", result.stdout_file))?;
         if !stdout.is_empty() {
             eprintln!("{stdout}");
         }
-        let stderr = fs::read_to_string(&result.stderr_file)?;
+        let stderr = fs::read_to_string(&result.stderr_file)
+            .with_context(|| format!("Could not find stderr file {:?}", result.stderr_file))?;
         if !stderr.is_empty() {
             eprintln!("{stderr}");
         }

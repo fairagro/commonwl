@@ -1,72 +1,77 @@
-use crate::{
-    backend::mount::{mount_input, mount_workdir_item},
-    backend::{TaskBackend, TaskExecutionRequest, TaskExecutionResult},
-    docker::build_container,
-    expression::{do_eval, do_eval_to_string},
-};
 use async_trait::async_trait;
 use crankshaft::{
-    config::backend::docker::Config,
-    docker::Docker,
+    config::backend::generic::{
+        Config,
+        driver::{self, Locale, Shell},
+    },
     engine::{
         Task,
         service::{
             name::{GeneratorIterator, UniqueAlphanumeric},
             runner::{
                 Backend,
-                backend::{TaskRunError, docker},
+                backend::{TaskRunError, generic},
             },
         },
         task::{
             Execution, Input, Output, Resources,
             input::{self, Contents},
-            output,
+            output::{self},
         },
     },
 };
 use cwl_core::IntegerOrExpression;
 use nonempty::nonempty;
 use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
+    fs, sync::{Arc, Mutex}, time::Duration
 };
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 use url::Url;
 use uuid::Uuid;
 
-const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
-const CONTAINER_TMPDIR: &str = "/mnt/task/tmp";
-const CONTAINER_INPUT_DIR: &str = "/mnt/task/inputs";
-const CONTAINER_STDOUT_FILE: &str = "/mnt/task/stdout";
-const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
+use crate::{
+    backend::{
+        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        mount::{mount_input, mount_workdir_item},
+    },
+    expression::{do_eval, do_eval_to_string},
+};
 
 #[derive(Debug, Clone)]
-pub struct DockerBackend {
-    //wrapper to Bollard Docker client
-    client: Docker,
+pub struct LocalBackend {
     //wrapper to crankshaft backend
-    backend: Arc<docker::Backend>,
+    backend: Arc<generic::Backend>,
 }
 
-impl DockerBackend {
-    pub async fn new(config: Config) -> anyhow::Result<Self> {
+impl LocalBackend {
+    pub async fn new() -> anyhow::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
             NAME_BUFFER_LEN,
         )));
-        let backend =
-            Arc::new(docker::Backend::initialize_default_with(config, names, None).await?);
+        let config = Config::builder()
+            .driver(
+                driver::Config::builder()
+                    .locale(Locale::Local)
+                    .max_attempts(1.into())
+                    .shell(Shell::Bash)
+                    .build(),
+            )
+            .monitor("")
+            .submit("")
+            .kill("kill ~{job_id}")
+            .build();
 
-        let client = Docker::with_defaults()?;
+        let backend = Arc::new(generic::Backend::initialize(config, None, names, None).await?);
 
-        Ok(Self { backend, client })
+        Ok(Self { backend })
     }
 }
 
 #[async_trait]
-impl TaskBackend for DockerBackend {
+impl TaskBackend for LocalBackend {
     async fn run(
         &self,
         request: &TaskExecutionRequest<'_>,
@@ -74,38 +79,34 @@ impl TaskBackend for DockerBackend {
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
         let mut container = "ubuntu".to_string(); //add config "default-container"
-        if let Some(dr) = request.docker {
-            if let Some(df) = &dr.docker_file
-                && let Some(dt) = &dr.docker_image_id
-            {
-                build_container(self.client.inner(), df, dt).await?;
-                container = dt.to_string();
-            } else if let Some(dp) = &dr.docker_pull {
-                container = dp.to_string();
-            }
-        }
+        //if let Some(dr) = request.docker {
+        //    if let Some(df) = &dr.docker_file
+        //        && let Some(dt) = &dr.docker_image_id
+        //    {
+        //        build_container(self.client.inner(), df, dt).await?;
+        //        container = dt.to_string();
+        //    } else if let Some(dp) = &dr.docker_pull {
+        //        container = dp.to_string();
+        //    }
+        //}
 
         let stdout_file = if let Some(s) = request.stdout_file {
-            &format!("/mnt/task/{s}")
+            &format!("{}/{s}", request.tmpdir.to_string_lossy())
         } else {
-            CONTAINER_STDOUT_FILE
+            &format!("{}/stdout", request.tmpdir.to_string_lossy())
         };
 
         let stderr_file = if let Some(s) = request.stderr_file {
-            &format!("/mnt/task/{s}")
+            &format!("{}/{s}", request.tmpdir.to_string_lossy())
         } else {
-            CONTAINER_STDERR_FILE
+            &format!("{}/stderr", request.tmpdir.to_string_lossy())
         };
-
+        
         let mut args = request
             .command
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>();
-        // manually check for an entypoint
-        if let Some(entrypoint) = self.get_docker_entrypoint(&container).await? {
-            args.splice(0..0, entrypoint);
-        }
 
         //build crankshaft task object
         let mut task = Task::builder()
@@ -126,7 +127,7 @@ impl TaskBackend for DockerBackend {
             .resources(
                 Resources::builder()
                     .cpu(request.runtime.cores as f64)
-                    //.disk(request.runtime.outdir_size) //we don't use this currently
+                    .disk(request.runtime.outdir_size as f64)
                     .ram(request.runtime.ram as f64)
                     .build(),
             )
@@ -162,7 +163,7 @@ impl TaskBackend for DockerBackend {
             Input::builder()
                 .name("tmpdir")
                 .contents(Contents::Path(request.tmpdir.to_path_buf()))
-                .path(CONTAINER_TMPDIR)
+                .path(self.tmp_dir())
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
@@ -232,7 +233,6 @@ impl TaskBackend for DockerBackend {
             //no time constraint
             self.backend.run(task, token)?.await?
         };
-
         Ok(TaskExecutionResult {
             exit_status,
             stdout_file: stdout_out_file,
@@ -241,111 +241,17 @@ impl TaskBackend for DockerBackend {
     }
 
     fn input_dir(&self) -> String {
-        CONTAINER_INPUT_DIR.to_string()
+        let uuid = &Uuid::new_v4().to_string()[..8];
+        format!("/tmp/{uuid}/task")
     }
 
     fn work_dir(&self) -> String {
-        CONTAINER_WORKDIR.to_string()
+        let uuid = &Uuid::new_v4().to_string()[..8];
+        format!("/tmp/{uuid}/work")
     }
 
     fn tmp_dir(&self) -> String {
-        CONTAINER_TMPDIR.to_string()
-    }
-}
-
-impl DockerBackend {
-    ///Crankshaft backend overwrites docker entrypoint, so we need to get it beforehand and append it to the command
-    async fn get_docker_entrypoint(&self, container: &str) -> anyhow::Result<Option<Vec<String>>> {
-        //ensure image
-        self.client.ensure_image(container).await?;
-        let info = self.client.inner().inspect_image(container).await?;
-        if let Some(cfg) = info.config
-            && let Some(entrypoint) = cfg.entrypoint
-        {
-            return Ok(Some(entrypoint));
-        }
-        Ok(None)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::*;
-    use crate::{backend::execute_commandline_tool, request::create_execution_request};
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn test_docker_backend_creation() {
-        let config = Config::default();
-        let backend = DockerBackend::new(config).await;
-        assert!(backend.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_docker_backend_run_simple() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir.join("cat-tool-shortcut.cwl");
-        let inputs_path = base_dir.join("cat-job.json");
-
-        let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
-        let tmpdir = tempdir().unwrap();
-        let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
-        let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
-        assert!(result.is_ok());
-
-        //check if output file exists
-        let out_file = tmpdir.path().join("output");
-        assert!(out_file.exists());
-    }
-
-    #[tokio::test]
-    async fn test_docker_backend_run_simple_with_dir() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir.join("dir3.cwl");
-        let inputs_path = base_dir.join("dir3-job.yml");
-
-        let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
-        let tmpdir = tempdir().unwrap();
-        let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
-        let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_docker_backend_run_simple_with_value_from() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir.join("cat3-from-dir.cwl");
-        let inputs_path = base_dir.join("cat-from-dir-job.yaml");
-
-        let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
-        let tmpdir = tempdir().unwrap();
-        let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
-        let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
-
-        assert!(result.is_ok());
-        //check if output file exists
-        let out_file = tmpdir.path().join("output.txt");
-
-        assert!(out_file.exists());
+        let uuid = &Uuid::new_v4().to_string()[..8];
+        format!("/tmp/{uuid}/tmp")
     }
 }

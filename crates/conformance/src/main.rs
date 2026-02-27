@@ -1,13 +1,18 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
-    backend::{EngineStatus, docker::DockerBackend, evaluate_exitcodes, execute},
+    backend::{
+        EngineStatus, TaskBackend, docker::DockerBackend, evaluate_exitcodes, execute,
+        local::LocalBackend,
+    },
     request::{InputObject, create_execution_request, create_execution_request_with_inputs},
 };
+use core::panic;
 use crankshaft::config::backend::docker::Config;
 use std::{
     env,
     path::{Path, PathBuf},
     process::exit,
+    sync::Arc,
 };
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
@@ -38,9 +43,16 @@ async fn main() -> anyhow::Result<()> {
             .with_max_level(Level::DEBUG)
             .init();
     }
+    let backend_select = env::var("BACKEND").unwrap_or("docker".to_string());
+    let backend: Arc<dyn TaskBackend> = if backend_select == "docker" {
+        let config = Config::default();
+        Arc::new(DockerBackend::new(config).await?)
+    } else if backend_select == "local" {
+        Arc::new(LocalBackend::new().await?)
+    } else {
+        panic!()
+    };
 
-    let config = Config::default();
-    let backend = DockerBackend::new(config).await?;
     let request = if let Some(job_path) = job_path {
         create_execution_request(spec_path, job_path, Some(outdir))?
     } else {

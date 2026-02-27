@@ -788,6 +788,7 @@ name = "cwl_engine"
 version = "1.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "boa_engine",
  "bollard",
  "crankshaft",

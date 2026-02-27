@@ -7,7 +7,7 @@ use cwl_engine::{
 use serde::Deserialize;
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::{Path, PathBuf}, sync::Arc,
 };
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
@@ -32,7 +32,8 @@ async fn test_conformance_docker_clt() {
 
     //create docker backend
     let config = Config::default();
-    let backend = DockerBackend::new(config).await.unwrap();
+    let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+
     execute_conformance_test(backend, before.iter().copied().chain(after.iter().copied())).await;
 }
 
@@ -46,7 +47,7 @@ async fn test_conformance_docker_et() {
 
     //create docker backend
     let config = Config::default();
-    let backend = DockerBackend::new(config).await.unwrap();
+    let backend = Arc::new(DockerBackend::new(config).await.unwrap());
 
     //all expression tools pass! :)
     execute_conformance_test(backend, selected_tests).await;
@@ -62,7 +63,7 @@ async fn test_conformance_docker_wf() {
 
     //create docker backend
     let config = Config::default();
-    let backend = DockerBackend::new(config).await.unwrap();
+    let backend = Arc::new(DockerBackend::new(config).await.unwrap());
 
     //all workflow pass! :)
     execute_conformance_test(backend, selected_tests).await;
@@ -189,7 +190,7 @@ fn flatten_sequences(seq: Vec<serde_yaml::Value>) -> Vec<serde_yaml::Value> {
 }
 
 async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
-    backend: T,
+    backend: Arc<T>,
     tests: impl Iterator<Item = &ConformanceTest>,
 ) {
     for test in tests {
@@ -216,7 +217,8 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
         let cancellation_token = CancellationToken::new();
 
         eprintln!("Running Test {}", test.id);
-        let result = execute(backend.clone(), &request, cancellation_token).await;
+        let backend = Arc::clone(&backend);
+        let result = execute(backend, &request, cancellation_token).await;
         if test.should_fail {
             if result.is_ok() {
                 dbg!(&result);
