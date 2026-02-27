@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        variant: ${{ fromJson(vars.TEST_VARIANTS || '["docker", "local"]') }}
+        variant: ${{ fromJson(vars.BACKEND || '["docker", "local"]') }}
     steps:
       - uses: actions/checkout@v5
         with:

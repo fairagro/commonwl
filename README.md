@@ -24,7 +24,7 @@ The CWL Engine features high conformance to the specification, passing all Tests
 | Backend | Status | Overall Conformance |
 |---------|--------|---------------------|
 | Docker*  |   ✔️  | 99% |
-| Local   |   🧾  | -   |
+| Local   |   🏗️  | -   |
 | TES     |   🧾  | -   |
 | Slurm   |   🧾  | -   |
 
