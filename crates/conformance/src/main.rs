@@ -48,7 +48,7 @@ async fn main() -> anyhow::Result<()> {
         let config = Config::default();
         Arc::new(DockerBackend::new(config).await?)
     } else if backend_select == "local" {
-        Arc::new(LocalBackend::new().await?)
+        Arc::new(LocalBackend::new())
     } else {
         panic!()
     };

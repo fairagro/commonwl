@@ -65,6 +65,8 @@ pub trait TaskBackend: Send + Sync + 'static {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult>;
 
+    fn task_scoped(&self) -> Arc<dyn TaskBackend>;
+
     fn input_dir(&self) -> String;
     fn work_dir(&self) -> String;
     fn tmp_dir(&self) -> String;

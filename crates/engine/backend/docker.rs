@@ -240,6 +240,10 @@ impl TaskBackend for DockerBackend {
         })
     }
 
+    fn task_scoped(&self) -> Arc<dyn TaskBackend> {
+        Arc::clone(&Arc::new(self.clone())) as Arc<dyn TaskBackend>
+    }
+
     fn input_dir(&self) -> String {
         CONTAINER_INPUT_DIR.to_string()
     }

@@ -1,73 +1,52 @@
-use async_trait::async_trait;
-use crankshaft::{
-    config::backend::generic::{
-        Config,
-        driver::{self, Locale, Shell},
+use crate::{
+    backend::{
+        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        local::command::CommandBackend,
+        mount::{mount_input, mount_workdir_item},
     },
-    engine::{
-        Task,
-        service::{
-            name::{GeneratorIterator, UniqueAlphanumeric},
-            runner::{
-                Backend,
-                backend::{TaskRunError, generic},
-            },
-        },
-        task::{
-            Execution, Input, Output, Resources,
-            input::{self, Contents},
-            output::{self},
-        },
+    expression::{do_eval, do_eval_to_string},
+};
+use async_trait::async_trait;
+use crankshaft::engine::{
+    Task,
+    service::runner::{Backend, backend::TaskRunError},
+    task::{
+        Execution, Input, Output, Resources,
+        input::{self, Contents},
+        output::{self},
     },
 };
 use cwl_core::IntegerOrExpression;
 use nonempty::nonempty;
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::error;
 use url::Url;
 use uuid::Uuid;
 
-use crate::{
-    backend::{
-        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
-        mount::{mount_input, mount_workdir_item},
-    },
-    expression::{do_eval, do_eval_to_string},
-};
+pub mod command;
 
 #[derive(Debug, Clone)]
 pub struct LocalBackend {
+    uuid: String,
     //wrapper to crankshaft backend
-    backend: Arc<generic::Backend>,
+    backend: Arc<CommandBackend>,
+}
+
+impl Default for LocalBackend {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl LocalBackend {
-    pub async fn new() -> anyhow::Result<Self> {
-        const NAME_BUFFER_LEN: usize = 4096;
-        let names = Arc::new(Mutex::new(GeneratorIterator::new(
-            UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
-            NAME_BUFFER_LEN,
-        )));
-        let config = Config::builder()
-            .driver(
-                driver::Config::builder()
-                    .locale(Locale::Local)
-                    .max_attempts(1.into())
-                    .shell(Shell::Bash)
-                    .build(),
-            )
-            .monitor("")
-            .submit("")
-            .kill("kill ~{job_id}")
-            .build();
+    pub fn new() -> Self {
+        let backend = Arc::new(CommandBackend {});
 
-        let backend = Arc::new(generic::Backend::initialize(config, None, names, None).await?);
-
-        Ok(Self { backend })
+        Self {
+            uuid: Uuid::new_v4().to_string()[..8].to_string(),
+            backend,
+        }
     }
 }
 
@@ -79,28 +58,20 @@ impl TaskBackend for LocalBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let container = "ubuntu".to_string(); //add config "default-container"
-        //if let Some(dr) = request.docker {
-        //    if let Some(df) = &dr.docker_file
-        //        && let Some(dt) = &dr.docker_image_id
-        //    {
-        //        build_container(self.client.inner(), df, dt).await?;
-        //        container = dt.to_string();
-        //    } else if let Some(dp) = &dr.docker_pull {
-        //        container = dp.to_string();
-        //    }
-        //}
+        if let Some(_dr) = request.docker {
+            unimplemented!("Docker support will come in future")
+        }
 
         let stdout_file = if let Some(s) = request.stdout_file {
-            &format!("{}/{s}", request.tmpdir.to_string_lossy())
+            &format!("{}/{s}", self.tmp_dir())
         } else {
-            &format!("{}/stdout", request.tmpdir.to_string_lossy())
+            &format!("{}/stdout", self.tmp_dir())
         };
 
         let stderr_file = if let Some(s) = request.stderr_file {
-            &format!("{}/{s}", request.tmpdir.to_string_lossy())
+            &format!("{}/{s}", self.tmp_dir())
         } else {
-            &format!("{}/stderr", request.tmpdir.to_string_lossy())
+            &format!("{}/stderr", self.tmp_dir())
         };
 
         let args = request
@@ -119,7 +90,7 @@ impl TaskBackend for LocalBackend {
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
-                    .image(container)
+                    .image("unsupported")
                     .stdout(stdout_file)
                     .stderr(stderr_file)
                     .maybe_stdin(request.stdin_file)
@@ -206,6 +177,16 @@ impl TaskBackend for LocalBackend {
                 .build(),
         );
 
+        //the backend needs to copy back workdir
+        task.add_output(
+            Output::builder()
+                .name("workdir")
+                .path(request.staged_dir)
+                .url(Url::from_file_path(request.outdir).unwrap())
+                .ty(output::Type::Directory)
+                .build(),
+        );
+
         let timelimit = request
             .timelimit
             .as_ref()
@@ -241,18 +222,17 @@ impl TaskBackend for LocalBackend {
         })
     }
 
+    fn task_scoped(&self) -> Arc<dyn TaskBackend> {
+        Arc::new(LocalBackend::new()) as Arc<dyn TaskBackend>
+    }
+
     fn input_dir(&self) -> String {
-        let uuid = &Uuid::new_v4().to_string()[..8];
-        format!("/tmp/{uuid}/task")
+        format!("/tmp/{}/inputs", self.uuid)
     }
-
     fn work_dir(&self) -> String {
-        let uuid = &Uuid::new_v4().to_string()[..8];
-        format!("/tmp/{uuid}/work")
+        format!("/tmp/{}/work", self.uuid)
     }
-
     fn tmp_dir(&self) -> String {
-        let uuid = &Uuid::new_v4().to_string()[..8];
-        format!("/tmp/{uuid}/tmp")
+        format!("/tmp/{}/tmp", self.uuid)
     }
 }
