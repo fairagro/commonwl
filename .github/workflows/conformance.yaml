@@ -29,16 +29,16 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install cwltest
-          cargo build --release && cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance --badgedir badges/$VARIANT
+          cargo build --release && cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance --badgedir badges/$BACKEND
           exit 0
       - name: Generate Summary
         env:
           BACKEND: ${{ matrix.variant }}
         run: |
-          echo "## Variant: $VARIANT" >> $GITHUB_STEP_SUMMARY
+          echo "## Variant: $BACKEND" >> $GITHUB_STEP_SUMMARY
           TABLE="| Subject        | Status | Badge                                      |"
           TABLE="$TABLE\n|----------------|--------|--------------------------------------------|"
-          for file in badges/$VARIANT/*.json; do
+          for file in badges/$BACKEND/*.json; do
                   SUBJECT=$(jq -r '.subject' $file)
                   STATUS=$(jq -r '.status' $file)
                   COLOR=$(jq -r '.color' $file)
