@@ -23,7 +23,7 @@ commonwl = { version = "0.0.1", features = ["engine"] }
 The CWL Engine features high conformance to the specification, passing all Tests for `Workflow` and `ExpressionTool` and nearly all tests for `CommandLineTool`. The conformance is dependent on the used `TaskBackend`. Currently there are the following existing and planned backends:
 | Backend | Status | Overall Conformance |
 |---------|--------|---------------------|
-| Docker*  |   ✔️  | 98% |
+| Docker*  |   ✔️  | 99% |
 | Local   |   🧾  | -   |
 | TES     |   🧾  | -   |
 | Slurm   |   🧾  | -   |
