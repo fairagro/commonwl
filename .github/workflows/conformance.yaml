@@ -33,7 +33,7 @@ jobs:
           exit 0
       - name: Generate Summary
         env:
-          VARIANT: ${{ matrix.variant }}
+          BACKEND: ${{ matrix.variant }}
         run: |
           echo "## Variant: $VARIANT" >> $GITHUB_STEP_SUMMARY
           TABLE="| Subject        | Status | Badge                                      |"
