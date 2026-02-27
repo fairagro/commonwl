@@ -36,7 +36,7 @@ jobs:
         env:
           BACKEND: ${{ matrix.variant }}
         run: |
-          echo "## Variant: $BACKEND" >> $GITHUB_STEP_SUMMARY
+          echo "## Conformance for Backend: $BACKEND" >> $GITHUB_STEP_SUMMARY
           TABLE="| Subject        | Status | Badge                                      |"
           TABLE="$TABLE\n|----------------|--------|--------------------------------------------|"
           for file in badges/$BACKEND/*.json; do
