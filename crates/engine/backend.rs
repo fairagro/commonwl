@@ -207,7 +207,6 @@ pub async fn execute_workflow(
 
         for step in wave {
             let step_id_clone = step.id.clone().unwrap();
-            let backend_clone = Arc::clone(&backend);
             let token_clone = token.clone();
             let inputs = collect_raw_inputs(step, &completed_outputs, mir)?;
             let working_dir_clone = request.working_dir.clone();
@@ -286,6 +285,8 @@ pub async fn execute_workflow(
                             continue;
                         }
                     }
+
+                    let backend_clone = backend.task_scoped();
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
@@ -341,6 +342,7 @@ pub async fn execute_workflow(
                     }
                 }
 
+                let backend_clone = backend.task_scoped();
                 handles.push(execute_step(
                     step,
                     backend_clone,
