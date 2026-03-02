@@ -88,7 +88,10 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
 
                 debug!("Command will spawn as {command:?}");
 
-                let mut child = command.spawn().map_err(|e| TaskRunError::Other(e.into()))?;
+                let mut child = command
+                    .spawn()
+                    .map_err(|e| TaskRunError::Other(e.into()))
+                    .context("Task could not run")?;
 
                 let status = select! {
                     biased;

@@ -4,6 +4,7 @@ use crate::{
         local::command::CommandBackend,
         mount::{mount_input, mount_workdir_item},
     },
+    docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
     expression::{do_eval, do_eval_to_string},
 };
 use async_trait::async_trait;
@@ -57,11 +58,6 @@ impl TaskBackend for LocalBackend {
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
-        //handle docker requirement
-        if let Some(_dr) = request.docker {
-            unimplemented!("Docker support will come in future")
-        }
-
         let stdout_file = if let Some(s) = request.stdout_file {
             &format!("{}/{s}", self.tmp_dir())
         } else {
@@ -74,11 +70,28 @@ impl TaskBackend for LocalBackend {
             &format!("{}/stderr", self.tmp_dir())
         };
 
-        let args = request
+        let mut args = request
             .command
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>();
+
+        //handle docker requirement
+        if let Some(dr) = &request.docker {
+            let dr = (*dr).clone();
+            let image_id = dr.docker_pull.or(dr.docker_image_id).unwrap();
+            let options = ContainerBuildOptions::builder()
+                .docker_image_id(image_id)
+                .network(request.network)
+                .engine(ContainerEngine::Docker) //need options for that
+                .env(request.env.clone())
+                .outdir(request.outdir.to_string_lossy())
+                .tmpdir(request.tmpdir.to_string_lossy())
+                .workdir(request.staged_dir)
+                .maybe_docker_file(dr.docker_file)
+                .build();
+            args = build_container_command(args, request.inputs, options)?;
+        }
 
         //build crankshaft task object
         let mut task = Task::builder()

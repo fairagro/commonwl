@@ -24,15 +24,15 @@ use crate::{
 use anyhow::Context;
 use async_trait::async_trait;
 use cwl_core::{
-    docstring,
+    BoolOrExpression, docstring,
     documents::{CWLDocument, ScatterMethod, StringOrDocument, WorkflowStep},
     files::FileOrDirectory,
     inputs::DefaultValue,
     requirements::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
         InlineJavascriptRequirement, InplaceUpdateRequirement, LoadListingRequirement,
-        MultipleInputFeatureRequirement, ResourceRequirement, ScatterFeatureRequirement,
-        ToolTimeLimit,
+        MultipleInputFeatureRequirement, NetworkAccess, ResourceRequirement,
+        ScatterFeatureRequirement, ToolTimeLimit,
     },
 };
 use futures_util::{
@@ -95,6 +95,7 @@ pub struct TaskExecutionRequest<'a> {
 
     pub docker: Option<&'a DockerRequirement>,
     pub timelimit: Option<&'a ToolTimeLimit>,
+    pub network: bool,
     pub use_container: bool,
 
     pub stdin_file: Option<&'a String>,
@@ -473,6 +474,7 @@ pub async fn execute_commandline_tool(
     let ttl = request.get_requirement_or_hint::<ToolTimeLimit>();
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
     let iur = request.get_requirement_or_hint::<InplaceUpdateRequirement>();
+    let na = request.get_requirement_or_hint::<NetworkAccess>();
 
     let outdir = tempdir()?;
     let tmpdir = tempdir()?;
@@ -584,6 +586,22 @@ pub async fn execute_commandline_tool(
 
         info!("Executing: {}", args.join(" "));
 
+        let network_access = if let Some(na) = na {
+            match &na.network_access {
+                BoolOrExpression::Bool(b) => *b,
+                BoolOrExpression::Expression(ex) => {
+                    let val = do_eval(ex, eval_context)?;
+                    if let serde_yaml::Value::Bool(b) = val {
+                        b
+                    } else {
+                        false
+                    }
+                }
+            }
+        } else {
+            false
+        };
+
         let doc = tool.doc.as_ref().map(|d| docstring(d.clone()));
         let result = backend
             .run(
@@ -605,6 +623,7 @@ pub async fn execute_commandline_tool(
 
                     docker: dr,
                     timelimit: ttl,
+                    network: network_access,
                     use_container: tool.has_requirement::<DockerRequirement>(), //hints no sufficient
 
                     stdin_file: stdin.as_ref(),
@@ -643,7 +662,9 @@ pub async fn execute_commandline_tool(
 
         // need to collect outputs
         if !&request.out_dir.exists() {
-            fs::create_dir_all(&request.out_dir)?;
+            fs::create_dir_all(&request.out_dir).with_context(|| {
+                format!("Could not create dir {}", request.out_dir.to_string_lossy())
+            })?;
         }
 
         let outputs = collect_command_outputs(

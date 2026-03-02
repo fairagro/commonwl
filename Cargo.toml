@@ -18,6 +18,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
+bon = "3.8.1"
 cwl_core = { path = "crates/core" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.143"
