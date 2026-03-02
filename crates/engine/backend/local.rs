@@ -85,8 +85,8 @@ impl TaskBackend for LocalBackend {
                 .network(request.network)
                 .engine(ContainerEngine::Docker) //need options for that
                 .env(request.env.clone())
-                .outdir(request.outdir.to_string_lossy())
-                .tmpdir(request.tmpdir.to_string_lossy())
+                .outdir(request.runtime.outdir.to_string_lossy())
+                .tmpdir(request.runtime.tmpdir.to_string_lossy())
                 .workdir(request.staged_dir)
                 .maybe_docker_file(dr.docker_file)
                 .build();

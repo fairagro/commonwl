@@ -107,7 +107,7 @@ pub fn build_container_command(
         ]
     } else {
         let workdir_mount = format!("--mount=type=bind,source={outdir},target={workdir}");
-        let tmpdir_mount = format!("--mount=type=bind,source={tmpdir},target=/tmp");
+        let tmpdir_mount = format!("--mount=type=bind,source={tmpdir},target={tmpdir}");
         let workdir_arg = format!("--workdir={}", &workdir);
 
         vec![
@@ -135,7 +135,7 @@ pub fn build_container_command(
     }
 
     args.push(format!("--env=HOME={}", &workdir));
-    args.push("--env=TMPDIR=/tmp".to_string());
+    args.push(format!("--env=TMPDIR={}", &tmpdir));
 
     for (key, val) in options
         .env
