@@ -8,7 +8,7 @@ use crankshaft::engine::{
         output,
     },
 };
-use dircpy::copy_dir;
+use dircpy::{CopyBuilder, copy_dir};
 use futures_util::{FutureExt, future::BoxFuture};
 use nonempty::NonEmpty;
 use std::{
@@ -125,17 +125,20 @@ async fn stage_inputs(inputs: impl Iterator<Item = &Input>) -> anyhow::Result<()
 
         match input.contents() {
             Contents::Literal(src) => {
+                debug!("Creating file {dest:?}");
                 fs::write(dest, src)
                     .await
                     .with_context(|| format!("Could not create file {dest:#?}"))?;
             }
             Contents::Path(src_path) => match input.ty() {
                 input::Type::File => {
+                    debug!("Copy from {src_path:?} to {dest:?}");
                     fs::copy(src_path, dest)
                         .await
                         .with_context(|| format!("Could not copy from {src_path:?} to {dest:?}"))?;
                 }
                 input::Type::Directory => {
+                    debug!("Copy from {src_path:?} to {dest:?}");
                     copy_dir(src_path, dest)
                         .with_context(|| format!("Could not copy from {src_path:?} to {dest:?}"))?;
                 }
@@ -174,7 +177,10 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
                     .with_context(|| format!("Could not copy from {src:?} to {dest_path:?}"))?;
             }
             output::Type::Directory => {
-                copy_dir(src, dest_path)
+                //we need overwrite options here!
+                CopyBuilder::new(src, dest_path)
+                    .overwrite(true)
+                    .run()
                     .with_context(|| format!("Could not copy from {src:?} to {dest_path:?}"))?;
             }
         }

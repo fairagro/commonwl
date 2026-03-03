@@ -195,7 +195,7 @@ fn stage_dirent(
     let has_trailing_newline = dirent.entry.ends_with("\n");
 
     //relocate used inputs
-    if !has_trailing_newline {
+    if !has_trailing_newline && matches!(dv, DefaultValue::FileOrDirectory(_)) {
         update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
     }
 
