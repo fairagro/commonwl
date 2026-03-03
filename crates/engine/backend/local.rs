@@ -7,6 +7,7 @@ use crate::{
     docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
     expression::{do_eval, do_eval_to_string},
 };
+use anyhow::Context;
 use async_trait::async_trait;
 use crankshaft::engine::{
     Task,
@@ -17,11 +18,11 @@ use crankshaft::engine::{
         output::{self},
     },
 };
-use cwl_core::IntegerOrExpression;
+use cwl_core::{IntegerOrExpression, files::FileOrDirectory};
 use nonempty::nonempty;
-use std::{sync::Arc, time::Duration};
+use std::{fs, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
-use tracing::error;
+use tracing::{debug, error};
 use url::Url;
 use uuid::Uuid;
 
@@ -70,6 +71,28 @@ impl TaskBackend for LocalBackend {
             &format!("{}/stderr", self.tmp_dir())
         };
 
+        let mut inputs = request.inputs.to_vec();
+
+        //lock in file literals
+        for file in &mut inputs
+            .iter_mut()
+            .filter_map(|f| {
+                if let FileOrDirectory::File(f) = f {
+                    Some(f)
+                } else {
+                    None
+                }
+            })
+            .filter(|f| f.location.is_none() && f.contents.is_some())
+        {
+            let file_uuid = &Uuid::new_v4().to_string()[0..8];
+            let location = request.tmpdir.join(file_uuid);
+            debug!("Writing File literal to {location:?}");
+            fs::write(&location, file.contents.as_ref().unwrap())
+                .with_context(|| format!("Could not lock in File Literal at {location:?}"))?;
+            file.location = Some(format!("file://{}", location.to_string_lossy()));
+        }
+
         let mut args = request
             .command
             .iter()
@@ -90,7 +113,7 @@ impl TaskBackend for LocalBackend {
                 .workdir(request.staged_dir)
                 .maybe_docker_file(dr.docker_file)
                 .build();
-            args = build_container_command(args, request.inputs, options)?;
+            args = build_container_command(args, &inputs, options)?;
         }
 
         //build crankshaft task object
@@ -119,7 +142,7 @@ impl TaskBackend for LocalBackend {
             .build();
 
         //add file inputs to task
-        for input in request.inputs {
+        for input in &inputs {
             mount_input(&mut task, input)?;
         }
 
