@@ -24,7 +24,7 @@ The CWL Engine features high conformance to the specification, passing all Tests
 | Backend | Status | Overall Conformance |
 |---------|--------|---------------------|
 | Docker* |   ✔️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-100%25-green )|
-| Local   |   🏗️  | ![all]( https://img.shields.io/badge/all-98%25-yellow ) ![required]( https://img.shields.io/badge/required-96%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-96%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-99%25-yellow)   |
+| Local   |   🏗️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-99%25-yellow)   |
 | TES     |   🧾  | -   |
 | Slurm   |   🧾  | -   |
 
