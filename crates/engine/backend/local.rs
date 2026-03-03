@@ -98,7 +98,6 @@ impl TaskBackend for LocalBackend {
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>();
-
         //handle docker requirement
         if let Some(dr) = &request.docker {
             let dr = (*dr).clone();
@@ -108,21 +107,20 @@ impl TaskBackend for LocalBackend {
                 .network(request.network)
                 .engine(ContainerEngine::Docker) //need options for that
                 .env(request.env.clone())
-                .outdir(request.runtime.outdir.to_string_lossy())
+                .outdir(self.work_dir())
                 .tmpdir(request.runtime.tmpdir.to_string_lossy())
                 .workdir(request.staged_dir)
                 .maybe_docker_file(dr.docker_file)
                 .build();
             args = build_container_command(args, &inputs, options)?;
         }
-
         //build crankshaft task object
         let mut task = Task::builder()
             .name(request.id)
             .maybe_description(request.description)
             .executions(nonempty![
                 Execution::builder()
-                    .work_dir(request.staged_dir)
+                    .work_dir(self.work_dir())
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
@@ -160,7 +158,7 @@ impl TaskBackend for LocalBackend {
             Input::builder()
                 .name("outdir")
                 .contents(Contents::Path(request.outdir.to_path_buf()))
-                .path(request.staged_dir)
+                .path(self.work_dir())
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
@@ -217,7 +215,7 @@ impl TaskBackend for LocalBackend {
         task.add_output(
             Output::builder()
                 .name("workdir")
-                .path(request.staged_dir)
+                .path(self.work_dir())
                 .url(Url::from_file_path(request.outdir).unwrap())
                 .ty(output::Type::Directory)
                 .build(),
