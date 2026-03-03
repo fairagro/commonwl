@@ -115,3 +115,41 @@ pub fn mount_workdir_item(
     }
     Ok(())
 }
+
+pub fn remove_materialized_inputs(
+    flattened_inputs: Vec<FileOrDirectory>,
+    mounts: &[WorkDirMount],
+    workdir: &String,
+) -> Vec<FileOrDirectory> {
+    let mut materialized_inputs = vec![];
+    let mut remaining_inputs = vec![];
+
+    for input in flattened_inputs {
+        let mut materialized = false;
+        for mount in mounts {
+            let Some(location) = input.location() else {
+                continue;
+            };
+            let loc_path = location.strip_prefix("file://").unwrap();
+            let Source::File(mount_path) = &mount.source else {
+                continue;
+            };
+            if loc_path == mount_path {
+                materialized = true;
+                break;
+            }
+            if input.path().is_some_and(|p| p.starts_with(workdir)) {
+                materialized = true;
+                break;
+            }
+        }
+
+        if materialized {
+            materialized_inputs.push(input);
+        } else {
+            remaining_inputs.push(input);
+        }
+    }
+
+    remaining_inputs
+}

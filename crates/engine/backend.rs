@@ -1,5 +1,7 @@
 use crate::{
-    V1_2_0, command, cwl_version,
+    V1_2_0,
+    backend::mount::remove_materialized_inputs,
+    command, cwl_version,
     environment::{
         env::handle_environment,
         runtime::{Runtime, build_runtime},
@@ -535,9 +537,6 @@ pub async fn execute_commandline_tool(
         ..Default::default()
     };
 
-    //needs to be constructed after we created the eval context
-    let flattened_inputs = flatten_inputs(&inputs)?;
-
     //evalute environment expressions
     let mut environment = handle_environment(request.environment.clone(), evr, eval_context)?;
     environment.insert("HOME".to_string(), runtime.outdir.to_string_lossy().into());
@@ -560,6 +559,10 @@ pub async fn execute_commandline_tool(
         vec![]
     };
 
+    //needs to be constructed after we created the eval context
+    let mut flattened_inputs = flatten_inputs(&inputs)?;
+    flattened_inputs = remove_materialized_inputs(flattened_inputs, &mounts, workdir);
+
     let eval_context = &mut EvaluationContext {
         inputs: Some(&inputs),
         workdir: Some(&request.working_dir),
@@ -567,7 +570,6 @@ pub async fn execute_commandline_tool(
         runtime: Some(&runtime),
         ..Default::default()
     };
-
     //execute commandline tool
     if let CWLDocument::CommandLineTool(tool) = &request.specification {
         //collect command string and correct args for staged paths

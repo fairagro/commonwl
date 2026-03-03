@@ -191,11 +191,13 @@ fn stage_dirent(
         //illegal
         anyhow::bail!("dirent.entryname must not start with ../")
     }
-    //relocate used inputs
-    update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
-
     //if dirent ends with newline and has expression we use string interpolation which means we do json serialization
     let has_trailing_newline = dirent.entry.ends_with("\n");
+
+    //relocate used inputs
+    if !has_trailing_newline {
+        update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
+    }
 
     let staged_path = stagedir.join(&entryname);
     let mut string_content = match dv {
@@ -206,13 +208,17 @@ fn stage_dirent(
                 let mut path = file.location.clone().unwrap();
                 path = path.strip_prefix("file://").unwrap_or(&path).to_owned();
 
-                if Path::new(&path).is_absolute() {
-                    fs::read_to_string(&path)
-                        .with_context(|| format!("Could not read file {path}"))?
+                let absolute_path = if Path::new(&path).is_absolute() {
+                    PathBuf::from(path)
                 } else {
-                    fs::read_to_string(workdir.join(&path))
-                        .with_context(|| format!("Could not read file {path}"))?
-                }
+                    workdir.join(&path)
+                };
+                return Ok(vec![WorkDirMount {
+                    source: Source::File(absolute_path),
+                    target: staged_path,
+                    ty: MountType::File,
+                    readonly: !dirent.writable.unwrap_or(false),
+                }]);
             }
         }
         DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) if !has_trailing_newline => {
