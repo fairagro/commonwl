@@ -98,6 +98,13 @@ impl TaskBackend for LocalBackend {
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>();
+        
+        let (extras, mounts): (Vec<_>, Vec<_>) = request
+            .mounts
+            .iter()
+            .cloned()
+            .partition(|m| !m.target.starts_with(request.outdir) && request.use_container);
+
         //handle docker requirement
         if let Some(dr) = &request.docker {
             let dr = (*dr).clone();
@@ -111,6 +118,7 @@ impl TaskBackend for LocalBackend {
                 .tmpdir(request.runtime.tmpdir.to_string_lossy())
                 .workdir(request.staged_dir)
                 .maybe_docker_file(dr.docker_file)
+                .mounts(extras)
                 .build();
             args = build_container_command(args, &inputs, options)?;
         }
@@ -144,7 +152,7 @@ impl TaskBackend for LocalBackend {
             mount_input(&mut task, input)?;
         }
 
-        for mount in request.mounts {
+        for mount in mounts {
             mount_workdir_item(
                 mount.clone(),
                 request.outdir,

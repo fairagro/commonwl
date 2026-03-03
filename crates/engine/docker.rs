@@ -5,6 +5,8 @@ use futures_util::TryStreamExt;
 use indexmap::IndexMap;
 use std::{fmt::Display, path::Path};
 
+use crate::environment::workdir::{self, WorkDirMount};
+
 /// builds a Docker container using the bollard Docker client
 pub(crate) async fn build_container(
     client: &Docker,
@@ -75,6 +77,8 @@ pub struct ContainerBuildOptions {
     pub env: IndexMap<String, String>,
     #[builder(into)]
     pub network: bool,
+    #[builder(into)]
+    pub mounts: Vec<WorkDirMount>,
 }
 
 pub fn build_container_command(
@@ -125,6 +129,18 @@ pub fn build_container_command(
         let mount = format!(
             "--mount=type=bind,source={loc},target={}",
             input.path().unwrap()
+        );
+        args.push(mount);
+    }
+
+    for mount in options.mounts {
+        let workdir::Source::File(loc) = mount.source else {
+            continue;
+        };
+        let mount = format!(
+            "--mount=type=bind,source={},target={}",
+            loc.to_string_lossy(),
+            mount.target.to_string_lossy()
         );
         args.push(mount);
     }
