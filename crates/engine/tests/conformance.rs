@@ -1,13 +1,17 @@
 use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
-    backend::{ExecutionResult, TaskBackend, docker::DockerBackend, execute},
+    backend::{
+        EngineStatus, ExecutionResult, TaskBackend, docker::DockerBackend, evaluate_exitcodes,
+        execute, local::LocalBackend,
+    },
     request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file},
 };
 use serde::Deserialize;
 use std::{
     fs,
-    path::{Path, PathBuf}, sync::Arc,
+    path::{Path, PathBuf},
+    sync::Arc,
 };
 use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
@@ -35,6 +39,21 @@ async fn test_conformance_docker_clt() {
     let backend = Arc::new(DockerBackend::new(config).await.unwrap());
 
     execute_conformance_test(backend, before.iter().copied().chain(after.iter().copied())).await;
+}
+
+#[tokio::test]
+async fn test_conformance_local_clt() {
+    //load and select tests
+    let tests = load_conformance_tests().unwrap();
+    let selected_tests = tests
+        .iter()
+        .filter(|t| t.tags.contains(&"command_line_tool".to_string()))
+        .collect::<Vec<_>>();
+
+    //create local backend
+    let backend = Arc::new(LocalBackend::new());
+
+    execute_conformance_test(backend, selected_tests.into_iter().take(178)).await;
 }
 
 #[tokio::test]
@@ -217,13 +236,18 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
         let cancellation_token = CancellationToken::new();
 
         eprintln!("Running Test {}", test.id);
-        let backend = Arc::clone(&backend);
+        let backend = backend.task_scoped();
         let result = execute(backend, &request, cancellation_token).await;
         if test.should_fail {
             if result.is_ok() {
                 dbg!(&result);
             }
-            assert!(result.is_err());
+            let status = if let Ok(result) = &result {
+                evaluate_exitcodes(result.exit_status.clone(), &request.specification)
+            } else {
+                EngineStatus::Undefined(666)
+            };
+            assert!(result.is_err() || matches!(status, EngineStatus::Failure(_)));
         } else {
             if result.is_err() {
                 dbg!(&result);
@@ -242,7 +266,8 @@ fn evaluate_result(output: &serde_yaml::Value, result: ExecutionResult) {
             assert!(
                 result.outputs.contains_key(&key),
                 "Could not find key {}, outputs: {:#?}",
-                key, result.outputs
+                key,
+                result.outputs
             );
             evaluate_item(value, result.outputs.get(&key).unwrap());
         }
