@@ -5,6 +5,8 @@ on:
   workflow_dispatch:
 
 name: 🚀 Publish
+permissions:
+  contents: read
 
 jobs:
   publish:
