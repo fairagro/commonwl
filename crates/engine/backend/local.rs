@@ -31,23 +31,19 @@ pub mod command;
 #[derive(Debug, Clone)]
 pub struct LocalBackend {
     uuid: String,
+    container_engine: ContainerEngine,
     //wrapper to crankshaft backend
     backend: Arc<CommandBackend>,
 }
 
-impl Default for LocalBackend {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl LocalBackend {
-    pub fn new() -> Self {
+    pub fn new(container_engine: ContainerEngine) -> Self {
         let backend = Arc::new(CommandBackend {});
 
         Self {
             uuid: Uuid::new_v4().to_string()[..8].to_string(),
             backend,
+            container_engine,
         }
     }
 }
@@ -98,7 +94,7 @@ impl TaskBackend for LocalBackend {
             .iter()
             .map(|s| s.to_string())
             .collect::<Vec<_>>();
-        
+
         let (extras, mounts): (Vec<_>, Vec<_>) = request
             .mounts
             .iter()
@@ -112,7 +108,7 @@ impl TaskBackend for LocalBackend {
             let options = ContainerBuildOptions::builder()
                 .docker_image_id(image_id)
                 .network(request.network)
-                .engine(ContainerEngine::Docker) //need options for that
+                .engine(self.container_engine)
                 .env(request.env.clone())
                 .outdir(self.work_dir())
                 .tmpdir(request.runtime.tmpdir.to_string_lossy())
@@ -265,7 +261,7 @@ impl TaskBackend for LocalBackend {
     }
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend> {
-        Arc::new(LocalBackend::new()) as Arc<dyn TaskBackend>
+        Arc::new(LocalBackend::new(self.container_engine)) as Arc<dyn TaskBackend>
     }
 
     fn input_dir(&self) -> String {

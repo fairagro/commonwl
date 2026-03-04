@@ -23,7 +23,7 @@ commonwl = { version = "0.0.1", features = ["engine"] }
 The CWL Engine features high conformance to the specification, passing all Tests for `Workflow` and `ExpressionTool` and nearly all tests for `CommandLineTool`. The conformance is dependent on the used `TaskBackend`. Currently there are the following existing and planned backends:
 | Backend | Status | Overall Conformance |
 |---------|--------|---------------------|
-| Local   |   ✔️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-100%25-yellow)   |
+| Local   |   ✔️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-100%25-green)   |
 | Docker* |   ✔️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-100%25-green )|
 | TES     |   🧾  | -   |
 | Slurm   |   🧾  | -   |

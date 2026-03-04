@@ -4,8 +4,7 @@ use cwl_engine::{
     backend::{
         EngineStatus, ExecutionResult, TaskBackend, docker::DockerBackend, evaluate_exitcodes,
         execute, local::LocalBackend,
-    },
-    request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file},
+    }, docker::ContainerEngine, request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file}
 };
 use serde::Deserialize;
 use std::{
@@ -51,7 +50,7 @@ async fn test_conformance_local_clt() {
         .collect::<Vec<_>>();
 
     //create local backend
-    let backend = Arc::new(LocalBackend::new());
+    let backend = Arc::new(LocalBackend::new(ContainerEngine::Docker));
 
     execute_conformance_test(backend, selected_tests.into_iter().take(178)).await;
 }

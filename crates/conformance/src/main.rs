@@ -4,6 +4,7 @@ use commonwl::engine::{
         EngineStatus, TaskBackend, docker::DockerBackend, evaluate_exitcodes, execute,
         local::LocalBackend,
     },
+    docker::ContainerEngine,
     request::{InputObject, create_execution_request, create_execution_request_with_inputs},
 };
 use core::panic;
@@ -48,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
         let config = Config::default();
         Arc::new(DockerBackend::new(config).await?)
     } else if backend_select == "local" {
-        Arc::new(LocalBackend::new())
+        Arc::new(LocalBackend::new(ContainerEngine::Docker))
     } else {
         panic!()
     };
