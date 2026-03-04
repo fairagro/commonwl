@@ -6,11 +6,11 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-salad_derive = { version = "*", path = "../salad_derive", optional = true }
+commonwl_salad_derive = { version = "*", path = "../salad_derive", optional = true }
 
 [lib]
 path = "lib.rs"
 
 [features]
 default = []
-derive = ["salad_derive"]
+derive = ["commonwl_salad_derive"]

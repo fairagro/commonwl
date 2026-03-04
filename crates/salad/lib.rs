@@ -4,4 +4,4 @@ pub trait Identifiable {
 }
 
 #[cfg(feature = "derive")]
-pub use salad_derive::Identifiable;
+pub use commonwl_salad_derive::Identifiable;
