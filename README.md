@@ -12,11 +12,11 @@ There is a `conformance` CLI which is being used to evaluate CWL Conformance.
 To use `commonwl`, you need to install and setup a Rust environment.
 Once Rust is installed, you can add the latest version of `commonwl` be using the following command
 ```bash
-cargo add commonwl # will not work as not published yet!
+cargo add commonwl 
 ```
 To use the execution engine, the `engine` feature needs to be enabled!
 ```toml
-commonwl = { version = "0.0.1", features = ["engine"] }
+commonwl = { version = "0.1", features = ["engine"] }
 ```
 
 ## CWL Engine
