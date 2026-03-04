@@ -1,5 +1,6 @@
 [package]
 name = "cwl_core"
+description = "Part of `CommonWL`. Document parsing"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
