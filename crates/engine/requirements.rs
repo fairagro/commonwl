@@ -172,7 +172,7 @@ impl From<WorkflowHints> for ProcessHints {
     }
 }
 
-pub fn collect_requirements(
+pub(crate) fn collect_requirements(
     specification: &CWLDocument,
     inputs: &InputObject,
 ) -> Vec<ProcessRequirements> {
@@ -211,7 +211,10 @@ pub fn collect_requirements(
     requirements
 }
 
-pub fn collect_hints(specification: &CWLDocument, inputs: &InputObject) -> Vec<ProcessHints> {
+pub(crate) fn collect_hints(
+    specification: &CWLDocument,
+    inputs: &InputObject,
+) -> Vec<ProcessHints> {
     let mut hints: Vec<ProcessHints> = match &specification {
         CWLDocument::CommandLineTool(tool) => tool
             .hints

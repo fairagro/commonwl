@@ -33,7 +33,7 @@ impl Formatter for PythonLikeFormatter {
         writer.write_all(b": ")
     }
 }
-pub fn to_string_dump<T: Serialize>(value: &T) -> serde_json::Result<String> {
+pub(crate) fn to_string_dump<T: Serialize>(value: &T) -> serde_json::Result<String> {
     let mut buf = Vec::new();
     let mut ser = serde_json::ser::Serializer::with_formatter(&mut buf, PythonLikeFormatter);
     value.serialize(&mut ser)?;

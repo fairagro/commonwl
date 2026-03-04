@@ -11,7 +11,7 @@ use cwl_core::{
 };
 use std::collections::HashMap;
 
-pub fn collect_raw_inputs(
+pub(crate) fn collect_raw_inputs(
     step: &WorkflowStep,
     completed_outputs: &HashMap<String, DefaultValue>,
     mir: Option<&MultipleInputFeatureRequirement>,
@@ -120,7 +120,7 @@ fn collect_workflow_step_inputs(
     Ok(inputs)
 }
 
-pub fn eval_inputs(
+pub(crate) fn eval_inputs(
     step: &WorkflowStep,
     raw_inputs: InputObject,
     eval_context: &EvaluationContext,

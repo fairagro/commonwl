@@ -25,13 +25,13 @@ use std::{
 };
 
 #[derive(Debug)]
-pub struct FormatValidator {
+pub(crate) struct FormatValidator {
     pub namespaces: HashMap<String, String>,
     pub ontologies: Vec<Ontology>,
 }
 
 #[derive(Debug)]
-pub enum Ontology {
+pub(crate) enum Ontology {
     Graph(Graph),
     SetOntology(SetOntology<ArcStr>),
 }
@@ -40,7 +40,7 @@ const SUBCLASS_OF: &str = "http://www.w3.org/2000/01/rdf-schema#subclassOf";
 const EQUIVALENT_CLASS: &str = "http://www.w3.org/2002/07/owl#equivalentClass";
 
 impl FormatValidator {
-    pub fn new(
+    pub(crate) fn new(
         namespaces: HashMap<String, String>,
         ontologies: Vec<impl AsRef<Path> + std::fmt::Debug>,
     ) -> anyhow::Result<Self> {
@@ -75,7 +75,7 @@ impl FormatValidator {
         })
     }
 
-    pub fn validate(&self, format_a: &str, format_b: &str) -> bool {
+    pub(crate) fn validate(&self, format_a: &str, format_b: &str) -> bool {
         //same formats, we are good to go and do not need any work
         if format_a == format_b {
             return true;
@@ -184,7 +184,7 @@ impl FormatValidator {
         false
     }
 
-    pub fn handle(
+    pub(crate) fn handle(
         &self,
         format: Option<&String>,
         context: Option<&EvaluationContext>,
@@ -208,7 +208,7 @@ impl FormatValidator {
     }
 }
 
-pub fn get_format_validator(
+pub(crate) fn get_format_validator(
     doc: &CWLDocument,
     working_dir: &Path,
 ) -> anyhow::Result<FormatValidator> {

@@ -6,7 +6,7 @@ use anyhow::Context;
 use cwl_core::requirements::EnvVarRequirement;
 use indexmap::IndexMap;
 
-pub fn build_environment(input_values: &InputObject) -> IndexMap<String, String> {
+pub(crate) fn build_environment(input_values: &InputObject) -> IndexMap<String, String> {
     if let Some(env) = input_values.get_requirement_or_hint::<EnvVarRequirement>() {
         env.clone().to_map().into_iter().collect()
     } else {
@@ -14,7 +14,7 @@ pub fn build_environment(input_values: &InputObject) -> IndexMap<String, String>
     }
 }
 
-pub fn handle_environment(
+pub(crate) fn handle_environment(
     input_env: IndexMap<String, String>,
     evr: Option<&EnvVarRequirement>,
     eval_context: &EvaluationContext,

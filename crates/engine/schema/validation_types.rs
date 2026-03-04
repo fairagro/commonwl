@@ -11,33 +11,34 @@ use cwl_core::{
     types::CWLType,
 };
 
-pub enum ValidationType {
+pub(crate) enum ValidationType {
     CWLType(CWLType),
     Schema(Box<ValidationSchema>),
+    #[allow(unused)]
     String(String),
 }
 
-pub enum ValidationSchema {
+pub(crate) enum ValidationSchema {
     Array(ValidationArraySchema),
     Enum(ValidationEnumSchema),
     Record(ValidationRecordSchema),
 }
 
-pub struct ValidationRecordField {
+pub(crate) struct ValidationRecordField {
     pub name: String,
     pub r#type: OneOrMany<ValidationType>,
     pub format: Option<OneOrMany<String>>,
 }
 
-pub struct ValidationRecordSchema {
+pub(crate) struct ValidationRecordSchema {
     pub fields: Option<Vec<ValidationRecordField>>,
 }
 
-pub struct ValidationEnumSchema {
+pub(crate) struct ValidationEnumSchema {
     pub symbols: Vec<String>,
 }
 
-pub struct ValidationArraySchema {
+pub(crate) struct ValidationArraySchema {
     pub items: OneOrMany<ValidationType>,
 }
 

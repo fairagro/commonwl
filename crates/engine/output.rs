@@ -33,7 +33,6 @@ use tracing::{debug, info, warn};
 #[derive(Debug)]
 pub struct OutputCollectionContext<'a> {
     pub source_dir: &'a Path,
-    pub tmp_dir: &'a Path,
     pub dest_dir: &'a Path,
     pub workdir: &'a Path,
     pub eval_context: &'a EvaluationContext<'a>,
@@ -41,7 +40,7 @@ pub struct OutputCollectionContext<'a> {
 }
 
 /// handles collection of command outputs after execution
-pub fn collect_command_outputs(
+pub(crate) fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
     stdout_file: &Path,
     stderr_file: &Path,
@@ -620,7 +619,7 @@ fn make_full_glob(glob_: &str, context: &OutputCollectionContext) -> anyhow::Res
     Ok(full_glob)
 }
 
-pub fn collect_expression_outputs(
+pub(crate) fn collect_expression_outputs(
     outputs: &[ExpressionToolOutputParameter],
     value: &serde_yaml::Value,
     context: &OutputCollectionContext,
@@ -648,7 +647,7 @@ pub fn collect_expression_outputs(
     Ok(output_map)
 }
 
-pub fn collect_workflow_outputs(
+pub(crate) fn collect_workflow_outputs(
     outputs: &[WorkflowOutputParameter],
     values: HashMap<String, DefaultValue>,
     context: &OutputCollectionContext,

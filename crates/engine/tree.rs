@@ -4,7 +4,7 @@ use cwl_core::{
 };
 use std::collections::{HashMap, HashSet, VecDeque};
 
-pub fn build_execution_tree(workflow: &Workflow) -> anyhow::Result<Vec<Vec<&WorkflowStep>>> {
+pub(crate) fn build_execution_tree(workflow: &Workflow) -> anyhow::Result<Vec<Vec<&WorkflowStep>>> {
     let step_map = workflow
         .steps
         .iter()

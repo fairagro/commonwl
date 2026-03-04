@@ -1,10 +1,9 @@
 use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
-    backend::{
-        EngineStatus, ExecutionResult, TaskBackend, docker::DockerBackend, evaluate_exitcodes,
-        execute, local::LocalBackend,
-    }, docker::ContainerEngine, request::{InputObject, create_execution_request_with_inputs, load_input_file_from_file}
+    ContainerEngine, DockerBackend, EngineStatus, ExecutionResult, InputObject, LocalBackend,
+    TaskBackend, create_execution_request_with_inputs, evaluate_exitcodes, execute,
+    load_input_file_from_file,
 };
 use serde::Deserialize;
 use std::{

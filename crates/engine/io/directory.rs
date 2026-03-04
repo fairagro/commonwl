@@ -12,7 +12,7 @@ use std::{
 use url::Url;
 
 /// locates a directory and writes metadata
-pub fn locate_dir(
+pub(crate) fn locate_dir(
     dir: &mut Directory,
     work_dir: &Path,
     stage_dir: &Path,
@@ -130,7 +130,7 @@ fn read_dir(
     Ok(entries)
 }
 
-pub fn move_dir(dir: &mut Directory, workdir: &Path, basename: Option<&String>) {
+pub(crate) fn move_dir(dir: &mut Directory, workdir: &Path, basename: Option<&String>) {
     let basename = basename.unwrap_or(dir.basename.as_ref().unwrap());
     let designated_path = workdir.join(basename);
     let FilePathMetaData {

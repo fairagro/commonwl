@@ -38,7 +38,7 @@ pub struct WorkDirMount {
     pub readonly: bool,
 }
 
-pub fn stage_work_dir(
+pub(crate) fn stage_work_dir(
     iwdr: &InitialWorkDirRequirement,
     workdir: &Path,
     stagedir: &Path,

@@ -5,14 +5,7 @@ use cwl_core::{
     inputs::DefaultValue,
     requirements::{ExpressionLibItem, InlineJavascriptRequirement},
 };
-use regex::Regex;
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    ops::Range,
-    path::Path,
-    str::FromStr,
-};
+use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
 
 #[derive(Debug, Default, Clone)]
 pub struct EvaluationContext<'a> {
@@ -66,7 +59,7 @@ impl Expression {
     }
 }
 
-pub fn do_eval_to_string(expression: &str, eval_context: &EvaluationContext) -> String {
+pub(crate) fn do_eval_to_string(expression: &str, eval_context: &EvaluationContext) -> String {
     if let Ok(res) = do_eval(expression, eval_context) {
         res.as_str().unwrap().to_string()
     } else {
@@ -422,7 +415,7 @@ fn to_str(value: &serde_yaml::Value) -> String {
     }
 }
 
-pub fn extract_input_name(expr: &str) -> Option<String> {
+pub(crate) fn extract_input_name(expr: &str) -> Option<String> {
     let exprs = parse_expressions(expr);
     if exprs.is_empty() {
         return None;
@@ -436,26 +429,6 @@ pub fn extract_input_name(expr: &str) -> Option<String> {
             .unwrap_or(rest.len());
         rest[..end].to_string()
     })
-}
-
-pub fn scan_input_usage(expr: &str) -> HashSet<String> {
-    let mut set = HashSet::new();
-
-    let patterns = [
-        r#"\binputs\.([a-zA-Z_][a-zA-Z0-9_]*)\b"#,
-        r#"\binputs\[\s*['\"]([^'\"]+)['\"]\s*\]"#,
-        r#"\binputs\?\.\s*([a-zA-Z_][a-zA-Z0-9_]*)\b"#,
-        r#"\binputs\?\.\s*\[\s*['\"]([^'\"]+)['\"]\s*\]"#,
-    ];
-
-    for pat in patterns {
-        let re = Regex::new(pat).unwrap();
-        for cap in re.captures_iter(expr) {
-            set.insert(cap[1].to_string());
-        }
-    }
-
-    set
 }
 
 #[cfg(test)]
@@ -559,19 +532,5 @@ mod tests {
         .unwrap();
 
         assert_eq!(result.as_str().unwrap(), r"'\val'");
-    }
-
-    #[test]
-    fn test_scan_input_usage() {
-        let text = r#"$(inputs.a)
-inputs["b"]
-inputs?.c
-inputs?.["d"]
-$(inputs.x + inputs.y)"#;
-        let result = scan_input_usage(text);
-        assert_eq!(
-            result,
-            HashSet::from(["a", "b", "c", "d", "x", "y"].map(|i| i.to_string()))
-        )
     }
 }

@@ -13,7 +13,7 @@ use cwl_core::{
 };
 use std::collections::HashMap;
 
-pub fn replace_schema_definitions(
+pub(crate) fn replace_schema_definitions(
     doc: &mut CWLDocument,
     requirements: &[ProcessRequirements],
 ) -> anyhow::Result<()> {
@@ -255,7 +255,7 @@ fn add_schema_defs_to_outputs(
     Ok(())
 }
 
-pub fn get_schema_definitions(
+pub(crate) fn get_schema_definitions(
     value: &serde_yaml::Value,
 ) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
     let mut defs = extract_schema_definitions(value)?;

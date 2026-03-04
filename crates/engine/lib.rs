@@ -1,20 +1,20 @@
 use cwl_core::documents::CWLDocument;
 use semver::Version;
 
-pub mod backend;
-pub mod command;
-pub mod docker;
-pub mod environment;
-pub mod expression;
-pub mod input;
-pub mod io;
-pub mod output;
-pub mod request;
-pub mod requirements;
-pub mod scatter;
-pub mod schema;
-pub mod tree;
-pub mod workflow;
+pub(crate) mod backend;
+pub(crate) mod command;
+pub(crate) mod docker;
+pub(crate) mod environment;
+pub(crate) mod expression;
+pub(crate) mod input;
+pub(crate) mod io;
+pub(crate) mod output;
+pub(crate) mod request;
+pub(crate) mod requirements;
+pub(crate) mod scatter;
+pub(crate) mod schema;
+pub(crate) mod tree;
+pub(crate) mod workflow;
 
 pub(crate) fn cwl_version(doc: &CWLDocument) -> anyhow::Result<Version> {
     let default = "v1.2".to_string();
@@ -29,3 +29,18 @@ pub(crate) fn cwl_version(doc: &CWLDocument) -> anyhow::Result<Version> {
 }
 
 pub(crate) const V1_2_0: Version = Version::new(1, 2, 0);
+
+pub use backend::{
+    EngineStatus, ExecutionResult, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+    docker::DockerBackend,
+    evaluate_exitcodes, execute, execute_commandline_tool, execute_workflow,
+    local::{LocalBackend, command::CommandBackend},
+};
+pub use docker::{
+    ContainerBuildOptions, ContainerBuildOptionsBuilder, ContainerEngine, build_container_command,
+};
+pub use request::{
+    ExecutionRequest, InputObject, create_execution_request,
+    create_execution_request_from_document, create_execution_request_with_inputs,
+    load_input_file_from_file,
+};

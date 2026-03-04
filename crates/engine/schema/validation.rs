@@ -14,7 +14,7 @@ use crate::{
     },
 };
 
-pub fn validate_command_input(
+pub(crate) fn validate_command_input(
     schema: &CommandInputParameterType,
     value: &DefaultValue,
     format: Option<&String>,
@@ -41,7 +41,7 @@ pub fn validate_command_input(
     }
 }
 
-pub fn validate_type(
+pub(crate) fn validate_type(
     r#type: &ValidationType,
     value: &DefaultValue,
     format: Option<&String>,

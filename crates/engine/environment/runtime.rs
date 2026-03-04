@@ -36,7 +36,7 @@ impl Default for Runtime {
     }
 }
 
-pub fn build_runtime(
+pub(crate) fn build_runtime(
     req: Option<&ResourceRequirement>,
     context: &EvaluationContext,
     cwl_version: &Version,

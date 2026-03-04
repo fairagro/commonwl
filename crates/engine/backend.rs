@@ -399,7 +399,6 @@ pub async fn execute_workflow(
     }
     let cc = OutputCollectionContext {
         source_dir: collection_dir.path(),
-        tmp_dir: Path::new(""), //not used
         dest_dir: &request.out_dir,
         workdir: Path::new(""), //not used
         eval_context,
@@ -678,7 +677,6 @@ pub async fn execute_commandline_tool(
             &OutputCollectionContext {
                 source_dir: outdir.path(),
                 dest_dir: &request.out_dir,
-                tmp_dir: tmpdir.path(),
                 workdir: Path::new(workdir),
                 eval_context: &eval_context,
                 validator: &fv,
@@ -714,7 +712,6 @@ pub async fn execute_commandline_tool(
             &OutputCollectionContext {
                 source_dir: outdir.path(),
                 dest_dir: &request.out_dir,
-                tmp_dir: tmpdir.path(),
                 workdir: Path::new(workdir),
                 eval_context,
                 validator: &fv,

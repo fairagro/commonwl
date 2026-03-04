@@ -15,7 +15,7 @@ use std::{
 };
 use url::Url;
 
-pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
+pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
     let ty = match input {
         FileOrDirectory::File(_) => input::Type::File,
         FileOrDirectory::Directory(_) => input::Type::Directory,
@@ -60,7 +60,7 @@ pub fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<(
     Ok(())
 }
 
-pub fn mount_workdir_item(
+pub(crate) fn mount_workdir_item(
     mount: WorkDirMount,
     outdir: &Path,
     use_container: bool,
@@ -116,7 +116,7 @@ pub fn mount_workdir_item(
     Ok(())
 }
 
-pub fn remove_materialized_inputs(
+pub(crate) fn remove_materialized_inputs(
     flattened_inputs: Vec<FileOrDirectory>,
     mounts: &[WorkDirMount],
     workdir: &String,

@@ -1,11 +1,7 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
-    backend::{
-        EngineStatus, TaskBackend, docker::DockerBackend, evaluate_exitcodes, execute,
-        local::LocalBackend,
-    },
-    docker::ContainerEngine,
-    request::{InputObject, create_execution_request, create_execution_request_with_inputs},
+    ContainerEngine, DockerBackend, EngineStatus, InputObject, LocalBackend, TaskBackend,
+    create_execution_request, create_execution_request_with_inputs, evaluate_exitcodes, execute,
 };
 use core::panic;
 use crankshaft::config::backend::docker::Config;

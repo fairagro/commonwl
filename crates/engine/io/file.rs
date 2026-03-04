@@ -20,7 +20,7 @@ use tracing::debug;
 use url::Url;
 
 /// locates a file by writing the location as Url and filling the staged metadata
-pub fn locate_file(
+pub(crate) fn locate_file(
     file: &mut File,
     work_dir: &Path,
     stage_dir: &Path,
@@ -107,7 +107,7 @@ pub fn locate_file(
     Ok(())
 }
 
-pub fn collect_secondary_files_for_inputs(
+pub(crate) fn collect_secondary_files_for_inputs(
     doc: &CWLDocument,
     values: &mut HashMap<String, DefaultValue>,
     context: &EvaluationContext,
@@ -205,7 +205,7 @@ fn set_secondary_files_empty(value: &mut DefaultValue) -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn move_file(file: &mut File, workdir: &Path, basename: Option<&String>) {
+pub(crate) fn move_file(file: &mut File, workdir: &Path, basename: Option<&String>) {
     let basename = basename.unwrap_or(file.basename.as_ref().unwrap());
     let designated_path = workdir.join(basename);
     let FilePathMetaData {
@@ -222,7 +222,7 @@ pub fn move_file(file: &mut File, workdir: &Path, basename: Option<&String>) {
     file.dirname = dirname;
 }
 
-pub fn handle_secondary_files(
+pub(crate) fn handle_secondary_files(
     file: &mut File,
     secondary_files: &OneOrMany<SecondaryFileSchema>,
     work_dir: &Path,

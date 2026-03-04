@@ -7,11 +7,11 @@ use std::{
 };
 use url::Url;
 
-pub mod directory;
-pub mod file;
-pub mod json;
+pub(crate) mod directory;
+pub(crate) mod file;
+pub(crate) mod json;
 
-pub fn get_location(path: &str, work_dir: &Path) -> String {
+fn get_location(path: &str, work_dir: &Path) -> String {
     let path = urlencoding::decode(path)
         .unwrap_or(std::borrow::Cow::Borrowed(path))
         .to_string();
@@ -27,7 +27,7 @@ pub fn get_location(path: &str, work_dir: &Path) -> String {
     }
 }
 
-pub fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<PathBuf> {
+fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<PathBuf> {
     let mut relative_part = location.path_segments().unwrap().next_back().unwrap();
 
     if location.scheme() != "file" {
