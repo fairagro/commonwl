@@ -23,6 +23,8 @@ jobs:
         with:
           crate: cargo-nextest
           locked: true
+      - name: 📎Linting
+        run: cargo clippy --workspace -- -W clippy::pedantic
       - name: Run tests
         run: cargo nextest run --workspace
       - name: Install cargo-tarpaulin
