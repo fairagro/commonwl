@@ -32,6 +32,7 @@ The CWL Engine features high conformance to the specification, passing all Tests
 
 *=Uses Docker even if DockerRequirement is not specified.
 
+Two tests fail due to f64 overflow outputting 1e42 instead of one with 42 zeros. `serde_json` stores all numbers as f64.
 ## License
 This work is dual-licensed under Apache 2.0 and MIT . You can choose between one of them if you use this work. 
 
