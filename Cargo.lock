@@ -516,7 +516,7 @@ dependencies = [
 
 [[package]]
 name = "commonwl"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "cwl_core",
  "cwl_engine",
@@ -524,14 +524,14 @@ dependencies = [
 
 [[package]]
 name = "commonwl_salad"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "commonwl_salad_derive",
 ]
 
 [[package]]
 name = "commonwl_salad_derive"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -554,7 +554,7 @@ dependencies = [
 
 [[package]]
 name = "conformance"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -788,7 +788,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bon",
@@ -801,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
