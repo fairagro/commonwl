@@ -1,5 +1,6 @@
 [package]
 name = "commonwl_salad"
+description = "schema salad types"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
