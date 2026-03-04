@@ -1,9 +1,13 @@
 [package]
 name = "commonwl"
+description = "Rust implementation of the CommonWorkflowLanguage (CWL) standard"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dependencies]
 cwl_core = { version = "*", path = "../core" }

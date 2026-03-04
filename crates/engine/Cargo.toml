@@ -1,5 +1,6 @@
 [package]
 name = "cwl_engine"
+description = "Part of `CommonWL`. CWL Execution"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
