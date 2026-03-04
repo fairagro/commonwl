@@ -10,8 +10,8 @@ license.workspace = true
 all-features = true
 
 [dependencies]
-cwl_core = { version = "*", path = "../core" }
-cwl_engine = { version = "*", path = "../engine", optional = true }
+cwl_core = { version = "0", path = "../core" }
+cwl_engine = { version = "0", path = "../engine", optional = true }
 
 [features]
 default = []

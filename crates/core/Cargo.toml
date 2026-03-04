@@ -12,7 +12,7 @@ bon.workspace = true
 sha1.workspace = true
 serde.workspace = true
 serde_yaml.workspace = true
-commonwl_salad = { version = "*", path = "../salad", features = ["derive"] }
+commonwl_salad = { version = "0", path = "../salad", features = ["derive"] }
 url.workspace = true
 
 [lib]

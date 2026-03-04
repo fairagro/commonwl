@@ -7,7 +7,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-commonwl_salad_derive = { version = "*", path = "../salad_derive", optional = true }
+commonwl_salad_derive = { version = "0", path = "../salad_derive", optional = true }
 
 [lib]
 path = "lib.rs"
