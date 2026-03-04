@@ -114,7 +114,7 @@ fn collect_workflow_step_inputs(
             load_file_contents(&mut value)?;
         }
 
-        inputs.insert(step_input_id.to_string(), value);
+        inputs.insert(step_input_id.clone(), value);
     }
 
     Ok(inputs)

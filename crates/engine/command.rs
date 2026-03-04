@@ -30,6 +30,7 @@ enum SortKey {
     Str(String),
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn build_command(
     tool: &CommandLineTool,
     inputs: &HashMap<String, DefaultValue>,
@@ -124,7 +125,7 @@ pub fn build_command(
 
         collect_input_bindings(
             &input.r#type,
-            &input.input_binding,
+            input.input_binding.as_ref(),
             value,
             input_id,
             &[],
@@ -144,7 +145,7 @@ pub fn build_command(
             };
 
             if bound.binding.shell_quote.unwrap_or(true) {
-                arg = apply_shell_quote(arg);
+                arg = apply_shell_quote(&arg);
             }
             cmd.extend(arg);
         }
@@ -169,9 +170,10 @@ pub fn build_command(
     Ok(args)
 }
 
+#[allow(clippy::too_many_lines)]
 fn collect_input_bindings(
     schema: &CommandInputParameterType,
-    binding: &Option<CommandLineBinding>,
+    binding: Option<&CommandLineBinding>,
     value: &DefaultValue,
     name: &str,
     base_sort_key: &[SortKey],
@@ -249,7 +251,9 @@ fn collect_input_bindings(
 
                             let is_optional = match &field.r#type {
                                 OneOrMany::One(t) => t.is_null_allowed(),
-                                OneOrMany::Many(items) => items.iter().any(|i| i.is_null_allowed()),
+                                OneOrMany::Many(items) => {
+                                    items.iter().any(CommandInputType::is_null_allowed)
+                                }
                             };
                             if let Some(value) = map.get(field.name.clone()) {
                                 let value = serde_yaml::from_value(value.clone())?;
@@ -257,12 +261,12 @@ fn collect_input_bindings(
 
                                 collect_input_bindings(
                                     &CommandInputParameterType::CommandInputType(schema),
-                                    &Some(fi_binding),
+                                    Some(&fi_binding),
                                     &value,
                                     &field.name,
                                     &sort_key,
                                     bindings,
-                                )?
+                                )?;
                             } else if !is_optional {
                                 //not found but not optional
                                 anyhow::bail!(
@@ -285,10 +289,8 @@ fn collect_input_bindings(
                     return Ok(());
                 }
 
-                let should_recurse = binding
-                    .clone()
-                    .map(|b| b.item_separator.is_none() && b.value_from.is_none())
-                    .unwrap_or(true);
+                let should_recurse =
+                    binding.is_none_or(|b| b.item_separator.is_none() && b.value_from.is_none());
                 if should_recurse {
                     for (ix, item) in vec.iter().enumerate() {
                         //reassign to DefaultValue
@@ -309,15 +311,17 @@ fn collect_input_bindings(
                             ));
                             sort_key.push(SortKey::Str(name.to_owned()));
                         }
+                        #[allow(clippy::cast_possible_truncation)]
+                        #[allow(clippy::cast_possible_wrap)]
                         sort_key.push(SortKey::Int(ix as i32));
 
                         let schema = array.items.clone();
 
-                        let binding = array.input_binding.clone().or_else(|| binding.clone());
+                        let binding = array.input_binding.clone().or_else(|| binding.cloned());
                         if let Some(binding) = binding {
                             collect_input_bindings(
                                 &CommandInputParameterType::CommandInputType(schema),
-                                &Some(binding),
+                                Some(&binding),
                                 &item,
                                 name,
                                 &sort_key,
@@ -331,7 +335,7 @@ fn collect_input_bindings(
     }
 
     //add root binding
-    if let Some(binding) = &binding
+    if let Some(binding) = binding
         && !matches!(
             schema,
             CommandInputParameterType::CommandInputType(OneOrMany::One(CommandInputType::CWLType(
@@ -339,13 +343,12 @@ fn collect_input_bindings(
             )))
         )
     {
-        let binding = binding.clone();
         let mut sort_key = base_sort_key.to_owned();
 
         let json_value = serde_json::to_value(value)?;
         sort_key.push(SortKey::Int(
             get_binding_position(
-                &binding,
+                binding,
                 &EvaluationContext {
                     context: Some(&json_value),
                     ..Default::default()
@@ -357,7 +360,7 @@ fn collect_input_bindings(
 
         bindings.push(BoundBinding {
             sort_key,
-            binding,
+            binding: binding.clone(),
             value: value.clone(),
         });
     }
@@ -423,15 +426,14 @@ pub(crate) fn generate_arg(
             serde_yaml::Value::Mapping(_) => {
                 if let Some(prefix) = &binding.prefix {
                     return Ok(vec![prefix.clone()]);
-                } else {
-                    return Ok(vec![]);
                 }
+                return Ok(vec![]);
             }
             _ => argl = vec![DefaultValue::Any(value.clone())],
         },
         DefaultValue::FileOrDirectory(fd) => {
             let fd = fd.clone();
-            argl = vec![DefaultValue::FileOrDirectory(fd)]
+            argl = vec![DefaultValue::FileOrDirectory(fd)];
         }
     }
 
@@ -485,7 +487,7 @@ fn use_value_from(
         if matches!(dv, DefaultValue::Any(serde_yaml::Value::Bool(false))) {
             return Ok(vec![]);
         }
-        value = dv
+        value = dv;
     } else {
         anyhow::bail!("Expression evaluation failed!")
     }
@@ -512,19 +514,19 @@ fn use_value_from(
 pub(crate) fn to_str(val: &DefaultValue) -> String {
     match val {
         DefaultValue::FileOrDirectory(fd) => match fd.path() {
-            Some(path) => path.to_string(),
+            Some(path) => path.clone(),
             None => {
                 if let FileOrDirectory::File(file) = fd
                     && let Some(checksum) = &file.checksum
                 {
-                    checksum.to_string()
+                    checksum.clone()
                 } else {
                     "\"No path given\"".to_string()
                 }
             }
         },
         DefaultValue::Any(value) => match value {
-            serde_yaml::Value::String(s) => s.to_string(),
+            serde_yaml::Value::String(s) => s.clone(),
             serde_yaml::Value::Number(n) => n.to_string(),
             _ => String::new(),
         },
@@ -535,6 +537,7 @@ fn is_argument(bound: &BoundBinding) -> bool {
     matches!(bound.value, DefaultValue::Any(serde_yaml::Value::Null))
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn get_binding_position(
     binding: &CommandLineBinding,
     eval_context: &EvaluationContext,
@@ -563,7 +566,7 @@ fn get_shell_command() -> Vec<String> {
     vec![shell.to_string(), param.to_string()]
 }
 
-fn apply_shell_quote(arg: Vec<String>) -> Vec<String> {
+fn apply_shell_quote(arg: &[String]) -> Vec<String> {
     arg.iter()
         .map(|a| {
             let escaped = a.replace('\'', "'\"'\"'");
@@ -1017,7 +1020,7 @@ stdout: output.txt"#;
     #[test]
     fn test_apply_shell_quote() {
         let args = vec!["hello world".to_string()];
-        let res = apply_shell_quote(args);
+        let res = apply_shell_quote(&args);
         assert_eq!(res, vec!["'hello world'".to_string()])
     }
 }

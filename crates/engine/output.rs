@@ -56,13 +56,13 @@ pub(crate) fn collect_command_outputs(
                     let path = f.path.clone().unwrap();
                     let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
-                    *value = handle_file(&path, None, context)?
+                    *value = handle_file(&path, None, context)?;
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     d.dry_validation();
                     let path = d.path.clone().unwrap();
                     let path = correct_output_path(Path::new(&path), context);
-                    *value = handle_dir(&path, context)?
+                    *value = handle_dir(&path, context)?;
                 }
                 _ => {}
             }
@@ -103,7 +103,7 @@ fn evaluate_command_binding(
 
     //collect items via globs
     if let Some(globs) = &binding.glob {
-        for glob_ in get_globs(globs, context.eval_context)? {
+        for glob_ in get_globs(globs, context.eval_context) {
             let full_glob = make_full_glob(&glob_, context)?;
             for entry in glob(&full_glob)? {
                 let Ok(item) = entry else {
@@ -119,7 +119,7 @@ fn evaluate_command_binding(
                         .build();
                     //handle load_listing
                     if let Some(load_listing) = binding.load_listing {
-                        dir.load_listing(load_listing)?
+                        dir.load_listing(load_listing)?;
                     } else {
                         dir.load_listing(LoadListingEnum::DeepListing)?;
                     }
@@ -215,12 +215,12 @@ fn validate_output_item(
     match item {
         FileOrDirectory::File(file) => validate_file(file, format, context, base_path, copy)?,
         FileOrDirectory::Directory(dir) => validate_dir(dir, context, base_path, copy)?,
-    };
+    }
 
     Ok(())
 }
 
-/// sets the designated path to the file and copies it and its secondary_files recursively to the output folder
+/// sets the designated path to the file and copies it and its `secondary_files` recursively to the output folder
 fn validate_file(
     file: &mut File,
     format: Option<&String>,
@@ -250,7 +250,7 @@ fn validate_file(
                 .unwrap()
                 .strip_prefix("file://")
                 .unwrap()
-                .to_string()
+                .to_string();
         }
 
         let parent = dest_path.parent().unwrap();
@@ -259,13 +259,14 @@ fn validate_file(
         }
 
         if copy {
-            fs::copy(&source_path, dest_path)
-                .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+            fs::copy(&source_path, dest_path).with_context(|| {
+                format!("Could not copy {source_path:?} to {}", dest_path.display())
+            })?;
         }
         if file.size.is_none() || file.checksum.is_none() {
             let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
             file.checksum = checksum;
-            file.size = Some(Integer::Long(size as i64))
+            file.size = Some(Integer::Long(size.cast_signed()));
         }
     } else if let Some(dest_path) = &path
         && let Some(contents) = &file.contents
@@ -277,12 +278,12 @@ fn validate_file(
         }
 
         fs::write(dest_path, contents)
-            .with_context(|| format!("Could not write contents to {dest_path:?}"))?;
+            .with_context(|| format!("Could not write contents to {}", dest_path.display()))?;
 
         if file.size.is_none() || file.checksum.is_none() {
             let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
             file.checksum = checksum;
-            file.size = Some(Integer::Long(size as i64))
+            file.size = Some(Integer::Long(size.cast_signed()));
         }
     }
 
@@ -333,7 +334,7 @@ fn validate_dir(
                 .unwrap()
                 .strip_prefix("file://")
                 .unwrap()
-                .to_string()
+                .to_string();
         }
 
         let parent = dest_path.parent().unwrap();
@@ -341,8 +342,9 @@ fn validate_dir(
             fs::create_dir_all(parent)?;
         }
         if copy {
-            copy_dir(&source_path, dest_path)
-                .with_context(|| format!("Could not copy {source_path:?} to {dest_path:?}"))?;
+            copy_dir(&source_path, dest_path).with_context(|| {
+                format!("Could not copy {source_path} to {}", dest_path.display())
+            })?;
         }
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
@@ -387,13 +389,13 @@ fn collect_output_item(
     stderr_file: &Path,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<DefaultValue> {
-    let format = output.format.as_ref().map(|f| f.as_one().to_string());
+    let format = output.format.as_ref().map(|f| f.as_one().clone());
     let value = match &output.r#type {
         CommandOutputParameterType::Stdout => handle_file(stdout_file, format, context),
         CommandOutputParameterType::Stderr => handle_file(stderr_file, format, context),
         CommandOutputParameterType::CommandOutputType(r#type) => collect_item(
             output,
-            &output.output_binding,
+            output.output_binding.as_ref(),
             r#type,
             format.as_ref(),
             output.secondary_files.as_ref(),
@@ -405,10 +407,7 @@ fn collect_output_item(
     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
         let valid = validate_output_type(&r#type.clone().into(), &value);
         if !valid {
-            anyhow::bail!(
-                "Output value {value:?} does not match output type {:?}",
-                r#type
-            )
+            anyhow::bail!("Output value {value:?} does not match output type {type:?}")
         }
     }
 
@@ -418,7 +417,7 @@ fn collect_output_item(
 // recursive implementention of item collection
 fn collect_item(
     output: &CommandOutputParameter,
-    output_binding: &Option<CommandOutputBinding>,
+    output_binding: Option<&CommandOutputBinding>,
     item: &OneOrMany<CommandOutputType>,
     format: Option<&String>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
@@ -448,7 +447,7 @@ fn collect_item(
             }
         }
         OneOrMany::One(CommandOutputType::CWLType(CWLType::Any)) => false,
-        _ => true,
+        OneOrMany::One(_) => true,
     };
     let is_any = match item {
         OneOrMany::One(CommandOutputType::CWLType(CWLType::Any)) => true,
@@ -470,9 +469,9 @@ fn collect_item(
                         field.name.clone(),
                         collect_item(
                             output,
-                            &field.output_binding,
+                            field.output_binding.as_ref(),
                             &field.r#type,
-                            field.format.as_ref().map(|f| f.as_one()),
+                            field.format.as_ref().map(OneOrMany::as_one),
                             field.secondary_files.as_ref(),
                             context,
                         )?,
@@ -512,7 +511,7 @@ fn validate_output_item_recurse(
 ) -> anyhow::Result<()> {
     match item {
         DefaultValue::FileOrDirectory(fod) => {
-            validate_output_item(fod, format, context, context.dest_dir, true)?
+            validate_output_item(fod, format, context, context.dest_dir, true)?;
         }
         DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
             for item in map.values_mut() {
@@ -528,13 +527,13 @@ fn validate_output_item_recurse(
                 *item = serde_yaml::to_value(dv)?;
             }
         }
-        _ => {}
+        DefaultValue::Any(_) => {}
     }
 
     Ok(())
 }
 
-fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::Result<Vec<String>> {
+fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> Vec<String> {
     let mut globs = vec![];
     match glob {
         OneOrMany::One(glob) => {
@@ -543,14 +542,14 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::R
                     //we can get a list here also
                     serde_yaml::Value::Sequence(vec) => {
                         for item in vec {
-                            globs.push(item.as_str().unwrap().into())
+                            globs.push(item.as_str().unwrap().into());
                         }
                     }
                     _ => globs.push(value.as_str().unwrap().into()),
                 }
             } else {
                 //no expression
-                globs.push(glob.to_string());
+                globs.push(glob.clone());
             }
         }
         OneOrMany::Many(items) => {
@@ -560,7 +559,7 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> anyhow::R
         }
     }
 
-    Ok(globs)
+    globs
 }
 
 //returns a file created in the output directory
@@ -573,8 +572,13 @@ fn handle_file(
 
     let dest_path = context.dest_dir.join(filename);
 
-    fs::copy(path, &dest_path)
-        .with_context(|| format!("Could not copy {path:?} to {dest_path:?}"))?;
+    fs::copy(path, &dest_path).with_context(|| {
+        format!(
+            "Could not copy {} to {}",
+            path.display(),
+            dest_path.display()
+        )
+    })?;
     let mut file = File::new_from_path(&dest_path)?;
     file.format = format;
 
@@ -607,13 +611,13 @@ fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<
 }
 
 fn make_full_glob(glob_: &str, context: &OutputCollectionContext) -> anyhow::Result<String> {
-    let full_glob = if !glob_.starts_with("/") {
-        format!("{}/{}", context.source_dir.display(), glob_)
-    } else {
+    let full_glob = if glob_.starts_with('/') {
         if !glob_.starts_with(&context.source_dir.to_string_lossy().to_string()) {
             anyhow::bail!("Can not access objects outside the working directory: {glob_}.");
         }
         glob_.to_owned()
+    } else {
+        format!("{}/{}", context.source_dir.display(), glob_)
     };
 
     Ok(full_glob)
@@ -637,9 +641,9 @@ pub(crate) fn collect_expression_outputs(
                 warn!(
                     "Output value {value:?} does not match output type {:?}",
                     output.r#type
-                )
+                );
             }
-            let format = output.format.as_ref().map(|f| f.as_one().to_string());
+            let format = output.format.as_ref().map(|f| f.as_one().clone());
             validate_output_item_recurse(&mut value, format.as_ref(), context)?;
             output_map.insert(output_id, value);
         }
@@ -649,7 +653,7 @@ pub(crate) fn collect_expression_outputs(
 
 pub(crate) fn collect_workflow_outputs(
     outputs: &[WorkflowOutputParameter],
-    values: HashMap<String, DefaultValue>,
+    values: &HashMap<String, DefaultValue>,
     context: &OutputCollectionContext,
     mir: Option<&MultipleInputFeatureRequirement>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
@@ -679,7 +683,7 @@ pub(crate) fn collect_workflow_outputs(
                             value.clone()
                         };
 
-                        let format = output.format.as_ref().map(|f| f.as_one().to_string());
+                        let format = output.format.as_ref().map(|f| f.as_one().clone());
                         validate_output_item_recurse(&mut value, format.as_ref(), context)?;
                         if let CommandOutputParameterType::CommandOutputType(r#type) =
                             &output.r#type
@@ -687,8 +691,7 @@ pub(crate) fn collect_workflow_outputs(
                             let valid = validate_output_type(&r#type.clone().into(), &value);
                             if !valid {
                                 anyhow::bail!(
-                                    "Invalid value for {output_id}. {:?} does not match {value:?}",
-                                    r#type
+                                    "Invalid value for {output_id}. {type:?} does not match {value:?}",
                                 );
                             }
                         }
@@ -719,14 +722,13 @@ pub(crate) fn collect_workflow_outputs(
                         );
                     };
 
-                    let format = output.format.as_ref().map(|f| f.as_one().to_string());
+                    let format = output.format.as_ref().map(|f| f.as_one().clone());
                     validate_output_item_recurse(&mut value, format.as_ref(), context)?;
                     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
                         let valid = validate_output_type(&r#type.clone().into(), &value);
                         if !valid {
                             anyhow::bail!(
-                                "Invalid value for {output_id}. {:?} does not match {value:?}",
-                                r#type
+                                "Invalid value for {output_id}. {type:?} does not match {value:?}"
                             );
                         }
                     }

@@ -69,7 +69,8 @@ impl Default for CommandInputParameterType {
 }
 
 impl CommandInputParameterType {
-    //specifies if for this input parameter a singular null value is allowed
+    /// specifies if for this input parameter a singular null value is allowed
+    #[must_use]
     pub fn is_null_allowed(&self) -> bool {
         matches!(
             self,
@@ -119,13 +120,15 @@ impl From<&str> for DefaultValue {
 }
 
 impl DefaultValue {
+    #[must_use]
     pub fn is_null(&self) -> bool {
         match self {
             Self::Any(value) => value.is_null(),
-            _ => false,
+            Self::FileOrDirectory(_) => false,
         }
     }
 
+    #[must_use]
     pub fn try_get_value_ref(&self) -> Option<&Value> {
         match self {
             Self::FileOrDirectory(_) => None,
@@ -133,6 +136,7 @@ impl DefaultValue {
         }
     }
 
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
             Self::Any(serde_yaml::Value::String(s)) => Some(s),
@@ -140,6 +144,7 @@ impl DefaultValue {
         }
     }
 
+    #[must_use]
     pub fn as_file(&self) -> Option<&File> {
         match self {
             Self::FileOrDirectory(FileOrDirectory::File(f)) => Some(f),
@@ -301,7 +306,7 @@ impl From<CommandInputParameter> for OperationInputParameter {
             CommandInputParameterType::Stdin => {
                 OneOrMany::One(InputType::String("stdin".to_string()))
             }
-            CommandInputParameterType::CommandInputType(types) => types.map(|t| t.into()),
+            CommandInputParameterType::CommandInputType(types) => types.map(Into::into),
         };
         Self {
             r#type: ty,
@@ -331,7 +336,7 @@ impl CommandInputSchema {
     pub fn is_null_allowed(&self) -> bool {
         match self {
             Self::Array(array) => match &array.items {
-                OneOrMany::Many(items) => items.iter().any(|i| i.is_null_allowed()),
+                OneOrMany::Many(items) => items.iter().any(CommandInputType::is_null_allowed),
                 OneOrMany::One(item) => item.is_null_allowed(),
             },
             _ => false,
@@ -373,10 +378,12 @@ impl Default for CommandInputType {
 }
 
 impl CommandInputType {
+    #[must_use]
     pub fn is_null(&self) -> bool {
         matches!(self, CommandInputType::CWLType(CWLType::Null))
     }
 
+    #[must_use]
     pub fn is_null_allowed(&self) -> bool {
         if self.is_null() {
             return true;

@@ -78,7 +78,7 @@ pub(crate) fn locate_dir(
                 match item {
                     FileOrDirectory::File(file) => locate_file(file, work_dir, &path, false)?,
                     FileOrDirectory::Directory(dir) => {
-                        locate_dir(dir, work_dir, &path, load_listing)?
+                        locate_dir(dir, work_dir, &path, load_listing)?;
                     }
                 }
             }
@@ -95,8 +95,8 @@ fn read_dir(
     stage_dir: &Path,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     let mut entries = Vec::new();
-    let read_dir =
-        fs::read_dir(path).with_context(|| format!("Could not read directory {path:?}"))?;
+    let read_dir = fs::read_dir(path)
+        .with_context(|| format!("Could not read directory {}", path.display()))?;
 
     for entry in read_dir.flatten() {
         let path_buf = entry.path();

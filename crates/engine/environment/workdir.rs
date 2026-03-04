@@ -192,7 +192,7 @@ fn stage_dirent(
         anyhow::bail!("dirent.entryname must not start with ../")
     }
     //if dirent ends with newline and has expression we use string interpolation which means we do json serialization
-    let has_trailing_newline = dirent.entry.ends_with("\n");
+    let has_trailing_newline = dirent.entry.ends_with('\n');
 
     //relocate used inputs
     if !has_trailing_newline && matches!(dv, DefaultValue::FileOrDirectory(_)) {
@@ -203,10 +203,12 @@ fn stage_dirent(
     let mut string_content = match dv {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) if !has_trailing_newline => {
             if let Some(contents) = file.contents {
-                contents.to_string()
+                contents.clone()
             } else {
                 let mut path = file.location.clone().unwrap();
-                path = path.strip_prefix("file://").unwrap_or(&path).to_owned();
+                if path.starts_with("file://") {
+                    path.drain(..7);
+                }
 
                 let absolute_path = if Path::new(&path).is_absolute() {
                     PathBuf::from(path)
@@ -234,11 +236,11 @@ fn stage_dirent(
             serde_yaml::Value::String(s) => s,
             _ => to_string_dump(&value)?,
         },
-        _ => to_string_dump(&dv)?,
+        DefaultValue::FileOrDirectory(_) => to_string_dump(&dv)?,
     };
 
-    if has_trailing_newline && !string_content.ends_with("\n") {
-        string_content += "\n"
+    if has_trailing_newline && !string_content.ends_with('\n') {
+        string_content += "\n";
     }
 
     Ok(vec![WorkDirMount {
@@ -329,11 +331,11 @@ fn update_inputs(
             match input {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
                     debug!("Moving {file:?} into {container_workdir:?}");
-                    move_file(file, Path::new(container_workdir), entryname)
+                    move_file(file, Path::new(container_workdir), entryname);
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
                     debug!("Moving {dir:?} into {container_workdir:?}");
-                    move_dir(dir, Path::new(container_workdir), entryname)
+                    move_dir(dir, Path::new(container_workdir), entryname);
                 }
                 _ => {}
             }
@@ -349,12 +351,20 @@ pub(crate) fn handle_inplace_update(mounts: Vec<WorkDirMount>) -> anyhow::Result
             match mount.ty {
                 MountType::File => {
                     fs::copy(&mount.target, src_path).with_context(|| {
-                        format!("Could not copy {:?} to {src_path:?}", mount.target)
+                        format!(
+                            "Could not copy {} to {}",
+                            mount.target.display(),
+                            src_path.display()
+                        )
                     })?;
                 }
                 MountType::Directory => {
                     copy_dir(&mount.target, src_path).with_context(|| {
-                        format!("Could not copy {:?} to {src_path:?}", mount.target)
+                        format!(
+                            "Could not copy {} to {}",
+                            mount.target.display(),
+                            src_path.display()
+                        )
                     })?;
                 }
             }

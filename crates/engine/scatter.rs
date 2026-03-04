@@ -6,7 +6,7 @@ use crate::request::InputObject;
 pub(crate) fn gather_jobs(
     scatter_inputs: &[Vec<serde_yaml::Value>],
     scatter_keys: &[String],
-    method: &ScatterMethod,
+    method: ScatterMethod,
 ) -> anyhow::Result<Vec<HashMap<String, serde_yaml::Value>>> {
     match method {
         ScatterMethod::Dotproduct => {
@@ -89,7 +89,7 @@ pub(crate) fn gather_inputs(
         .collect::<anyhow::Result<Vec<Vec<serde_yaml::Value>>>>()
 }
 
-pub(crate) fn nest_results(flat: Vec<serde_yaml::Value>, dims: &[usize]) -> serde_yaml::Value {
+pub(crate) fn nest_results(flat: &[serde_yaml::Value], dims: &[usize]) -> serde_yaml::Value {
     fn chunk(flat: &[serde_yaml::Value], dims: &[usize]) -> serde_yaml::Value {
         if dims.len() == 1 {
             serde_yaml::Value::Sequence(flat.to_vec())
@@ -102,10 +102,10 @@ pub(crate) fn nest_results(flat: Vec<serde_yaml::Value>, dims: &[usize]) -> serd
             serde_yaml::Value::Sequence(chunks)
         }
     }
-    chunk(&flat, dims)
+    chunk(flat, dims)
 }
 
-pub(crate) fn empty(method: &ScatterMethod, dims: &[usize]) -> serde_yaml::Value {
+pub(crate) fn empty(method: ScatterMethod, dims: &[usize]) -> serde_yaml::Value {
     match method {
         ScatterMethod::Dotproduct | ScatterMethod::FlatCrossproduct => {
             serde_yaml::Value::Sequence(vec![])

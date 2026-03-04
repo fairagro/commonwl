@@ -30,7 +30,7 @@ pub(crate) fn handle_environment(
             //do not overwrite input requirements
             if !environment.contains_key(&item.env_name) {
                 let parsed_value = eval_as_string(&item.env_value, eval_context)?;
-                environment.insert(item.env_name.clone(), parsed_value.to_string());
+                environment.insert(item.env_name.clone(), parsed_value.clone());
             }
         }
     }

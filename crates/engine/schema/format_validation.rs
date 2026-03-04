@@ -2,7 +2,7 @@ use crate::expression::{EvaluationContext, do_eval};
 use anyhow::Context;
 use cwl_core::documents::CWLDocument;
 use horned_owl::{
-    io::ParserOutput,
+    io::{ParserConfiguration, ParserOutput},
     model::{
         AnnotatedComponent, ArcStr, Build, ClassExpression, Component, EquivalentClasses,
         SubClassOf,
@@ -16,7 +16,7 @@ use rdf::{
     uri::Uri,
 };
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeSet, HashMap, HashSet, VecDeque},
     fs::{self, File},
     io::BufReader,
     path::Path,
@@ -41,7 +41,7 @@ const EQUIVALENT_CLASS: &str = "http://www.w3.org/2002/07/owl#equivalentClass";
 
 impl FormatValidator {
     pub(crate) fn new(
-        namespaces: HashMap<String, String>,
+        namespaces: &HashMap<String, String>,
         ontologies: Vec<impl AsRef<Path> + std::fmt::Debug>,
     ) -> anyhow::Result<Self> {
         let mut ontos = vec![];
@@ -61,7 +61,7 @@ impl FormatValidator {
                     horned_owl::io::rdf::reader::read_with_build(
                         &mut bufreader,
                         &b,
-                        Default::default(),
+                        ParserConfiguration::default(),
                     )
                     .unwrap(),
                 );
@@ -70,7 +70,7 @@ impl FormatValidator {
             }
         }
         Ok(Self {
-            namespaces: namespaces.to_owned(),
+            namespaces: namespaces.clone(),
             ontologies: ontos,
         })
     }
@@ -135,10 +135,10 @@ impl FormatValidator {
                         EquivalentClasses(vec![b.class(format_a).into(), b.class(format_b).into()]);
                     if set_ontology.i().contains(&AnnotatedComponent::new(
                         Component::EquivalentClasses(ec),
-                        Default::default(),
+                        BTreeSet::default(),
                     )) {
                         return true;
-                    };
+                    }
 
                     //check subclass of
                     let mut visited = HashSet::new();
@@ -155,7 +155,7 @@ impl FormatValidator {
 
                         if set_ontology.i().contains(&AnnotatedComponent::new(
                             Component::SubClassOf(sc),
-                            Default::default(),
+                            BTreeSet::default(),
                         )) {
                             return true;
                         }
@@ -198,7 +198,7 @@ impl FormatValidator {
                 *t_format = value.as_str().unwrap().to_string();
             }
 
-            if let Some((namespace, value)) = t_format.split_once(":")
+            if let Some((namespace, value)) = t_format.split_once(':')
                 && let Some(resolved) = self.namespaces.get(namespace)
             {
                 format = Some(format!("{resolved}{value}"));
@@ -244,7 +244,7 @@ pub(crate) fn get_format_validator(
         })
         .unwrap_or_default();
 
-    FormatValidator::new(namespaces, schemas)
+    FormatValidator::new(&namespaces, schemas)
 }
 
 #[cfg(test)]
@@ -256,7 +256,7 @@ mod tests {
     fn test_validate_format() {
         let namespaces = HashMap::new();
         let fv = FormatValidator::new(
-            namespaces,
+            &namespaces,
             [
                 Path::new("../../testdata/cwl/tests/EDAM.owl"),
                 Path::new("../../testdata/cwl/tests/gx_edam.ttl"),

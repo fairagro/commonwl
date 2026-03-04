@@ -20,12 +20,14 @@ pub enum FileOrDirectory {
 }
 
 impl FileOrDirectory {
+    #[must_use]
     pub fn path(&self) -> Option<&String> {
         match self {
             Self::File(f) => f.path.as_ref(),
             Self::Directory(d) => d.path.as_ref(),
         }
     }
+    #[must_use]
     pub fn location(&self) -> Option<&String> {
         match self {
             Self::File(f) => f.location.as_ref(),
@@ -40,6 +42,7 @@ impl FileOrDirectory {
         }
     }
 
+    #[must_use]
     pub fn basename(&self) -> Option<&String> {
         match self {
             Self::File(f) => f.basename.as_ref(),
@@ -54,14 +57,20 @@ impl FileOrDirectory {
         }
     }
 
+    #[must_use]
     pub fn is_file(&self) -> bool {
         matches!(self, FileOrDirectory::File(_))
     }
 
+    #[must_use]
     pub fn is_dir(&self) -> bool {
         matches!(self, FileOrDirectory::Directory(_))
     }
 
+    #[must_use]
+    /// Gets a `FileOrDirectory` from its yaml Mapping
+    /// # Panics
+    /// if class is not given
     pub fn from_mapping(value: serde_yaml::Value) -> Self {
         serde_yaml::from_value(value).expect("class not found")
     }
@@ -121,6 +130,9 @@ impl File {
         }
     }
 
+    /// Creats a `File` from `Path`.
+    /// # Errors
+    /// if file does not exist
     pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
         let path_as_str = path.to_string_lossy();
         let FilePathMetaData {
@@ -170,10 +182,13 @@ impl Directory {
         if let Some(location) = &self.location
             && self.path.is_none()
         {
-            self.path = Some(location.to_string());
+            self.path = Some(location.clone());
         }
     }
 
+    /// Creates a directory from a given path
+    /// # Errors
+    /// If dir does not exist
     pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
         let path_as_str = path.to_string_lossy();
         let FilePathMetaData {
@@ -191,6 +206,9 @@ impl Directory {
         Ok(dir)
     }
 
+    /// Loads listing for directory
+    /// # Errors
+    /// if a file or dir does not exist or path is not given
     pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> anyhow::Result<()> {
         self.dry_validation();
         let Some(path) = &self.path else {

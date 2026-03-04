@@ -3,6 +3,10 @@ use quote::quote;
 use syn::{Data, DeriveInput, parse_macro_input};
 
 #[proc_macro_derive(Identifiable)]
+/// Derive Macro for `Identifiable`
+/// # Panics
+/// - If a non struct type is given
+/// - Struct does not have id field
 pub fn derive_identifiable(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = input.ident;
@@ -16,11 +20,9 @@ pub fn derive_identifiable(input: TokenStream) -> TokenStream {
     // Look for a field named `id: Option<String>`
     let has_id = fields
         .iter()
-        .any(|f| f.ident.as_ref().map(|i| i == "id").unwrap_or(false));
+        .any(|f| f.ident.as_ref().is_some_and(|i| i == "id"));
 
-    if !has_id {
-        panic!("Identifiable requires a field named `id`");
-    }
+    assert!(has_id, "Identifiable requires a field named `id`");
 
     let expanded = quote! {
         impl Identifiable for #name {

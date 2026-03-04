@@ -241,7 +241,7 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
                 dbg!(&result);
             }
             let status = if let Ok(result) = &result {
-                evaluate_exitcodes(result.exit_status.clone(), &request.specification)
+                evaluate_exitcodes(&result.exit_status, &request.specification)
             } else {
                 EngineStatus::Undefined(666)
             };

@@ -284,7 +284,7 @@ impl From<OneOrMany<CommandOutputType>> for OneOrMany<OutputType> {
     fn from(value: OneOrMany<CommandOutputType>) -> Self {
         match value {
             OneOrMany::One(t) => OneOrMany::One(t.into()),
-            OneOrMany::Many(v) => OneOrMany::Many(v.into_iter().map(|t| t.into()).collect()),
+            OneOrMany::Many(v) => OneOrMany::Many(v.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -481,12 +481,16 @@ pub enum StringOrWorkflowStepOutput {
 }
 
 impl StringOrWorkflowStepOutput {
+    /// Gets the `WorkflowStepOutput` ID
+    /// # Panics
+    /// if id is null (never!)
+    #[must_use]
     pub fn id(&self) -> String {
         match self {
             Self::String(s) => s,
             Self::WorkflowStepOutput(wfs) => wfs.id.as_ref().unwrap(),
         }
-        .to_string()
+        .clone()
     }
 }
 

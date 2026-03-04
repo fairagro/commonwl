@@ -100,20 +100,21 @@ impl From<i64> for Integer {
 
 impl From<u32> for Integer {
     fn from(value: u32) -> Self {
-        Integer::Int(value as i32)
+        Integer::Int(value.cast_signed())
     }
 }
 
 impl From<u64> for Integer {
     fn from(value: u64) -> Self {
-        Integer::Long(value as i64)
+        Integer::Long(value.cast_signed())
     }
 }
 
 impl Integer {
+    #[must_use]
     pub fn as_i64(&self) -> i64 {
         match self {
-            Self::Int(i) => *i as i64,
+            Self::Int(i) => i64::from(*i),
             Self::Long(l) => *l,
         }
     }
@@ -149,7 +150,7 @@ impl<'a> From<&'a [&'a str]> for OneOrMany<String> {
         if value.len() == 1 {
             return OneOrMany::One(value[0].to_string());
         }
-        OneOrMany::Many(value.iter().map(|s| s.to_string()).collect())
+        OneOrMany::Many(value.iter().map(ToString::to_string).collect())
     }
 }
 
@@ -170,6 +171,9 @@ impl<T: Clone> OneOrMany<T> {
         }
     }
 
+    /// Returns `OneOrMany` as One
+    /// # Panics
+    /// if many
     pub fn as_one(&self) -> &T {
         match self {
             OneOrMany::One(t) => t,
@@ -177,10 +181,11 @@ impl<T: Clone> OneOrMany<T> {
         }
     }
 
+    /// Returns `OneOrMany` as Many
     pub fn as_many(&self) -> Vec<T> {
         match self {
             OneOrMany::One(t) => vec![t.clone()],
-            OneOrMany::Many(v) => v.to_vec(),
+            OneOrMany::Many(v) => v.clone(),
         }
     }
 }
@@ -191,15 +196,19 @@ pub trait ExtractFromEnum<E> {
         Self: Sized;
 }
 
+/// Returns `String`, `Number` or `Bool` as String
+/// # Errors
+/// otherwise
 pub fn value_as_string(value: &Value) -> anyhow::Result<String> {
     match value {
-        Value::String(s) => Ok(s.to_string()),
+        Value::String(s) => Ok(s.clone()),
         Value::Number(n) => Ok(n.to_string()),
         Value::Bool(b) => Ok(b.to_string()),
         _ => anyhow::bail!("Value is not a string, number, or bool"),
     }
 }
 
+#[must_use]
 pub fn docstring(doc: OneOrMany<String>) -> String {
     match doc {
         OneOrMany::One(s) => s,
@@ -215,6 +224,7 @@ pub struct FilePathMetaData {
     pub dirname: Option<String>,
 }
 
+#[must_use]
 pub fn get_path_metadata(path: &Path) -> FilePathMetaData {
     let basename = path.file_name().map(|f| f.to_string_lossy().into_owned());
     let nameroot = path.file_stem().map(|s| s.to_string_lossy().into_owned());
@@ -237,6 +247,9 @@ pub struct FileMetaData {
     pub checksum: Option<String>,
 }
 
+/// Tries to retrieve `FileMetaData` for given `Path`
+/// # Errors
+/// if file does no exist
 pub fn get_file_metadata(path: &Path) -> anyhow::Result<FileMetaData> {
     let metadata = fs::metadata(path)
         .with_context(|| format!("Can not retrieve File metadata for {}", path.display()))?;

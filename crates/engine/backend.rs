@@ -118,6 +118,9 @@ pub struct TaskExecutionResult {
     pub stderr_file: PathBuf,
 }
 
+///Executes a `CWLDocument`
+/// # Panics
+///  Panics if `Operation` is used as this anstract type is not meant to be executed
 pub fn execute(
     backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
@@ -128,10 +131,16 @@ pub fn execute(
         CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => {
             execute_commandline_tool(backend, request, token).boxed()
         }
-        _ => panic!("Unsupported document type for execution"),
+        CWLDocument::Operation(_) => panic!("Unsupported document type for execution"),
     }
 }
 
+///Executes a CWL `Worfklow` object
+/// # Panics
+/// Panics if document is not a `Workflow`
+/// # Errors
+/// Errors in multiple occasions. Tells you basically something is wrong with the CWL
+#[allow(clippy::too_many_lines)]
 pub async fn execute_workflow(
     backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
@@ -227,14 +236,14 @@ pub async fn execute_workflow(
                     .unwrap_or(&ScatterMethod::Dotproduct);
 
                 let scatter_inputs = scatter::gather_inputs(&scatter_keys, &inputs)?;
-                let dims: Vec<usize> = scatter_inputs.iter().map(|v| v.len()).collect();
-                let jobs = scatter::gather_jobs(&scatter_inputs, &scatter_keys, method)?;
+                let dims: Vec<usize> = scatter_inputs.iter().map(Vec::len).collect();
+                let jobs = scatter::gather_jobs(&scatter_inputs, &scatter_keys, *method)?;
 
                 //no jobs -> we add empty output arrays
                 if jobs.is_empty() {
                     for output in &step.out {
                         let key = format!("{}/{}", step_id_clone, output.id());
-                        let empty_result = scatter::empty(method, &dims);
+                        let empty_result = scatter::empty(*method, &dims);
                         completed_outputs.insert(key, DefaultValue::Any(empty_result));
                     }
                     continue;
@@ -252,8 +261,7 @@ pub async fn execute_workflow(
                     if let Some(when) = &step.when {
                         if cwl_version < V1_2_0 {
                             anyhow::bail!(
-                                "Conditional execution with when is not supported for CWL version {}",
-                                cwl_version
+                                "Conditional execution with when is not supported for CWL version {cwl_version}",
                             );
                         }
                         let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
@@ -264,10 +272,7 @@ pub async fn execute_workflow(
                                 .out
                                 .iter()
                                 .map(|o| {
-                                    (
-                                        o.id().to_string(),
-                                        DefaultValue::Any(serde_yaml::Value::Null),
-                                    )
+                                    (o.id().clone(), DefaultValue::Any(serde_yaml::Value::Null))
                                 })
                                 .collect::<HashMap<_, _>>();
                             //spawn the "Null-Job"
@@ -306,27 +311,18 @@ pub async fn execute_workflow(
                 if let Some(when) = &step.when {
                     if cwl_version < V1_2_0 {
                         anyhow::bail!(
-                            "Conditional execution with when is not supported for CWL version {}",
-                            cwl_version
+                            "Conditional execution with when is not supported for CWL version {cwl_version}",
                         );
                     }
                     let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
                         anyhow::bail!("Condition {when} did not evaluate to boolean");
                     };
                     if !result {
-                        debug!(
-                            "Step skipped because when evaluated to false in {}",
-                            step_id_clone
-                        );
+                        debug!("Step skipped because when evaluated to false in {step_id_clone}",);
                         let null_outputs = step
                             .out
                             .iter()
-                            .map(|o| {
-                                (
-                                    o.id().to_string(),
-                                    DefaultValue::Any(serde_yaml::Value::Null),
-                                )
-                            })
+                            .map(|o| (o.id().clone(), DefaultValue::Any(serde_yaml::Value::Null)))
                             .collect::<HashMap<_, _>>();
                         //spawn the "Null-Job"
                         let step_id = step_id_clone.clone();
@@ -364,7 +360,7 @@ pub async fn execute_workflow(
                 .context("Step task panicked")?
                 .context("Step execution failed")?;
             for (output_name, value) in exec_result.outputs {
-                let key = format!("{}/{}", step_id, output_name);
+                let key = format!("{step_id}/{output_name}");
                 if scattered_step_ids.contains(&step_id) && sfr.is_some() {
                     scatter_accum.entry(key).or_default().push(value);
                 } else {
@@ -384,7 +380,7 @@ pub async fn execute_workflow(
                                 .into_iter()
                                 .map(serde_yaml::to_value)
                                 .collect::<Result<_, _>>()?;
-                            scatter::nest_results(raw, dims)
+                            scatter::nest_results(&raw, dims)
                         }
                         // flat and dotproduct both produce a flat array
                         _ => serde_yaml::to_value(values)?,
@@ -404,7 +400,7 @@ pub async fn execute_workflow(
         eval_context,
         validator: &fv,
     };
-    let outputs = collect_workflow_outputs(&wf.outputs, completed_outputs, &cc, mir)?;
+    let outputs = collect_workflow_outputs(&wf.outputs, &completed_outputs, &cc, mir)?;
 
     Ok(ExecutionResult {
         exit_status: NonEmpty::new(ExitStatus::default()),
@@ -459,6 +455,10 @@ fn execute_step(
     }
 }
 
+/// Executes a CWL `CommandLineTool`
+/// # Errors
+/// Can return error in multiple occasions.
+#[allow(clippy::too_many_lines)]
 pub async fn execute_commandline_tool(
     backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
@@ -559,7 +559,7 @@ pub async fn execute_commandline_tool(
     };
 
     //needs to be constructed after we created the eval context
-    let mut flattened_inputs = flatten_inputs(&inputs)?;
+    let mut flattened_inputs = flatten_inputs(&inputs);
     flattened_inputs = remove_materialized_inputs(flattened_inputs, &mounts, workdir);
 
     let eval_context = &mut EvaluationContext {
@@ -581,10 +581,10 @@ pub async fn execute_commandline_tool(
             *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
                 serde_yaml::to_string(&value)?.trim().to_owned()
             } else {
-                stdin.to_string()
+                stdin.clone()
             };
 
-            args.push(stdin.to_string());
+            args.push(stdin.clone());
         }
 
         info!("Executing: {}", args.join(" "));
@@ -614,7 +614,7 @@ pub async fn execute_commandline_tool(
 
                     command: args
                         .iter()
-                        .map(|s| s.as_str())
+                        .map(String::as_str)
                         .collect::<Vec<&str>>()
                         .as_slice(),
                     inputs: &flattened_inputs,
@@ -652,13 +652,21 @@ pub async fn execute_commandline_tool(
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
         //evaluate stderr/stdout
-        let stdout = fs::read_to_string(&result.stdout_file)
-            .with_context(|| format!("Could not find stdout file {:?}", result.stdout_file))?;
+        let stdout = fs::read_to_string(&result.stdout_file).with_context(|| {
+            format!(
+                "Could not find stdout file {}",
+                result.stdout_file.display()
+            )
+        })?;
         if !stdout.is_empty() {
             eprintln!("{stdout}");
         }
-        let stderr = fs::read_to_string(&result.stderr_file)
-            .with_context(|| format!("Could not find stderr file {:?}", result.stderr_file))?;
+        let stderr = fs::read_to_string(&result.stderr_file).with_context(|| {
+            format!(
+                "Could not find stderr file {}",
+                result.stderr_file.display()
+            )
+        })?;
         if !stderr.is_empty() {
             eprintln!("{stderr}");
         }
@@ -734,11 +742,11 @@ pub enum EngineStatus {
     Failure(i32),
     Undefined(i32),
 }
-
-pub fn evaluate_exitcodes(exit_codes: NonEmpty<ExitStatus>, doc: &CWLDocument) -> EngineStatus {
+#[must_use]
+pub fn evaluate_exitcodes(exit_codes: &NonEmpty<ExitStatus>, doc: &CWLDocument) -> EngineStatus {
     //currently we only look at first code
     let actual_code = exit_codes.first();
-    let code = actual_code.code().unwrap();
+    let code = actual_code.code().unwrap_or(1);
     if let CWLDocument::CommandLineTool(tool) = doc {
         let success_codes = tool.success_codes.clone().unwrap_or(vec![0]);
         let failure_codes = tool.permanent_fail_codes.clone().unwrap_or(vec![1]);

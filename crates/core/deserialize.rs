@@ -5,6 +5,7 @@ use serde_yaml::Value;
 use std::collections::HashMap;
 
 pub trait FromShortHand {
+    #[must_use]
     fn from_shorthand(_key: &str, _value: Value) -> Option<Value> {
         None
     }
@@ -26,13 +27,10 @@ where
         TFormat::Array(items) => Ok(items),
         TFormat::Map(mut map) => {
             let mut result = vec![];
-            for (key, value) in map.iter_mut() {
+            for (key, value) in &mut map {
                 let normalized = match value {
                     Value::Mapping(m) => {
-                        m.insert(
-                            Value::String(tag.to_string()),
-                            Value::String(key.to_string()),
-                        );
+                        m.insert(Value::String(tag.to_string()), Value::String(key.clone()));
                         Value::Mapping(m.clone())
                     }
                     _ => {
@@ -53,6 +51,9 @@ where
 
 macro_rules! make_deserialize_map_list {
     ($func_name:ident, $tag:expr) => {
+        /// Deserializes map and list types together
+        /// # Errors
+        /// Errors on deserialization error
         pub fn $func_name<'de, D, T>(deserializer: D) -> Result<Vec<T>, D::Error>
         where
             D: Deserializer<'de>,
@@ -65,6 +66,9 @@ macro_rules! make_deserialize_map_list {
 
 macro_rules! make_deserialize_map_list_option {
     ($func_name:ident, $tag:expr) => {
+        /// Deserializes map and list types together
+        /// # Errors
+        /// Errors on deserialization error
         pub fn $func_name<'de, D, T>(deserializer: D) -> Result<Option<Vec<T>>, D::Error>
         where
             D: Deserializer<'de>,
@@ -100,6 +104,9 @@ macro_rules! make_shorthand_impl {
 }
 pub(crate) use make_shorthand_impl;
 
+/// Deserializes a type with the cwl typedsl
+/// # Errors
+/// Returns Error when deserialization fails
 pub fn deserialize_with_type_dsl<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,
@@ -110,6 +117,9 @@ where
     T::deserialize(normalized).map_err(D::Error::custom)
 }
 
+/// Deserializes a type with the cwl secondaryfiles dsl
+/// # Errors
+/// Returns Error when deserialization fails
 pub fn deserialize_with_secondary_files_dsl<'de, D, T>(deserializer: D) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,

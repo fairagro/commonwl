@@ -17,7 +17,7 @@ pub enum CWLType {
     #[serde(rename = "Directory")]
     Directory,
     #[serde(rename = "Any")]
-    Any
+    Any,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -28,6 +28,7 @@ pub struct SecondaryFileSchema {
     pub required: Option<BoolOrExpression>,
 }
 
+#[must_use]
 pub fn type_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
     let mut value = value;
     while let Some(new_value) = type_dsl_impl(&value) {
@@ -39,7 +40,7 @@ pub fn type_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
 fn type_dsl_impl(value: &serde_yaml::Value) -> Option<serde_yaml::Value> {
     match value {
         serde_yaml::Value::String(value) => {
-            if value.ends_with("?") {
+            if value.ends_with('?') {
                 let inner = serde_yaml::Value::String(value[..value.len() - 1].to_string());
 
                 return Some(serde_yaml::Value::Sequence(vec![
@@ -69,7 +70,7 @@ fn type_dsl_impl(value: &serde_yaml::Value) -> Option<serde_yaml::Value> {
 pub fn secondary_files_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
     match value {
         serde_yaml::Value::String(value) => {
-            if value.ends_with("?") {
+            if value.ends_with('?') {
                 return serde_yaml::Value::Mapping(Mapping::from_iter([
                     (
                         serde_yaml::Value::String("pattern".into()),

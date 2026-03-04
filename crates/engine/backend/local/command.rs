@@ -95,7 +95,7 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
 
                 let status = select! {
                     biased;
-                    _ = token.cancelled() =>{
+                    () = token.cancelled() =>{
                         let _ = child.kill().await;
                         return Err(TaskRunError::Canceled);
                     }
@@ -120,27 +120,36 @@ async fn stage_inputs(inputs: impl Iterator<Item = &Input>) -> anyhow::Result<()
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)
                 .await
-                .with_context(|| format!("Could not create dir: {parent:?}"))?;
+                .with_context(|| format!("Could not create dir: {}", parent.display()))?;
         }
 
         match input.contents() {
             Contents::Literal(src) => {
-                debug!("Creating file {dest:?}");
+                debug!("Creating file {}", dest.display());
                 fs::write(dest, src)
                     .await
-                    .with_context(|| format!("Could not create file {dest:#?}"))?;
+                    .with_context(|| format!("Could not create file {}", dest.display()))?;
             }
             Contents::Path(src_path) => match input.ty() {
                 input::Type::File => {
                     debug!("Copy from {src_path:?} to {dest:?}");
-                    fs::copy(src_path, dest)
-                        .await
-                        .with_context(|| format!("Could not copy from {src_path:?} to {dest:?}"))?;
+                    fs::copy(src_path, dest).await.with_context(|| {
+                        format!(
+                            "Could not copy from {} to {}",
+                            src_path.display(),
+                            dest.display()
+                        )
+                    })?;
                 }
                 input::Type::Directory => {
                     debug!("Copy from {src_path:?} to {dest:?}");
-                    copy_dir(src_path, dest)
-                        .with_context(|| format!("Could not copy from {src_path:?} to {dest:?}"))?;
+                    copy_dir(src_path, dest).with_context(|| {
+                        format!(
+                            "Could not copy from {} to {}",
+                            src_path.display(),
+                            dest.display()
+                        )
+                    })?;
                 }
             },
             Contents::Url(url) => {
@@ -157,7 +166,7 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
         if let Some(parent) = src.parent() {
             fs::create_dir_all(parent)
                 .await
-                .with_context(|| format!("Could not create dir: {parent:?}"))?;
+                .with_context(|| format!("Could not create dir: {}", parent.display()))?;
         }
 
         let dest = output.url();
@@ -172,16 +181,18 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
         let dest_path = dest_url.path();
         match output.ty() {
             output::Type::File => {
-                fs::copy(src, dest_path)
-                    .await
-                    .with_context(|| format!("Could not copy from {src:?} to {dest_path:?}"))?;
+                fs::copy(src, dest_path).await.with_context(|| {
+                    format!("Could not copy from {} to {dest_path}", src.display())
+                })?;
             }
             output::Type::Directory => {
                 //we need overwrite options here!
                 CopyBuilder::new(src, dest_path)
                     .overwrite(true)
                     .run()
-                    .with_context(|| format!("Could not copy from {src:?} to {dest_path:?}"))?;
+                    .with_context(|| {
+                        format!("Could not copy from {} to {dest_path}", src.display())
+                    })?;
             }
         }
     }

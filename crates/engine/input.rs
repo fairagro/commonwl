@@ -24,8 +24,8 @@ pub(crate) fn collect_inputs(
     let mut values = HashMap::new();
     for input in &doc.get_inputs() {
         // collect the actual value
-        let mut value = get_input_value(input, inputs)?;
-        let format = input.format.as_ref().map(|f| f.as_one());
+        let mut value = get_input_value(input, inputs);
+        let format = input.format.as_ref().map(OneOrMany::as_one);
         //do some validation
         let valid = match doc {
             CWLDocument::CommandLineTool(clt) => {
@@ -105,14 +105,18 @@ fn load_input(
                 *item = serde_yaml::to_value(&dv)?;
             }
         }
+        #[allow(clippy::cast_possible_truncation)]
         DefaultValue::Any(serde_yaml::Value::Number(n)) => {
             //the spec wants floats with .0 to be represented as integer
+            const MAX_I64_AS_FLOAT: f64 = 9_223_372_036_854_775_808.0;
+            const MIN_I64_AS_FLOAT: f64 = -9_223_372_036_854_775_808.0;
             if let Some(f) = n.as_f64()
                 && f.is_finite()
                 && f.fract() == 0.0
-                && f.abs() <= i64::MAX as f64
+                && (MIN_I64_AS_FLOAT..MAX_I64_AS_FLOAT).contains(&f)
             {
                 *value = DefaultValue::Any(serde_yaml::Value::Number(serde_yaml::Number::from(
+                    //guarded!
                     f as i64,
                 )));
             }
@@ -125,19 +129,18 @@ fn load_input(
 pub(crate) fn get_input_value(
     input: &OperationInputParameter,
     inputs: &HashMap<String, DefaultValue>,
-) -> anyhow::Result<DefaultValue> {
+) -> DefaultValue {
     let value = inputs.get(&input.id.clone().unwrap_or_default());
-    Ok(
-        if let Some(value) = value
-            && !value.is_null()
-        {
-            value.clone()
-        } else if let Some(default) = &input.default {
-            default.clone()
-        } else {
-            DefaultValue::Any(serde_yaml::Value::Null)
-        },
-    )
+
+    if let Some(value) = value
+        && !value.is_null()
+    {
+        value.clone()
+    } else if let Some(default) = &input.default {
+        default.clone()
+    } else {
+        DefaultValue::Any(serde_yaml::Value::Null)
+    }
 }
 
 pub(crate) fn get_stdin(
@@ -145,7 +148,7 @@ pub(crate) fn get_stdin(
     inputs: &HashMap<String, DefaultValue>,
 ) -> Option<String> {
     if let Some(stdin) = &tool.stdin {
-        return Some(stdin.to_string());
+        return Some(stdin.clone());
     }
 
     if let Some(input) = tool
@@ -161,14 +164,12 @@ pub(crate) fn get_stdin(
 }
 
 //flattens inputs of any type to a list of file or directory
-pub(crate) fn flatten_inputs(
-    inputs: &HashMap<String, DefaultValue>,
-) -> anyhow::Result<Vec<FileOrDirectory>> {
+pub(crate) fn flatten_inputs(inputs: &HashMap<String, DefaultValue>) -> Vec<FileOrDirectory> {
     let mut flattened = vec![];
     for input in inputs.values() {
         flatten_inputs_impl(input, &mut flattened);
     }
-    Ok(flattened)
+    flattened
 }
 
 fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) {

@@ -50,6 +50,9 @@ pub struct DockerBackend {
 }
 
 impl DockerBackend {
+    /// Creates a new instance of `DockerBackend`
+    /// # Errors
+    /// Throws if the docker client is not reachable
     pub async fn new(config: Config) -> anyhow::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
@@ -61,10 +64,11 @@ impl DockerBackend {
 
         let client = Docker::with_defaults()?;
 
-        Ok(Self { backend, client })
+        Ok(Self { client, backend })
     }
 }
 
+#[allow(clippy::too_many_lines)]
 #[async_trait]
 impl TaskBackend for DockerBackend {
     async fn run(
@@ -79,9 +83,9 @@ impl TaskBackend for DockerBackend {
                 && let Some(dt) = &dr.docker_image_id
             {
                 build_container(self.client.inner(), df, dt).await?;
-                container = dt.to_string();
+                container = dt.clone();
             } else if let Some(dp) = &dr.docker_pull {
-                container = dp.to_string();
+                container = dp.clone();
             }
         }
 
@@ -100,7 +104,7 @@ impl TaskBackend for DockerBackend {
         let mut args = request
             .command
             .iter()
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>();
         // manually check for an entypoint
         if let Some(entrypoint) = self.get_docker_entrypoint(&container).await? {
@@ -108,6 +112,7 @@ impl TaskBackend for DockerBackend {
         }
 
         //build crankshaft task object
+        #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
             .name(request.id)
             .maybe_description(request.description)
@@ -208,7 +213,7 @@ impl TaskBackend for DockerBackend {
             .timelimit
             .as_ref()
             .and_then(|ttl| match &ttl.timelimit {
-                IntegerOrExpression::Int(i) => Some(*i as i64),
+                IntegerOrExpression::Int(i) => Some(i64::from(*i)),
                 IntegerOrExpression::Long(i) => Some(*i),
                 IntegerOrExpression::Expression(e) => {
                     let value = do_eval(e, request.eval_context).ok()?;
@@ -222,7 +227,7 @@ impl TaskBackend for DockerBackend {
             let token_clone = token.clone();
             tokio::select! {
                 result = self.backend.run(task, token)? => result?,
-                _ = tokio::time::sleep(limit) => {
+                () = tokio::time::sleep(limit) => {
                     token_clone.cancel();
                     error!("Timelimit reached: {timeout}");
                     return Err(TaskRunError::Canceled.into());

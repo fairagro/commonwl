@@ -135,7 +135,7 @@ fn file_checksum(path: &Path) -> std::io::Result<[u8; 20]> {
     let file = std::fs::File::open(path)?;
     let mut reader = BufReader::with_capacity(64 * 1024, file); // 64KB buffer
     let mut hasher = Sha1::new();
-    let mut buf = [0u8; 64 * 1024]; // stack-allocated buffer, no heap alloc
+    let mut buf = Vec::with_capacity(64 * 1024);
 
     loop {
         let n = reader.read(&mut buf)?;

@@ -89,7 +89,7 @@ fn collect_step_dependencies<'a>(
     for input in &step.r#in {
         let sources = match &input.source {
             Some(OneOrMany::One(s)) => vec![s.as_str()],
-            Some(OneOrMany::Many(ss)) => ss.iter().map(|s| s.as_str()).collect(),
+            Some(OneOrMany::Many(ss)) => ss.iter().map(String::as_str).collect(),
             None => vec![],
         };
 

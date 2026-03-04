@@ -72,7 +72,7 @@ pub(crate) fn locate_file(
                 get_file_metadata(Path::new(location.strip_prefix("file://").unwrap()))
         {
             file.checksum = checksum;
-            file.size = Some(Integer::Long(size as i64));
+            file.size = Some(Integer::Long(size.cast_signed()));
             if load_contents && size < 64 * 1024 {
                 file.contents = Some(fs::read_to_string(
                     location.strip_prefix("file://").unwrap(),
@@ -98,7 +98,7 @@ pub(crate) fn locate_file(
         for item in secondary_files {
             match item {
                 FileOrDirectory::File(file) => {
-                    locate_file(file, work_dir, stage_dir, load_contents)?
+                    locate_file(file, work_dir, stage_dir, load_contents)?;
                 }
                 FileOrDirectory::Directory(dir) => locate_dir(dir, work_dir, stage_dir, None)?,
             }
@@ -278,10 +278,10 @@ pub(crate) fn handle_secondary_files(
                     PathOrFile::File(item) => {
                         match &mut **item {
                             FileOrDirectory::File(file) => {
-                                locate_file(file, work_dir, stage_dir, false)?
+                                locate_file(file, work_dir, stage_dir, false)?;
                             }
                             FileOrDirectory::Directory(dir) => {
-                                locate_dir(dir, work_dir, stage_dir, None)?
+                                locate_dir(dir, work_dir, stage_dir, None)?;
                             }
                         }
                         sec_files.push(*item.clone());
@@ -384,7 +384,7 @@ fn handle_secondary_file_from_expression(
             }
             Ok(Some(values))
         }
-        _ => Ok(None),
+        DefaultValue::Any(_) => Ok(None),
     }
 }
 

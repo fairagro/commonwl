@@ -81,6 +81,11 @@ pub struct ContainerBuildOptions {
     pub mounts: Vec<WorkDirMount>,
 }
 
+/// Builds a container command from the given raw command
+/// # Panics
+/// Building containers currently is unimplemented
+/// # Errors
+/// Throws if building dockerfile fails
 pub fn build_container_command(
     raw_command: Vec<String>,
     inputs: &[FileOrDirectory],
@@ -158,7 +163,7 @@ pub fn build_container_command(
         .into_iter()
         .skip_while(|(key, _)| *key == "HOME" || *key == "TMPDIR")
     {
-        args.push(format!("--env={}={}", key, val));
+        args.push(format!("--env={key}={val}"));
     }
 
     if !options.network {

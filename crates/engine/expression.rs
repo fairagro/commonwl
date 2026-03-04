@@ -46,6 +46,7 @@ enum ExpressionType {
 
 #[derive(Debug)]
 struct Expression {
+    #[allow(clippy::struct_field_names)]
     expression: String,
     ty: ExpressionType,
     indices: Range<usize>,
@@ -99,16 +100,15 @@ pub fn do_eval(
                 ijsr,
                 eval_context.workdir,
             );
-        } else {
-            return simple_expression_eval(&expressions[0].expression(), &map);
         }
+        return simple_expression_eval(&expressions[0].expression(), &map);
     }
 
     //string interpolation
     let v = replace_expressions(
         expression,
-        expressions,
-        map,
+        &expressions,
+        &map,
         eval_context.ijsr,
         eval_context.workdir,
     )?;
@@ -178,13 +178,13 @@ fn js_eval(
                         .eval(Source::from_bytes(expr))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
                 }
-            };
+            }
         }
     }
 
     //auto wrap expressions if object notation
     let expression = if expression.trim().starts_with('{') {
-        format!("({})", expression)
+        format!("({expression})")
     } else {
         expression.to_string()
     };
@@ -205,13 +205,16 @@ fn js_eval(
     Ok(serde_yaml::to_value(json)?)
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn normalize_json_numbers(value: &mut serde_json::Value) {
     match value {
         serde_json::Value::Number(n) => {
+            const MAX_I64_AS_FLOAT: f64 = 9_223_372_036_854_775_808.0;
+            const MIN_I64_AS_FLOAT: f64 = -9_223_372_036_854_775_808.0;
             if let Some(f) = n.as_f64()
                 && f.is_finite()
                 && f.fract() == 0.0
-                && f.abs() <= i64::MAX as f64
+                && (MIN_I64_AS_FLOAT..MAX_I64_AS_FLOAT).contains(&f)
             {
                 *value = serde_json::Value::Number(serde_json::Number::from(f as i64));
             }
@@ -232,8 +235,8 @@ fn normalize_json_numbers(value: &mut serde_json::Value) {
 
 fn replace_expressions(
     expr: &str,
-    expressions: Vec<Expression>,
-    map: HashMap<&str, serde_json::Value>,
+    expressions: &[Expression],
+    map: &HashMap<&str, serde_json::Value>,
     ijsr: Option<&InlineJavascriptRequirement>,
     workdir: Option<&Path>,
 ) -> anyhow::Result<serde_yaml::Value> {
@@ -241,9 +244,9 @@ fn replace_expressions(
         .iter()
         .map(|e| {
             if let Some(ijsr) = ijsr {
-                js_eval(&e.expression(), &map, ijsr, workdir)
+                js_eval(&e.expression(), map, ijsr, workdir)
             } else {
-                simple_expression_eval(&e.expression(), &map)
+                simple_expression_eval(&e.expression(), map)
             }
         })
         .collect::<anyhow::Result<Vec<serde_yaml::Value>>>()?;
@@ -406,7 +409,7 @@ fn unescape_value(expr: &str) -> String {
 
 fn to_str(value: &serde_yaml::Value) -> String {
     match value {
-        serde_yaml::Value::String(s) => s.to_string(),
+        serde_yaml::Value::String(s) => s.clone(),
         serde_yaml::Value::Number(n) => n.to_string(),
         serde_yaml::Value::Bool(b) => b.to_string(),
         serde_yaml::Value::Null => "null".to_string(),

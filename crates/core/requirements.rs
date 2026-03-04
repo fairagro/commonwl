@@ -226,6 +226,7 @@ pub struct EnvVarRequirement {
 }
 
 impl EnvVarRequirement {
+    #[must_use]
     pub fn to_map(self) -> HashMap<String, String> {
         self.env_def
             .into_iter()

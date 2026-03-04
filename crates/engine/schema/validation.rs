@@ -98,8 +98,7 @@ fn validate_cwl_type(
         DefaultValue::Any(value) => match r#type {
             CWLType::Null => value.is_null(),
             CWLType::Boolean => value.is_bool(),
-            CWLType::Int => value.is_i64() || value.is_u64(),
-            CWLType::Long => value.is_i64() || value.is_u64(),
+            CWLType::Int | CWLType::Long => value.is_i64() || value.is_u64(),
             CWLType::Float => value.is_f64() || value.is_i64() || value.is_u64(),
             CWLType::Double => value.is_f64(),
             CWLType::String => value.is_string(),
@@ -127,9 +126,8 @@ fn validate_record_schema(
     value: &DefaultValue,
     fv: Option<&FormatValidator>,
 ) -> bool {
-    let mapping = match value {
-        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => map,
-        _ => return false,
+    let DefaultValue::Any(serde_yaml::Value::Mapping(mapping)) = value else {
+        return false;
     };
 
     if let Some(fields) = &schema.fields {
@@ -141,7 +139,7 @@ fn validate_record_schema(
                         item,
                         &serde_yaml::from_value(field_value.clone())
                             .expect("DefaultValue violates itself"),
-                        f.format.as_ref().map(|f| f.as_one()),
+                        f.format.as_ref().map(OneOrMany::as_one),
                         fv,
                     ),
                     OneOrMany::Many(items) => items.iter().any(|item| {
@@ -149,7 +147,7 @@ fn validate_record_schema(
                             item,
                             &serde_yaml::from_value(field_value.clone())
                                 .expect("DefaultValue violates itself"),
-                            f.format.as_ref().map(|f| f.as_one()),
+                            f.format.as_ref().map(OneOrMany::as_one),
                             fv,
                         )
                     }),
@@ -161,7 +159,7 @@ fn validate_record_schema(
                     OneOrMany::Many(items) => items
                         .iter()
                         .any(|item| matches!(item, ValidationType::CWLType(CWLType::Null))),
-                    _ => false,
+                    OneOrMany::One(_) => false,
                 }
             }
         });
@@ -182,9 +180,7 @@ fn validate_array_schema(
                 serde_yaml::from_value(item.clone()).expect("DefaultValue violates itself");
             match &schema.items {
                 OneOrMany::One(t) => validate_type(t, &item_value, format, fv),
-                OneOrMany::Many(ts) => ts
-                    .iter()
-                    .any(|t| validate_type(t, &item_value, format, fv)),
+                OneOrMany::Many(ts) => ts.iter().any(|t| validate_type(t, &item_value, format, fv)),
             }
         })
     } else {

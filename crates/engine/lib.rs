@@ -21,7 +21,7 @@ pub(crate) fn cwl_version(doc: &CWLDocument) -> anyhow::Result<Version> {
     let version = doc.cwl_version().unwrap_or(&default);
     let version = version.trim_start_matches('v');
     let version = if version.matches('.').count() == 1 {
-        format!("{}.0", version)
+        format!("{version}.0")
     } else {
         version.to_owned()
     };

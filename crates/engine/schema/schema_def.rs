@@ -49,7 +49,7 @@ pub(crate) fn replace_schema_definitions(
                 add_schema_defs_to_inputs(&mut wf.inputs, &defs)?;
                 add_schema_defs_to_outputs(&mut wf.outputs, &defs)?;
             }
-            _ => {}
+            CWLDocument::Operation(_) => {}
         }
     }
 
@@ -63,11 +63,11 @@ fn add_schema_defs_to_command_inputs(
     for input in inputs {
         match &mut input.r#type {
             CommandInputParameterType::CommandInputType(OneOrMany::One(ty)) => {
-                add_schema_defs_to_command_inputs_impl(ty, defs)?
+                add_schema_defs_to_command_inputs_impl(ty, defs)?;
             }
             CommandInputParameterType::CommandInputType(OneOrMany::Many(tys)) => {
                 for ty in tys {
-                    add_schema_defs_to_command_inputs_impl(ty, defs)?
+                    add_schema_defs_to_command_inputs_impl(ty, defs)?;
                 }
             }
             _ => {}
@@ -108,13 +108,13 @@ fn add_schema_defs_to_command_inputs_impl(
                     }
                 }
             },
-            _ => {}
+            CommandInputSchema::Enum(_) => {}
         },
         CommandInputType::String(s) => {
             if let Some(def) = defs.get(&format!("#{s}")) {
                 let new_type: CommandInputType = serde_yaml::from_value(def.clone())?;
                 *r#type = new_type;
-            } else if s.starts_with("#")
+            } else if s.starts_with('#')
                 && let Some(def) = defs.get(s)
             {
                 let new_type: CommandInputType = serde_yaml::from_value(def.clone())?;
@@ -127,7 +127,7 @@ fn add_schema_defs_to_command_inputs_impl(
                 *r#type = new_type;
             }
         }
-        _ => {}
+        CommandInputType::CWLType(_) => {}
     }
     Ok(())
 }
@@ -141,7 +141,7 @@ fn add_schema_defs_to_inputs(
             OneOrMany::One(ty) => add_schema_defs_to_inputs_impl(ty, defs)?,
             OneOrMany::Many(tys) => {
                 for ty in tys {
-                    add_schema_defs_to_inputs_impl(ty, defs)?
+                    add_schema_defs_to_inputs_impl(ty, defs)?;
                 }
             }
         }
@@ -181,13 +181,13 @@ fn add_schema_defs_to_inputs_impl(
                     }
                 }
             },
-            _ => {}
+            InputSchema::Enum(_) => {}
         },
         InputType::String(s) => {
             if let Some(def) = defs.get(&format!("#{s}")) {
                 let new_type: InputType = serde_yaml::from_value(def.clone())?;
                 *r#type = new_type;
-            } else if s.starts_with("#")
+            } else if s.starts_with('#')
                 && let Some(def) = defs.get(s)
             {
                 let new_type: InputType = serde_yaml::from_value(def.clone())?;
@@ -200,7 +200,7 @@ fn add_schema_defs_to_inputs_impl(
                 *r#type = new_type;
             }
         }
-        _ => {}
+        InputType::CWLType(_) => {}
     }
 
     Ok(())
@@ -258,7 +258,7 @@ fn add_schema_defs_to_outputs(
 pub(crate) fn get_schema_definitions(
     value: &serde_yaml::Value,
 ) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
-    let mut defs = extract_schema_definitions(value)?;
+    let mut defs = extract_schema_definitions(value);
 
     if !defs.is_empty() {
         //replace recursive definitions
@@ -270,9 +270,7 @@ pub(crate) fn get_schema_definitions(
     Ok(defs)
 }
 
-fn extract_schema_definitions(
-    value: &serde_yaml::Value,
-) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
+fn extract_schema_definitions(value: &serde_yaml::Value) -> HashMap<String, serde_yaml::Value> {
     let mut schemas = HashMap::new();
 
     // Flatten: types can be a Sequence of Mappings, or a Sequence containing
@@ -298,11 +296,11 @@ fn extract_schema_definitions(
             //validate names
             validate_field_name(&mut type_def);
 
-            schemas.insert(format!("#{}", name), type_def);
+            schemas.insert(format!("#{name}"), type_def);
         }
     }
 
-    Ok(schemas)
+    schemas
 }
 
 fn replace_schema_references(

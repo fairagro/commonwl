@@ -60,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
     let result = execute(backend, &request, cancellation_token).await?;
     let exit_status = result.exit_status;
 
-    let evaluated_code = evaluate_exitcodes(exit_status, &request.specification);
+    let evaluated_code = evaluate_exitcodes(&exit_status, &request.specification);
 
     if let EngineStatus::Success(_) = evaluated_code {
         let json = serde_json::to_string_pretty(&result.outputs)?;

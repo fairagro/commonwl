@@ -71,27 +71,43 @@ pub(crate) fn mount_workdir_item(
             && !parent.exists()
         {
             fs::create_dir_all(parent).with_context(|| {
-                format!("Could not create parent directories for {:?}", mount.target)
+                format!(
+                    "Could not create parent directories for {}",
+                    mount.target.display()
+                )
             })?;
         }
         match (mount.ty, mount.source) {
             (MountType::File, Source::File(path)) => {
                 fs::copy(&path, &mount.target).with_context(|| {
-                    format!("Could not copy from {path:?} to {:?}", mount.target)
+                    format!(
+                        "Could not copy from {} to {}",
+                        path.display(),
+                        mount.target.display()
+                    )
                 })?;
             }
             (MountType::File, Source::Contents(items)) => {
                 fs::write(&mount.target, &items)
-                    .with_context(|| format!("Could not write to {:?}", mount.target))?;
+                    .with_context(|| format!("Could not write to {}", mount.target.display()))?;
             }
             (MountType::Directory, Source::File(path)) => copy_dir(&path, &mount.target)
-                .with_context(|| format!("Could not copy from {path:?} to {:?}", mount.target))?,
+                .with_context(|| {
+                    format!(
+                        "Could not copy from {} to {}",
+                        path.display(),
+                        mount.target.display()
+                    )
+                })?,
             (MountType::Directory, Source::Contents(_)) => {
                 fs::create_dir_all(&mount.target).with_context(|| {
-                    format!("Could not create parent directories for {:?}", mount.target)
+                    format!(
+                        "Could not create parent directories for {}",
+                        mount.target.display()
+                    )
                 })?;
             }
-        };
+        }
     } else if use_container {
         task.add_input(
             Input::builder()
@@ -109,8 +125,8 @@ pub(crate) fn mount_workdir_item(
         );
     } else {
         anyhow::bail!(
-            "Workdir item target {:?} is outside of working directory and container is not used, can not stage",
-            mount.target
+            "Workdir item target {} is outside of working directory and container is not used, can not stage",
+            mount.target.display()
         );
     }
     Ok(())

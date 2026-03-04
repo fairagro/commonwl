@@ -17,6 +17,9 @@ pub struct PackedCWL {
 }
 
 impl PackedCWL {
+    /// Tries to unpack `PackedCWL` to `CWLDocument`
+    /// # Errors
+    /// - If root entity is invalid (e.g. #main)
     pub fn unpack(self, root_entity: Option<&str>) -> anyhow::Result<CWLDocument> {
         let needle = root_entity.unwrap_or_else(|| {
             if self.graph.len() == 1 {
@@ -154,7 +157,7 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
                 src.strip_prefix(&format!("{base_id}/"))
                     .unwrap_or(&src)
                     .to_string()
-            })
+            });
         }
     }
 
@@ -167,7 +170,7 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
                     .to_owned();
             }
             StringOrWorkflowStepOutput::WorkflowStepOutput(step_output) => {
-                unpack_identifiable(step_output, &step_id)
+                unpack_identifiable(step_output, &step_id);
             }
         }
     }

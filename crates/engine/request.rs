@@ -25,13 +25,14 @@ pub struct ExecutionRequest {
 }
 
 impl ExecutionRequest {
+    #[must_use]
     pub fn get_requirement<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ProcessRequirements>,
     {
         self.requirements.iter().find_map(|req| T::get(req))
     }
-
+    #[must_use]
     pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ProcessRequirements>,
@@ -46,14 +47,14 @@ impl ExecutionRequest {
         });
         maybe_req.or(maybe_hint)
     }
-
+    #[must_use]
     pub fn has_requirement<T>(&self) -> bool
     where
         T: ExtractFromEnum<ProcessRequirements>,
     {
         self.get_requirement::<T>().is_some()
     }
-
+    #[must_use]
     pub fn has_requirement_or_hint<T>(&self) -> bool
     where
         T: ExtractFromEnum<ProcessRequirements>,
@@ -69,13 +70,14 @@ pub struct InputObject {
     pub hints: Vec<ProcessHints>,
 }
 impl InputObject {
+    #[must_use]
     pub fn get_requirement<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ProcessRequirements>,
     {
         self.requirements.iter().find_map(|req| T::get(req))
     }
-
+    #[must_use]
     pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ProcessRequirements>,
@@ -90,7 +92,7 @@ impl InputObject {
         });
         maybe_req.or(maybe_hint)
     }
-
+    #[must_use]
     pub fn has_requirement<T>(&self) -> bool
     where
         T: ExtractFromEnum<ProcessRequirements>,
@@ -98,6 +100,7 @@ impl InputObject {
         self.get_requirement::<T>().is_some()
     }
 
+    #[must_use]
     pub fn has_requirement_or_hint<T>(&self) -> bool
     where
         T: ExtractFromEnum<ProcessRequirements>,
@@ -107,6 +110,8 @@ impl InputObject {
 }
 
 /// Load an execution context from a CWL specification file and an inputs file.
+/// # Errors
+/// Returns error on failed `serde_yaml` parsing when evaluating `SchemaDefRequirement` and on `load_input_file_from_file`
 pub fn create_execution_request(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs_path: impl AsRef<Path> + std::fmt::Debug,
@@ -120,6 +125,8 @@ pub fn create_execution_request(
 }
 
 /// Load an execution context from a CWL specification file and an already built inputs object (if inputs come as arguments, for example).
+/// # Errors
+/// Returns error on failed `serde_yaml` parsing when evaluating `SchemaDefRequirement`
 pub fn create_execution_request_with_inputs(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs: InputObject,
@@ -135,6 +142,8 @@ pub fn create_execution_request_with_inputs(
 }
 
 /// Load an execution context from a CWL Document and an inputs object (if coming from workflow step for example).
+/// # Errors
+/// Returns error on failed `serde_yaml` parsing when evaluating `SchemaDefRequirement`
 pub fn create_execution_request_from_document(
     mut specification: CWLDocument,
     inputs: InputObject,
@@ -172,6 +181,9 @@ pub fn create_execution_request_from_document(
     Ok(ctx)
 }
 
+/// Loads an `InputObject` from file via `path`
+/// # Errors
+/// Returns error on failed `serde_yaml` parsing
 pub fn load_input_file_from_file(
     path: impl AsRef<Path> + std::fmt::Debug,
     base_path: impl AsRef<Path>,

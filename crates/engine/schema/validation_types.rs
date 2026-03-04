@@ -65,7 +65,7 @@ impl From<InputSchema> for ValidationSchema {
 impl From<InputArraySchema> for ValidationArraySchema {
     fn from(schema: InputArraySchema) -> Self {
         ValidationArraySchema {
-            items: schema.items.map(|m| m.into()),
+            items: schema.items.map(Into::into),
         }
     }
 }
@@ -75,7 +75,7 @@ impl From<InputRecordSchema> for ValidationRecordSchema {
         ValidationRecordSchema {
             fields: schema
                 .fields
-                .map(|v| v.into_iter().map(|f| f.into()).collect()),
+                .map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -84,7 +84,7 @@ impl From<InputRecordField> for ValidationRecordField {
     fn from(field: InputRecordField) -> Self {
         ValidationRecordField {
             name: field.name,
-            r#type: field.r#type.map(|t| t.into()),
+            r#type: field.r#type.map(Into::into),
             format: field.format,
         }
     }
@@ -121,7 +121,7 @@ impl From<OutputSchema> for ValidationSchema {
 impl From<OutputArraySchema> for ValidationArraySchema {
     fn from(schema: OutputArraySchema) -> Self {
         ValidationArraySchema {
-            items: schema.items.map(|m| m.into()),
+            items: schema.items.map(Into::into),
         }
     }
 }
@@ -131,7 +131,7 @@ impl From<OutputRecordSchema> for ValidationRecordSchema {
         ValidationRecordSchema {
             fields: schema
                 .fields
-                .map(|v| v.into_iter().map(|f| f.into()).collect()),
+                .map(|v| v.into_iter().map(Into::into).collect()),
         }
     }
 }
@@ -140,7 +140,7 @@ impl From<OutputRecordField> for ValidationRecordField {
     fn from(field: OutputRecordField) -> Self {
         ValidationRecordField {
             name: field.name,
-            r#type: field.r#type.map(|t| t.into()),
+            r#type: field.r#type.map(Into::into),
             format: field.format,
         }
     }

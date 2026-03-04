@@ -37,6 +37,7 @@ pub struct LocalBackend {
 }
 
 impl LocalBackend {
+    #[must_use]
     pub fn new(container_engine: ContainerEngine) -> Self {
         let backend = Arc::new(CommandBackend {});
 
@@ -48,6 +49,7 @@ impl LocalBackend {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 #[async_trait]
 impl TaskBackend for LocalBackend {
     async fn run(
@@ -84,15 +86,16 @@ impl TaskBackend for LocalBackend {
             let file_uuid = &Uuid::new_v4().to_string()[0..8];
             let location = request.tmpdir.join(file_uuid);
             debug!("Writing File literal to {location:?}");
-            fs::write(&location, file.contents.as_ref().unwrap())
-                .with_context(|| format!("Could not lock in File Literal at {location:?}"))?;
+            fs::write(&location, file.contents.as_ref().unwrap()).with_context(|| {
+                format!("Could not lock in File Literal at {}", location.display())
+            })?;
             file.location = Some(format!("file://{}", location.to_string_lossy()));
         }
 
         let mut args = request
             .command
             .iter()
-            .map(|s| s.to_string())
+            .map(ToString::to_string)
             .collect::<Vec<_>>();
 
         let (extras, mounts): (Vec<_>, Vec<_>) = request
@@ -119,6 +122,7 @@ impl TaskBackend for LocalBackend {
             args = build_container_command(args, &inputs, options)?;
         }
         //build crankshaft task object
+        #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
             .name(request.id)
             .maybe_description(request.description)
@@ -229,7 +233,7 @@ impl TaskBackend for LocalBackend {
             .timelimit
             .as_ref()
             .and_then(|ttl| match &ttl.timelimit {
-                IntegerOrExpression::Int(i) => Some(*i as i64),
+                IntegerOrExpression::Int(i) => Some(i64::from(*i)),
                 IntegerOrExpression::Long(i) => Some(*i),
                 IntegerOrExpression::Expression(e) => {
                     let value = do_eval(e, request.eval_context).ok()?;
@@ -243,7 +247,7 @@ impl TaskBackend for LocalBackend {
             let token_clone = token.clone();
             tokio::select! {
                 result = self.backend.run(task, token)? => result?,
-                _ = tokio::time::sleep(limit) => {
+                () = tokio::time::sleep(limit) => {
                     token_clone.cancel();
                     error!("Timelimit reached: {timeout}");
                     return Err(TaskRunError::Canceled.into());

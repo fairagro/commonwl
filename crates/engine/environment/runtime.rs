@@ -97,6 +97,8 @@ fn resolve_min_max(
     )
 }
 
+#[allow(clippy::cast_possible_truncation)]
+#[allow(clippy::cast_sign_loss)]
 fn handle_value(
     val: &NumberOrExpression,
     context: &EvaluationContext,

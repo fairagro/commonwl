@@ -29,6 +29,7 @@ pub enum CWLDocument {
 }
 
 impl CWLDocument {
+    #[must_use]
     pub fn get_inputs(&self) -> Vec<OperationInputParameter> {
         match self {
             Self::Operation(o) => o.inputs.clone(),
@@ -37,6 +38,8 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.inputs.iter().map(|i| i.clone().into()).collect(),
         }
     }
+
+    #[must_use]
     pub fn get_requirement<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,
@@ -49,6 +52,7 @@ impl CWLDocument {
         }
     }
 
+    #[must_use]
     pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,
@@ -60,7 +64,7 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.get_requirement_or_hint::<T>(),
         }
     }
-
+    #[must_use]
     pub fn cwl_version(&self) -> Option<&String> {
         match self {
             Self::CommandLineTool(clt) => clt.cwl_version.as_ref(),
