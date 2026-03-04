@@ -11,7 +11,7 @@ use crate::{
     files::{FileOrDirectory, LoadListingEnum},
 };
 use bon::Builder;
-use salad::Identifiable;
+use commonwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 

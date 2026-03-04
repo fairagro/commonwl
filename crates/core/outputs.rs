@@ -5,7 +5,7 @@ use crate::deserialize::{
 use crate::types::{CWLType, SecondaryFileSchema};
 use crate::{OneOrMany, files::LoadListingEnum};
 use bon::Builder;
-use salad::Identifiable;
+use commonwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone)]

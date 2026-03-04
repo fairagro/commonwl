@@ -516,10 +516,17 @@ dependencies = [
 
 [[package]]
 name = "commonwl"
-version = "1.1.0"
+version = "0.1.0"
 dependencies = [
  "cwl_core",
  "cwl_engine",
+]
+
+[[package]]
+name = "commonwl_salad"
+version = "0.1.0"
+dependencies = [
+ "salad_derive",
 ]
 
 [[package]]
@@ -538,7 +545,7 @@ dependencies = [
 
 [[package]]
 name = "conformance"
-version = "1.1.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -772,11 +779,11 @@ dependencies = [
 
 [[package]]
 name = "cwl_core"
-version = "1.1.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "bon",
- "salad",
+ "commonwl_salad",
  "serde",
  "serde_yaml",
  "sha1",
@@ -785,7 +792,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine"
-version = "1.1.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2839,15 +2846,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dd29631678d6fb0903b69223673e122c32e9ae559d0960a38d574695ebc0ea15"
 
 [[package]]
-name = "salad"
-version = "1.1.0"
-dependencies = [
- "salad_derive",
-]
-
-[[package]]
 name = "salad_derive"
-version = "1.1.0"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",

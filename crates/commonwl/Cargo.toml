@@ -6,8 +6,8 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-cwl_core = { path = "../core" }
-cwl_engine = { path = "../engine", optional = true }
+cwl_core = { version = "*", path = "../core" }
+cwl_engine = { version = "*", path = "../engine", optional = true }
 
 [features]
 default = []

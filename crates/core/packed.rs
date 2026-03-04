@@ -5,7 +5,7 @@ use crate::{
     },
     outputs::StringOrWorkflowStepOutput,
 };
-use salad::Identifiable;
+use commonwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

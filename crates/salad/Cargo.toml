@@ -1,12 +1,12 @@
 [package]
-name = "salad"
+name = "commonwl_salad"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
 
 [dependencies]
-salad_derive = { path = "../salad_derive", optional = true }
+salad_derive = { version = "*", path = "../salad_derive", optional = true }
 
 [lib]
 path = "lib.rs"
