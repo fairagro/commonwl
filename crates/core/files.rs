@@ -50,13 +50,6 @@ impl FileOrDirectory {
         }
     }
 
-    pub fn dry_validation(&mut self) {
-        match self {
-            Self::File(f) => f.dry_validation(),
-            Self::Directory(d) => d.dry_validation(),
-        }
-    }
-
     #[must_use]
     pub fn is_file(&self) -> bool {
         matches!(self, FileOrDirectory::File(_))
@@ -115,21 +108,6 @@ pub struct File {
 }
 
 impl File {
-    // according to the spec this fn sets the value of location (if some) to path (if none)
-    // however file's existence is not questioned, yet
-    pub fn dry_validation(&mut self) {
-        if let Some(location) = &self.location
-            && self.path.is_none()
-        {
-            let location = if let Some((_, location)) = location.split_once("://") {
-                location
-            } else {
-                location
-            };
-            self.path = Some(location.to_string());
-        }
-    }
-
     /// Creats a `File` from `Path`.
     /// # Errors
     /// if file does not exist
@@ -176,16 +154,6 @@ pub struct Directory {
 }
 
 impl Directory {
-    // according to the spec this fn sets the value of location (if some) to path (if none)
-    // however directory's existence is not questioned, yet
-    pub fn dry_validation(&mut self) {
-        if let Some(location) = &self.location
-            && self.path.is_none()
-        {
-            self.path = Some(location.clone());
-        }
-    }
-
     /// Creates a directory from a given path
     /// # Errors
     /// If dir does not exist
@@ -210,7 +178,6 @@ impl Directory {
     /// # Errors
     /// if a file or dir does not exist or path is not given
     pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> anyhow::Result<()> {
-        self.dry_validation();
         let Some(path) = &self.path else {
             anyhow::bail!("No path given!");
         };

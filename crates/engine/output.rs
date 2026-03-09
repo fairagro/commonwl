@@ -52,15 +52,15 @@ pub(crate) fn collect_command_outputs(
         for value in values.values_mut() {
             match value {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
-                    f.dry_validation();
-                    let path = f.path.clone().unwrap();
+                    let path = f.path.clone().or(f.location.clone()).unwrap();
+                    let path = path.strip_prefix("file://").unwrap_or(&path);
                     let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
                     *value = handle_file(&path, None, context)?;
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
-                    d.dry_validation();
-                    let path = d.path.clone().unwrap();
+                    let path = d.path.clone().or(d.location.clone()).unwrap();
+                    let path = path.strip_prefix("file://").unwrap_or(&path);
                     let path = correct_output_path(Path::new(&path), context);
                     *value = handle_dir(&path, context)?;
                 }
