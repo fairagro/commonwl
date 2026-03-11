@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 commonwl = { version = "0", path = "../commonwl", features = ["engine"] }
+cwl_engine_storage = { path = "../storage" }
 crankshaft = { version = "0.9.0", features = ["docker"] }
 anyhow.workspace = true
 tokio.workspace = true

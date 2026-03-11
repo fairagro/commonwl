@@ -103,7 +103,7 @@ impl TaskBackend for LocalBackend {
             .iter()
             .cloned()
             .partition(|m| !m.target.starts_with(request.outdir) && request.use_container);
-
+        
         //handle docker requirement
         if let Some(dr) = &request.docker {
             let dr = (*dr).clone();
@@ -158,7 +158,9 @@ impl TaskBackend for LocalBackend {
                 request.outdir,
                 request.use_container,
                 &mut task,
-            )?;
+                request.storage.clone(),
+            )
+            .await?;
         }
 
         //add outdir mount

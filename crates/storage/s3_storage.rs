@@ -6,42 +6,62 @@ use aws_sdk_s3::primitives::ByteStream;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
+use tokio::sync::OnceCell;
+use url::Url;
 
+#[derive(Debug)]
 pub struct S3Storage {
-    client: s3::Client,
+    client: OnceCell<s3::Client>,
 }
 
 impl S3Storage {
-    pub async fn new() -> Self {
-        dotenvy::dotenv().ok();
-        let endpoint_url = std::env::var("S3_ENDPOINT_URL").expect("S3_ENDPOINT_URL must be set");
-        let config = aws_config::load_from_env().await;
-        let client = aws_sdk_s3::Client::from_conf(
-            s3::config::Builder::from(&config)
-                .endpoint_url(endpoint_url)
-                .force_path_style(true)
-                .build(),
-        );
-        Self { client }
+    pub fn new() -> Self {
+        Self {
+            client: OnceCell::new(),
+        }
+    }
+
+    pub async fn client(&self) -> anyhow::Result<&s3::Client> {
+        self.client
+            .get_or_try_init(|| async {
+                dotenvy::dotenv().ok();
+
+                let endpoint_url = std::env::var("S3_ENDPOINT_URL")?;
+                let config = aws_config::load_from_env().await;
+                Ok(aws_sdk_s3::Client::from_conf(
+                    s3::config::Builder::from(&config)
+                        .endpoint_url(endpoint_url)
+                        .force_path_style(true)
+                        .build(),
+                ))
+            })
+            .await
     }
 
     /// Parses "s3://bucket/key" or "bucket/key" into (bucket, key)
-    fn parse_uri(uri: &str) -> anyhow::Result<(String, String)> {
-        let path = uri.strip_prefix("s3://").unwrap_or(uri);
-        match path.split_once('/') {
-            Some((bucket, key)) => Ok((bucket.to_string(), key.to_string())),
-            None => Ok((path.to_string(), String::new())), // bucket only, no key
-        }
+    fn parse_uri(uri: &Url) -> anyhow::Result<(String, String)> {
+        let bucket = uri
+            .host_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing bucket"))?;
+        let key = uri.path().trim_start_matches('/');
+        Ok((bucket.to_string(), key.to_string()))
+    }
+}
+
+impl Default for S3Storage {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 #[async_trait]
 impl Storage for S3Storage {
-    async fn upload(&self, local: &Path, dest: &str) -> anyhow::Result<()> {
+    async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()> {
         let (bucket, key) = S3Storage::parse_uri(dest)?;
         let body = ByteStream::from_path(local).await?;
 
-        self.client
+        self.client()
+            .await?
             .put_object()
             .bucket(&bucket)
             .key(&key)
@@ -52,12 +72,13 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn download(&self, src: &str, local: &Path) -> anyhow::Result<()> {
+    async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()> {
         let (bucket, key) = S3Storage::parse_uri(src)?;
 
         if key.ends_with("/") {
             let objects = self
-                .client
+                .client()
+                .await?
                 .list_objects_v2()
                 .bucket(&bucket)
                 .prefix(&key)
@@ -82,11 +103,12 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn exists(&self, uri: &str) -> anyhow::Result<bool> {
+    async fn exists(&self, uri: &Url) -> anyhow::Result<bool> {
         let (bucket, key) = S3Storage::parse_uri(uri)?;
 
         let result = self
-            .client
+            .client()
+            .await?
             .head_object()
             .bucket(&bucket)
             .key(&key)
@@ -110,7 +132,8 @@ impl Storage for S3Storage {
 impl S3Storage {
     async fn download_file(&self, bucket: &str, key: &str, local: &Path) -> anyhow::Result<()> {
         let resp = self
-            .client
+            .client()
+            .await?
             .get_object()
             .bucket(bucket)
             .key(key)

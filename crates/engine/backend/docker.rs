@@ -148,7 +148,9 @@ impl TaskBackend for DockerBackend {
                 request.outdir,
                 request.use_container,
                 &mut task,
-            )?;
+                request.storage.clone(),
+            )
+            .await?;
         }
 
         //add outdir mount
@@ -283,6 +285,7 @@ mod tests {
 
     use super::*;
     use crate::{backend::execute_commandline_tool, request::create_execution_request};
+    use cwl_engine_storage::StorageBackend;
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -307,7 +310,8 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
         assert!(result.is_ok());
 
         //check if output file exists
@@ -330,7 +334,8 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
         assert!(result.is_ok());
     }
 
@@ -349,7 +354,8 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
 
         assert!(result.is_ok());
         //check if output file exists

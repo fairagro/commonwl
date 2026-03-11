@@ -37,6 +37,7 @@ use cwl_core::{
         ScatterFeatureRequirement, ToolTimeLimit,
     },
 };
+use cwl_engine_storage::StorageBackend;
 use futures_util::{
     FutureExt,
     future::{BoxFuture, join_all},
@@ -110,6 +111,8 @@ pub struct TaskExecutionRequest<'a> {
     pub tmpdir: &'a Path,
     pub working_dir: &'a Path,
     pub staged_dir: &'a str,
+
+    pub storage: Arc<StorageBackend>,
 }
 
 #[derive(Debug, Clone)]
@@ -125,13 +128,14 @@ pub struct TaskExecutionResult {
 ///  Panics if `Operation` is used as this anstract type is not meant to be executed
 pub fn execute(
     backend: Arc<dyn TaskBackend>,
+    storage: Arc<StorageBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> BoxFuture<'_, anyhow::Result<ExecutionResult>> {
     match &request.specification {
-        CWLDocument::Workflow(_) => execute_workflow(backend, request, token).boxed(),
+        CWLDocument::Workflow(_) => execute_workflow(backend, storage, request, token).boxed(),
         CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => {
-            execute_commandline_tool(backend, request, token).boxed()
+            execute_commandline_tool(backend, storage, request, token).boxed()
         }
         CWLDocument::Operation(_) => panic!("Unsupported document type for execution"),
     }
@@ -145,6 +149,7 @@ pub fn execute(
 #[allow(clippy::too_many_lines)]
 pub async fn execute_workflow(
     backend: Arc<dyn TaskBackend>,
+    storage: Arc<StorageBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
@@ -299,6 +304,7 @@ pub async fn execute_workflow(
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
+                        storage.clone(),
                         &working_dir_clone,
                         Some(&step_outdir),
                         step_inputs,
@@ -346,6 +352,7 @@ pub async fn execute_workflow(
                 handles.push(execute_step(
                     step,
                     backend_clone,
+                    storage.clone(),
                     &working_dir_clone,
                     Some(&step_outdir),
                     step_inputs,
@@ -415,6 +422,7 @@ pub async fn execute_workflow(
 fn execute_step(
     step: &WorkflowStep,
     backend: Arc<dyn TaskBackend>,
+    storage: Arc<StorageBackend>,
     working_dir: &Path,
     outdir: Option<&Path>,
     inputs: InputObject,
@@ -434,7 +442,7 @@ fn execute_step(
             )?;
             let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
                 tokio::spawn(async move {
-                    let result = execute(backend, &request, token).await?;
+                    let result = execute(backend, storage, &request, token).await?;
                     Ok((step_id_clone, result))
                 });
             Ok(handle)
@@ -449,7 +457,7 @@ fn execute_step(
             )?;
             let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
                 tokio::spawn(async move {
-                    let result = execute(backend, &request, token).await?;
+                    let result = execute(backend, storage, &request, token).await?;
                     Ok((step_id_clone, result))
                 });
             Ok(handle)
@@ -463,6 +471,7 @@ fn execute_step(
 #[allow(clippy::too_many_lines)]
 pub async fn execute_commandline_tool(
     backend: Arc<dyn TaskBackend>,
+    storage: Arc<StorageBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
@@ -642,6 +651,8 @@ pub async fn execute_commandline_tool(
                     tmpdir: tmpdir.path(),
                     working_dir: &request.working_dir,
                     staged_dir: workdir,
+
+                    storage: storage.clone(),
                 },
                 token,
             )
@@ -697,7 +708,7 @@ pub async fn execute_commandline_tool(
         )?;
 
         if iur.is_some_and(|i| i.inplace_update) {
-            handle_inplace_update(mounts)?;
+            handle_inplace_update(mounts, storage).await?;
         }
 
         Ok(ExecutionResult {

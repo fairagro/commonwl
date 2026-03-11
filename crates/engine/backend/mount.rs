@@ -1,4 +1,7 @@
-use crate::environment::workdir::{MountType, Source, WorkDirMount};
+use crate::{
+    environment::workdir::{MountType, Source, WorkDirMount},
+    io::normalize_url,
+};
 use anyhow::Context;
 use crankshaft::engine::{
     Task,
@@ -8,10 +11,11 @@ use crankshaft::engine::{
     },
 };
 use cwl_core::files::FileOrDirectory;
-use dircpy::copy_dir;
+use cwl_engine_storage::{Storage, StorageBackend};
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use url::Url;
 
@@ -60,11 +64,12 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
     Ok(())
 }
 
-pub(crate) fn mount_workdir_item(
+pub(crate) async fn mount_workdir_item(
     mount: WorkDirMount,
     outdir: &Path,
     use_container: bool,
     task: &mut Task,
+    backend: Arc<StorageBackend>,
 ) -> anyhow::Result<()> {
     if mount.target.starts_with(outdir) {
         if let Some(parent) = mount.target.parent()
@@ -78,27 +83,14 @@ pub(crate) fn mount_workdir_item(
             })?;
         }
         match (mount.ty, mount.source) {
-            (MountType::File, Source::File(path)) => {
-                fs::copy(&path, &mount.target).with_context(|| {
-                    format!(
-                        "Could not copy from {} to {}",
-                        path.display(),
-                        mount.target.display()
-                    )
-                })?;
-            }
+            (MountType::File, Source::Url(path)) => backend.download(&path, &mount.target).await?,
             (MountType::File, Source::Contents(items)) => {
                 fs::write(&mount.target, &items)
                     .with_context(|| format!("Could not write to {}", mount.target.display()))?;
             }
-            (MountType::Directory, Source::File(path)) => copy_dir(&path, &mount.target)
-                .with_context(|| {
-                    format!(
-                        "Could not copy from {} to {}",
-                        path.display(),
-                        mount.target.display()
-                    )
-                })?,
+            (MountType::Directory, Source::Url(path)) => {
+                backend.download(&path, &mount.target).await?
+            }
             (MountType::Directory, Source::Contents(_)) => {
                 fs::create_dir_all(&mount.target).with_context(|| {
                     format!(
@@ -113,7 +105,7 @@ pub(crate) fn mount_workdir_item(
             Input::builder()
                 .path(mount.target.to_string_lossy())
                 .contents(match mount.source {
-                    Source::File(path) => Contents::Path(path),
+                    Source::Url(path) => Contents::Url(path),
                     Source::Contents(data) => Contents::Literal(data),
                 })
                 .ty(match mount.ty {
@@ -146,11 +138,11 @@ pub(crate) fn remove_materialized_inputs(
             let Some(location) = input.location() else {
                 continue;
             };
-            let loc_path = location.strip_prefix("file://").unwrap();
-            let Source::File(mount_path) = &mount.source else {
+            let loc_url = Url::parse(location).unwrap();
+            let Source::Url(mount_path) = &mount.source else {
                 continue;
             };
-            if loc_path == mount_path {
+            if loc_url == normalize_url(mount_path) {
                 materialized = true;
                 break;
             }

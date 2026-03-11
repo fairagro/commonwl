@@ -15,18 +15,14 @@ use crankshaft::{
                 backend::{TaskRunError, tes},
             },
         },
-        task::{
-            Execution, Input, Output, Resources,
-            input::{self, Contents},
-            output,
-        },
+        task::{Execution, Output, Resources, output},
     },
 };
 use cwl_core::IntegerOrExpression;
-use cwl_engine_storage::{Storage, StorageBackend};
+use cwl_engine_storage::Storage;
 use nonempty::nonempty;
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     sync::{Arc, Mutex},
     time::Duration,
 };
@@ -73,7 +69,7 @@ impl TaskBackend for TesBackend {
         //handle docker requirement
         let mut container = "ubuntu".to_string(); //add config "default-container"
         if let Some(dr) = request.docker {
-            if let Some(df) = &dr.docker_file
+            if let Some(_df) = &dr.docker_file
                 && let Some(dt) = &dr.docker_image_id
             {
                 //build_container(self.client.inner(), df, dt).await?;
@@ -119,7 +115,7 @@ impl TaskBackend for TesBackend {
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
-                    .maybe_stdin(request.stdin_file)
+                    //.maybe_stdin(request.stdin_file)
                     .build()
             ])
             .resources(
@@ -132,16 +128,15 @@ impl TaskBackend for TesBackend {
             .build();
 
         //add file inputs to task
-        let backend = StorageBackend::from_uri(&Url::parse("s3://")?).await;
         let mut inputs = request.inputs.to_vec();
         for input in &mut inputs {
             if let Some(location) = input.location()
                 && let Some(path) = location.strip_prefix("file://")
             {
                 //file is local and needs to be uploaded
-                let dest = format!("s3://test-bucket/{}", input.basename().unwrap());
-                backend.upload(Path::new(path), &dest).await?;
-                input.set_location(Some(dest));
+                let dest = Url::parse(&format!("s3://test-bucket/{}", input.basename().unwrap()))?;
+                request.storage.upload(Path::new(path), &dest).await?;
+                input.set_location(Some(dest.to_string()));
             }
             mount_input(&mut task, input)?;
         }
@@ -152,7 +147,9 @@ impl TaskBackend for TesBackend {
                 request.outdir,
                 request.use_container,
                 &mut task,
-            )?;
+                request.storage.clone(),
+            )
+            .await?;
         }
 
         //add outdir mount
@@ -180,8 +177,7 @@ impl TaskBackend for TesBackend {
         //handle stderr output
         let bucket_url = Url::parse(&format!("s3://test-bucket/{}/", request.id))?;
         let stderr_out_file_name = if let Some(stdout) = request.stderr_file {
-            let stderr = do_eval_to_string(stdout, request.eval_context);
-            stderr
+            do_eval_to_string(stdout, request.eval_context)
         } else {
             format!("stdout_{}", &Uuid::new_v4().to_string()[..8])
         };
@@ -207,8 +203,7 @@ impl TaskBackend for TesBackend {
 
         //handle stdout output
         let stdout_out_file_name = if let Some(stdout) = request.stdout_file {
-            let stdout = do_eval_to_string(stdout, request.eval_context);
-            stdout
+            do_eval_to_string(stdout, request.eval_context)
         } else {
             format!("stdout_{}", &Uuid::new_v4().to_string()[..8])
         };
@@ -253,15 +248,18 @@ impl TaskBackend for TesBackend {
 
         //download results
         let stdout_path = request.outdir.join(stdout_out_file_name);
-        backend
-            .download(stdout_location.as_str(), &stdout_path)
+        request
+            .storage
+            .download(&stdout_location, &stdout_path)
             .await?;
         let stderr_path = request.outdir.join(stderr_out_file_name);
-        backend
-            .download(stderr_location.as_str(), &stderr_path)
+        request
+            .storage
+            .download(&stderr_location, &stderr_path)
             .await?;
-        backend
-            .download(s3_workdir.as_str(), request.outdir)
+        request
+            .storage
+            .download(&s3_workdir, request.outdir)
             .await?;
 
         Ok(TaskExecutionResult {
@@ -290,7 +288,7 @@ impl TaskBackend for TesBackend {
 
 impl TesBackend {
     ///Crankshaft backend overwrites docker entrypoint, so we need to get it beforehand and append it to the command
-    async fn get_docker_entrypoint(&self, container: &str) -> anyhow::Result<Option<Vec<String>>> {
+    async fn get_docker_entrypoint(&self, _container: &str) -> anyhow::Result<Option<Vec<String>>> {
         //ensure image
         //self.client.ensure_image(container).await?;
         //let info = self.client.inner().inspect_image(container).await?;
@@ -300,87 +298,5 @@ impl TesBackend {
         //    return Ok(Some(entrypoint));
         //}
         Ok(None)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::*;
-    use crate::{backend::execute_commandline_tool, request::create_execution_request};
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn test_docker_backend_creation() {
-        let config = Config::default();
-        let backend = DockerBackend::new(config).await;
-        assert!(backend.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_docker_backend_run_simple() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir.join("cat-tool-shortcut.cwl");
-        let inputs_path = base_dir.join("cat-job.json");
-
-        let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
-        let tmpdir = tempdir().unwrap();
-        let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
-        let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
-        assert!(result.is_ok());
-
-        //check if output file exists
-        let out_file = tmpdir.path().join("output");
-        assert!(out_file.exists());
-    }
-
-    #[tokio::test]
-    async fn test_docker_backend_run_simple_with_dir() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir.join("dir3.cwl");
-        let inputs_path = base_dir.join("dir3-job.yml");
-
-        let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
-        let tmpdir = tempdir().unwrap();
-        let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
-        let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_docker_backend_run_simple_with_value_from() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir.join("cat3-from-dir.cwl");
-        let inputs_path = base_dir.join("cat-from-dir-job.yaml");
-
-        let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
-        let tmpdir = tempdir().unwrap();
-        let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
-        let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
-
-        assert!(result.is_ok());
-        //check if output file exists
-        let out_file = tmpdir.path().join("output.txt");
-
-        assert!(out_file.exists());
     }
 }
