@@ -54,6 +54,7 @@ use tempfile::tempdir;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
+use uuid::Uuid;
 
 pub mod docker;
 pub mod local;
@@ -607,10 +608,13 @@ pub async fn execute_commandline_tool(
         };
 
         let doc = tool.doc.as_ref().map(|d| docstring(d.clone()));
+        let id = tool.id.clone().unwrap_or("Unnamed".to_owned())
+            + "_"
+            + &Uuid::new_v4().to_string()[..8];
         let result = backend
             .run(
                 &TaskExecutionRequest {
-                    id: &tool.id.clone().unwrap_or("Unnamed".to_owned()),
+                    id: &id,
                     description: doc.as_deref(),
 
                     command: args

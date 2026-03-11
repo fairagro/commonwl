@@ -178,7 +178,7 @@ impl TaskBackend for TesBackend {
         //);
 
         //handle stderr output
-        let bucket_url = Url::parse("s3://test-bucket")?;
+        let bucket_url = Url::parse(&format!("s3://test-bucket/{}/", request.id))?;
         let stderr_out_file_name = if let Some(stdout) = request.stderr_file {
             let stderr = do_eval_to_string(stdout, request.eval_context);
             stderr
