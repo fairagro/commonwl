@@ -1,10 +1,12 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
     ContainerEngine, DockerBackend, EngineStatus, InputObject, LocalBackend, TaskBackend,
-    create_execution_request, create_execution_request_with_inputs, evaluate_exitcodes, execute,
+    TesBackend, create_execution_request, create_execution_request_with_inputs, evaluate_exitcodes,
+    execute,
 };
+use url::Url;
 use core::panic;
-use crankshaft::config::backend::docker::Config;
+use crankshaft::config::backend::{docker::Config, tes};
 use std::{
     env,
     path::{Path, PathBuf},
@@ -46,6 +48,9 @@ async fn main() -> anyhow::Result<()> {
         Arc::new(DockerBackend::new(config).await?)
     } else if backend_select == "local" {
         Arc::new(LocalBackend::new(ContainerEngine::Docker))
+    } else if backend_select == "tes" {
+        let config = tes::Config::builder().url(Url::parse("http://localhost:8000")?).interval(10).build();
+        Arc::new(TesBackend::new(config).await?)
     } else {
         panic!()
     };

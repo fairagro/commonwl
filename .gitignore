@@ -1,2 +1,8 @@
 /target
 .venv
+.env
+# some local testing stuff
+data
+logs
+funnel-work-dir
+funnel-config.yaml

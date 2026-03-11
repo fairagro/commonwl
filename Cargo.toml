@@ -6,6 +6,7 @@ members = [
     "crates/engine",
     "crates/salad",
     "crates/salad_derive",
+    "crates/storage",
 ]
 
 resolver = "3"
@@ -18,6 +19,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 anyhow = "1.0.102"
+async-trait = "0.1.89"
 bon = "3.8.1"
 cwl_core = { version = "0", path = "crates/core" }
 serde = { version = "1.0.228", features = ["derive"] }

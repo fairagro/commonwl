@@ -58,6 +58,7 @@ use tracing::{debug, info};
 pub mod docker;
 pub mod local;
 pub mod mount;
+pub mod tes;
 
 #[async_trait]
 pub trait TaskBackend: Send + Sync + 'static {

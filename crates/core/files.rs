@@ -42,6 +42,13 @@ impl FileOrDirectory {
         }
     }
 
+    pub fn set_location(&mut self, location: Option<String>) {
+        match self {
+            Self::File(f) => f.location = location,
+            Self::Directory(d) => d.location = location,
+        }
+    }
+
     #[must_use]
     pub fn basename(&self) -> Option<&String> {
         match self {

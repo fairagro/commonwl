@@ -35,6 +35,7 @@ pub use backend::{
     docker::DockerBackend,
     evaluate_exitcodes, execute, execute_commandline_tool, execute_workflow,
     local::{LocalBackend, command::CommandBackend},
+    tes::TesBackend,
 };
 pub use docker::{
     ContainerBuildOptions, ContainerBuildOptionsBuilder, ContainerEngine, build_container_command,
