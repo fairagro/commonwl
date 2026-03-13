@@ -271,7 +271,8 @@ impl TaskBackend for TesBackend {
         request
             .storage
             .download(&s3_workdir, request.outdir)
-            .await?;
+            .await
+            .ok(); //errors if workdir is empty as such thing as empty does not exist in s3
 
         Ok(TaskExecutionResult {
             exit_status,
