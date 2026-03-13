@@ -18,3 +18,4 @@ aws-sdk-s3 = "1.125.0"
 aws-config = { version = "1.8.15", features = ["behavior-version-latest"] }
 dotenvy = "0.15.7"
 dircpy.workspace = true
+tempfile.workspace = true

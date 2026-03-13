@@ -1,8 +1,8 @@
+use crate::{local_storage::LocalStorage, s3_storage::S3Storage};
 use async_trait::async_trait;
 use std::{collections::HashMap, path::Path};
+use tempfile::NamedTempFile;
 use url::Url;
-
-use crate::{local_storage::LocalStorage, s3_storage::S3Storage};
 
 pub mod local_storage;
 pub mod s3_storage;
@@ -25,6 +25,12 @@ impl StorageBackend {
         backends.insert("file".to_string(), Box::new(LocalStorage {}));
         backends.insert("s3".to_string(), Box::new(S3Storage::new()));
         Self { inner: backends }
+    }
+
+    pub async fn upload_bytes(&self, data: &[u8], dest: &Url) -> anyhow::Result<()> {
+        let mut tmp = NamedTempFile::new()?;
+        std::io::Write::write_all(&mut tmp, data)?;
+        self.upload(tmp.path(), dest).await
     }
 }
 

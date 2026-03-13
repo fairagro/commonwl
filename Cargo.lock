@@ -1357,6 +1357,7 @@ dependencies = [
  "aws-sdk-s3",
  "dircpy",
  "dotenvy",
+ "tempfile",
  "tokio",
  "url",
 ]

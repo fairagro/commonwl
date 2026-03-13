@@ -1,6 +1,8 @@
 use crate::{
-    backend::mount::{mount_input, mount_workdir_item},
-    backend::{TaskBackend, TaskExecutionRequest, TaskExecutionResult},
+    backend::{
+        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        mount::{MountStrategy, mount_input, mount_workdir_item},
+    },
     expression::{do_eval, do_eval_to_string},
 };
 use async_trait::async_trait;
@@ -122,7 +124,7 @@ impl TaskBackend for TesBackend {
                 Resources::builder()
                     .cpu(request.runtime.cores as f64)
                     //.disk(request.runtime.outdir_size) //we don't use this currently
-                    .ram(request.runtime.ram as f64)
+                    .ram(request.runtime.ram as f64 / 1024.0)
                     .build(),
             )
             .build();
@@ -134,20 +136,35 @@ impl TaskBackend for TesBackend {
                 && let Some(path) = location.strip_prefix("file://")
             {
                 //file is local and needs to be uploaded
-                let dest = Url::parse(&format!("s3://test-bucket/{}", input.basename().unwrap()))?;
+                let relative = input
+                    .path()
+                    .unwrap()
+                    .strip_prefix(&self.input_dir())
+                    .unwrap();
+                let dest = Url::parse(&format!(
+                    "s3://test-bucket/{}/{}{}",
+                    request.id,
+                    Uuid::new_v4(),
+                    relative
+                ))?;
                 request.storage.upload(Path::new(path), &dest).await?;
                 input.set_location(Some(dest.to_string()));
             }
             mount_input(&mut task, input)?;
         }
 
+        let s3_workdir = Url::parse(&format!("s3://test-bucket/{}/workdir/", request.id))?;
         for mount in request.mounts {
             mount_workdir_item(
                 mount.clone(),
                 request.outdir,
+                request.staged_dir,
                 request.use_container,
                 &mut task,
                 request.storage.clone(),
+                MountStrategy::Remote {
+                    base_url: s3_workdir.clone(),
+                },
             )
             .await?;
         }
@@ -176,22 +193,22 @@ impl TaskBackend for TesBackend {
 
         //handle stderr output
         let bucket_url = Url::parse(&format!("s3://test-bucket/{}/", request.id))?;
-        let stderr_out_file_name = if let Some(stdout) = request.stderr_file {
-            do_eval_to_string(stdout, request.eval_context)
+        let (stderr_local, stderr_remote) = if let Some(stderr) = request.stderr_file {
+            let filename = do_eval_to_string(stderr, request.eval_context);
+            (request.outdir.join(&filename), s3_workdir.join(&filename)?)
         } else {
-            format!("stdout_{}", &Uuid::new_v4().to_string()[..8])
+            let filename = format!("stderr{}", &Uuid::new_v4().to_string()[..8]);
+            (request.outdir.join(&filename), bucket_url.join(&filename)?)
         };
-        let stderr_location = bucket_url.join(&stderr_out_file_name)?;
         task.add_output(
             Output::builder()
                 .name("stderr")
                 .path(stderr_file)
-                .url(stderr_location.clone())
+                .url(stderr_remote.clone())
                 .ty(output::Type::File)
                 .build(),
         );
 
-        let s3_workdir = Url::parse(&format!("s3://test-bucket/{}/workdir/", request.id))?;
         task.add_output(
             Output::builder()
                 .name("workdir")
@@ -202,17 +219,18 @@ impl TaskBackend for TesBackend {
         );
 
         //handle stdout output
-        let stdout_out_file_name = if let Some(stdout) = request.stdout_file {
-            do_eval_to_string(stdout, request.eval_context)
+        let (stdout_local, stdout_remote) = if let Some(stdout) = request.stdout_file {
+            let filename = do_eval_to_string(stdout, request.eval_context);
+            (request.outdir.join(&filename), s3_workdir.join(&filename)?)
         } else {
-            format!("stdout_{}", &Uuid::new_v4().to_string()[..8])
+            let filename = format!("stdout_{}", &Uuid::new_v4().to_string()[..8]);
+            (request.outdir.join(&filename), bucket_url.join(&filename)?)
         };
-        let stdout_location = bucket_url.join(&stdout_out_file_name)?;
         task.add_output(
             Output::builder()
                 .name("stdout")
                 .path(stdout_file)
-                .url(stdout_location.clone())
+                .url(stdout_remote.clone())
                 .ty(output::Type::File)
                 .build(),
         );
@@ -247,15 +265,13 @@ impl TaskBackend for TesBackend {
         };
 
         //download results
-        let stdout_path = request.outdir.join(stdout_out_file_name);
         request
             .storage
-            .download(&stdout_location, &stdout_path)
+            .download(&stdout_remote, &stdout_local)
             .await?;
-        let stderr_path = request.outdir.join(stderr_out_file_name);
         request
             .storage
-            .download(&stderr_location, &stderr_path)
+            .download(&stderr_remote, &stderr_local)
             .await?;
         request
             .storage
@@ -264,8 +280,8 @@ impl TaskBackend for TesBackend {
 
         Ok(TaskExecutionResult {
             exit_status,
-            stdout_file: stdout_path,
-            stderr_file: stderr_path,
+            stdout_file: stdout_local,
+            stderr_file: stderr_local,
         })
     }
 

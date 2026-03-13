@@ -27,11 +27,16 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
     if let Some(path) = input.path()
         && let Some(location) = input.location()
     {
+        let location = if input.is_dir() && !location.ends_with('/') {
+            format!("{}/", location)
+        } else {
+            location.to_string()
+        };
         let contents = if location.starts_with("file://") {
             let location = location.strip_prefix("file://").unwrap();
             Contents::Path(PathBuf::from(location))
         } else {
-            Contents::Url(Url::parse(location)?)
+            Contents::Url(Url::parse(&location)?)
         };
 
         task.add_input(
@@ -64,7 +69,31 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
     Ok(())
 }
 
+pub enum MountStrategy {
+    Local,
+    Remote { base_url: Url },
+}
+
 pub(crate) async fn mount_workdir_item(
+    mount: WorkDirMount,
+    outdir: &Path,
+    workdir: &str,
+    use_container: bool,
+    task: &mut Task,
+    backend: Arc<StorageBackend>,
+    strategy: MountStrategy,
+) -> anyhow::Result<()> {
+    match strategy {
+        MountStrategy::Local => {
+            mount_workdir_item_local(mount, outdir, use_container, task, backend).await
+        }
+        MountStrategy::Remote { base_url } => {
+            mount_workdir_item_remote(mount, outdir, workdir, task, backend, &base_url).await
+        }
+    }
+}
+
+async fn mount_workdir_item_local(
     mount: WorkDirMount,
     outdir: &Path,
     use_container: bool,
@@ -121,6 +150,76 @@ pub(crate) async fn mount_workdir_item(
             mount.target.display()
         );
     }
+    Ok(())
+}
+
+async fn mount_workdir_item_remote(
+    mount: WorkDirMount,
+    outdir: &Path,
+    workdir: &str,
+    task: &mut Task,
+    backend: Arc<StorageBackend>,
+    base_url: &Url,
+) -> anyhow::Result<()> {
+    let rel = mount.target.strip_prefix(outdir).unwrap_or(&mount.target);
+    let guest_path = if mount.target.starts_with(outdir) {
+        format!("{}/{}", workdir, rel.display())
+    } else {
+        mount.target.to_string_lossy().to_string()
+    };
+
+    match (mount.ty, mount.source) {
+        (MountType::File, Source::Url(url)) => {
+            let dest = if url.scheme() == "file" {
+                let local = Path::new(url.path());
+                let dest = base_url.join(&rel.to_string_lossy())?;
+                backend.upload(local, &dest).await?;
+                dest
+            } else {
+                url // already remote, use directly
+            };
+            task.add_input(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::File)
+                    .read_only(true)
+                    .build(),
+            );
+        }
+        (MountType::File, Source::Contents(data)) => {
+            let dest = base_url.join(&rel.to_string_lossy())?;
+            backend.upload_bytes(&data, &dest).await?;
+            task.add_input(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::File)
+                    .read_only(true)
+                    .build(),
+            );
+        }
+        (MountType::Directory, Source::Url(url)) => {
+            let dest = if url.scheme() == "file" {
+                let local = Path::new(url.path());
+                let dest = base_url.join(&format!("{}/", rel.display()))?;
+                backend.upload(local, &dest).await?;
+                dest
+            } else {
+                url
+            };
+            task.add_input(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::Directory)
+                    .read_only(true)
+                    .build(),
+            );
+        }
+        (MountType::Directory, Source::Contents(_)) => {}
+    }
+
     Ok(())
 }
 
