@@ -136,16 +136,11 @@ impl TaskBackend for TesBackend {
                 && let Some(path) = location.strip_prefix("file://")
             {
                 //file is local and needs to be uploaded
-                let relative = input
-                    .path()
-                    .unwrap()
-                    .strip_prefix(&self.input_dir())
-                    .unwrap();
                 let dest = Url::parse(&format!(
                     "s3://test-bucket/{}/{}{}",
                     request.id,
-                    Uuid::new_v4(),
-                    relative
+                    &Uuid::new_v4().to_string()[..8],
+                    input.basename().unwrap()
                 ))?;
                 request.storage.upload(Path::new(path), &dest).await?;
                 input.set_location(Some(dest.to_string()));
@@ -197,7 +192,7 @@ impl TaskBackend for TesBackend {
             let filename = do_eval_to_string(stderr, request.eval_context);
             (request.outdir.join(&filename), s3_workdir.join(&filename)?)
         } else {
-            let filename = format!("stderr{}", &Uuid::new_v4().to_string()[..8]);
+            let filename = format!("stderr_{}", &Uuid::new_v4().to_string()[..8]);
             (request.outdir.join(&filename), bucket_url.join(&filename)?)
         };
         task.add_output(
