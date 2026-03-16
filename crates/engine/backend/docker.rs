@@ -70,8 +70,8 @@ impl DockerBackend {
 
         Ok(Self {
             client,
-            backend,
             storage,
+            backend,
         })
     }
 }
