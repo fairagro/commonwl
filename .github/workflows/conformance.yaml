@@ -50,7 +50,8 @@ jobs:
           ./funnel server run --config ./.github/funnel-config.yaml & 
           FUNNEL_PID=$!
           echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
-          sleep 2
+          sleep 10
+          curl -sf http://localhost:8000/v1/tasks
       - name: Run Conformance Tests
         continue-on-error: true
         env:
@@ -66,6 +67,7 @@ jobs:
       - name: Stop Funnel
         if: matrix.variant == 'tes' && always()
         run: |
+          curl -s http://localhost:8000/v1/tasks?view=FULL | jq '.tasks[] | {id, state, logs}'
           [ -n "$FUNNEL_PID" ] && kill "$FUNNEL_PID" || true
       - name: Stop rustfs
         if: matrix.variant == 'tes' && always()
