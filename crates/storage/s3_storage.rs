@@ -5,12 +5,13 @@ use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::RequestChecksumCalculation;
 use aws_sdk_s3::primitives::ByteStream;
 use std::path::Path;
+use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::OnceCell;
 use url::Url;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct S3Storage {
     client: OnceCell<s3::Client>,
 }
@@ -64,18 +65,30 @@ impl Storage for S3Storage {
         if local.is_file() {
             self.upload_file(local, &bucket, &key).await?;
         } else {
+            let mut set = tokio::task::JoinSet::new();
+            let sem = Arc::new(tokio::sync::Semaphore::new(32));
             for item in local.read_dir()? {
                 let dir_dest = if dest.path().ends_with('/') {
                     dest.clone()
                 } else {
                     Url::parse(&format!("{dest}/"))?
                 };
+
                 let item = item?;
                 let path = item.path();
                 if let Some(filename) = path.file_name() {
                     let dest = dir_dest.join(&filename.to_string_lossy())?;
-                    self.upload(&path, &dest).await?;
+                    let this = self.clone();
+
+                    let permit = sem.clone().acquire_owned().await?;
+                    set.spawn(async move {
+                        let _permit = permit; //reference semaphore
+                        this.upload(&path, &dest).await
+                    });
                 }
+            }
+            while let Some(res) = set.join_next().await {
+                res??;
             }
         }
         Ok(())
@@ -96,16 +109,32 @@ impl Storage for S3Storage {
                     .send()
                     .await?;
 
-                for item in objects.contents() {
-                    let obj_key = item.key().unwrap_or_default();
-                    let relative = obj_key.strip_prefix(&key).unwrap_or(obj_key);
+                let keys: Vec<String> = objects
+                    .contents()
+                    .iter()
+                    .filter_map(|obj| obj.key().map(str::to_owned))
+                    .collect();
+                let mut set = tokio::task::JoinSet::new();
+                let sem = Arc::new(tokio::sync::Semaphore::new(32));
+                for obj_key in keys {
+                    let relative = obj_key.strip_prefix(&key).unwrap_or(&obj_key);
                     let local_path = local.join(relative);
                     if let Some(parent) = local_path.parent() {
                         tokio::fs::create_dir_all(parent).await.with_context(|| {
                             format!("Could not create directory {}", parent.display())
                         })?;
                     }
-                    self.download_file(&bucket, obj_key, &local_path).await?;
+                    let permit = sem.clone().acquire_owned().await?;
+
+                    let bucket = bucket.clone();
+                    let this = self.clone();
+                    set.spawn(async move {
+                        let _permit = permit; //reference semaphore
+                        this.download_file(&bucket, &obj_key, &local_path).await
+                    });
+                }
+                while let Some(res) = set.join_next().await {
+                    res??;
                 }
             }
             S3PathType::NotFound => anyhow::bail!("Could not find path {bucket}/{key}"),
