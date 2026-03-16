@@ -5,4 +5,4 @@
 data
 logs
 funnel-work-dir
-funnel-config.yaml
+./funnel-config.yaml

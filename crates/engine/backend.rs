@@ -252,7 +252,7 @@ pub async fn execute_workflow(
                     continue;
                 }
 
-                for job in jobs {
+                for (job_index, job) in jobs.into_iter().enumerate() {
                     let mut sub_inputs = inputs.clone();
                     for (k, v) in job {
                         //convert to default value (inner values we extracted before as vec!)
@@ -297,11 +297,14 @@ pub async fn execute_workflow(
                     }
 
                     let backend_clone = backend.task_scoped();
+                    let job_outdir = collection_dir
+                        .path()
+                        .join(format!("{}_{}", step_id_clone, job_index));
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
                         &working_dir_clone,
-                        Some(&step_outdir),
+                        Some(&job_outdir),
                         step_inputs,
                         token_clone.clone(),
                         request,

@@ -1,0 +1,16 @@
+Database: boltdb
+Compute: local
+
+Server:
+  HostName: localhost
+  HTTPPort: "8000"
+  RPCPort: "9090"
+
+AmazonS3:
+  Disabled: true
+
+GenericS3:
+  - Disabled: false
+    Endpoint: "http://localhost:9000"
+    Key: "rustfsadmin"
+    Secret: "rustfsadmin"

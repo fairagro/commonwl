@@ -15,12 +15,38 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        variant: ${{ fromJson(vars.BACKEND || '["docker", "local"]') }}
+        variant: ${{ fromJson(vars.BACKEND || '["docker", "local", "tes"]') }}
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: "true"
       - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Start rustfs
+        if: matrix.variant == 'tes'
+        run: |
+          docker run  -p 9000:9000 -p 9001:9001 -v $(pwd)/data:/data -v $(pwd)/logs:/logs rustfs/rustfs:latest
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/health && break
+            echo "Waiting for rustfs... ($i/30)"
+            sleep 2
+          done
+      - name: Start Funnel
+        if: matrix.variant == 'tes'
+        run: |
+          FUNNEL_VERSION=$(curl -s https://api.github.com/repos/ohsu-comp-bio/funnel/releases/latest \
+            | jq -r '.tag_name')
+          curl -sL "https://github.com/ohsu-comp-bio/funnel/releases/download/${FUNNEL_VERSION}/funnel-linux-amd64-${FUNNEL_VERSION}.tar.gz" \
+            | tar -xz
+          chmod +x funnel
+          ./funnel server run --config ./.github/funnel-config.yaml & 
+          FUNNEL_PID=$!
+           echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
+
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/v1/tasks && break
+            echo "Waiting for Funnel... ($i/30)"
+            sleep 2
+          done
       - name: Run Conformance Tests
         continue-on-error: true
         env:
@@ -32,6 +58,12 @@ jobs:
           mkdir badges
           cargo build --release && cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance --badgedir badges/$BACKEND
           exit 0
+
+      - name: Stop Funnel
+        if: matrix.variant == 'tes' && always()
+        run: |
+          [ -n "$FUNNEL_PID" ] && kill "$FUNNEL_PID" || true
+
       - name: Generate Summary
         env:
           BACKEND: ${{ matrix.variant }}

@@ -1,0 +1,1517 @@
+<?xml version="1.0" ?>
+<testsuites disabled="0" errors="0" failures="7" tests="85" time="744.6824290752411">
+	<testsuite disabled="0" errors="0" failures="7" name="conformance_tests" skipped="0" tests="85" time="744.6824290752411">
+		<testcase name="General test of command line generation" time="10.049654" class="required, command_line_tool" file="cl_basic_generation" url="cwltest:conformance_tests#1">
+			<system-out>{
+  &quot;args&quot;: [
+    &quot;bwa&quot;,
+    &quot;mem&quot;,
+    &quot;-t&quot;,
+    &quot;2&quot;,
+    &quot;-I&quot;,
+    &quot;1,2,3,4&quot;,
+    &quot;-m&quot;,
+    &quot;3&quot;,
+    &quot;chr20.fa&quot;,
+    &quot;example_human_Illumina.pe_1.fastq&quot;,
+    &quot;example_human_Illumina.pe_2.fastq&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test nested prefixes with arrays" time="10.048871" class="required, command_line_tool" file="nested_prefixes_arrays" url="cwltest:conformance_tests#2">
+			<system-out>{
+  &quot;args&quot;: [
+    &quot;bwa&quot;,
+    &quot;mem&quot;,
+    &quot;chr20.fa&quot;,
+    &quot;-XXX&quot;,
+    &quot;-YYY&quot;,
+    &quot;example_human_Illumina.pe_1.fastq&quot;,
+    &quot;-YYY&quot;,
+    &quot;example_human_Illumina.pe_2.fastq&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test nested command line bindings" time="10.048674" class="schema_def, command_line_tool" file="nested_cl_bindings" url="cwltest:conformance_tests#3">
+			<system-out>{
+  &quot;args&quot;: [
+    &quot;tmap&quot;,
+    &quot;mapall&quot;,
+    &quot;stage1&quot;,
+    &quot;map1&quot;,
+    &quot;--min-seq-length&quot;,
+    &quot;20&quot;,
+    &quot;map2&quot;,
+    &quot;--min-seq-length&quot;,
+    &quot;20&quot;,
+    &quot;stage2&quot;,
+    &quot;map1&quot;,
+    &quot;--max-seq-length&quot;,
+    &quot;20&quot;,
+    &quot;--min-seq-length&quot;,
+    &quot;10&quot;,
+    &quot;--seed-length&quot;,
+    &quot;16&quot;,
+    &quot;map2&quot;,
+    &quot;--max-seed-hits&quot;,
+    &quot;-1&quot;,
+    &quot;--max-seq-length&quot;,
+    &quot;20&quot;,
+    &quot;--min-seq-length&quot;,
+    &quot;10&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test command line with optional input (missing)" time="10.050481" class="required, command_line_tool" file="cl_optional_inputs_missing" url="cwltest:conformance_tests#4">
+			<system-out>{
+  &quot;args&quot;: [
+    &quot;cat&quot;,
+    &quot;hello.txt&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test command line with optional input (provided)" time="10.047797" class="required, command_line_tool" file="cl_optional_bindings_provided" url="cwltest:conformance_tests#5">
+			<system-out>{
+  &quot;args&quot;: [
+    &quot;cat&quot;,
+    &quot;-n&quot;,
+    &quot;hello.txt&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test InitialWorkDirRequirement ExpressionEngineRequirement.engineConfig feature" time="10.052478" class="initial_work_dir, inline_javascript, command_line_tool" file="initworkdir_expreng_requirements" url="cwltest:conformance_tests#6">
+			<system-out>{
+  &quot;foo&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpgh7xzyye/foo.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpgh7xzyye/foo.txt&quot;,
+    &quot;basename&quot;: &quot;foo.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpgh7xzyye&quot;,
+    &quot;nameroot&quot;: &quot;foo&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$63da67422622fbf9251a046d7a34b7ea0fd4fead&quot;,
+    &quot;size&quot;: 22
+  }
+}
+</system-out>
+			<system-err>The file is hello.txt
+
+</system-err>
+		</testcase>
+		<testcase name="Test command execution in Docker with stdout redirection" time="10.047011" class="docker, command_line_tool" file="stdout_redirect_docker" url="cwltest:conformance_tests#7">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpk1hjauoo/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpk1hjauoo/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpk1hjauoo&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  }
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test command execution in Docker with shortcut stdout redirection" time="10.046532" class="docker, command_line_tool" file="stdout_redirect_shortcut_docker" url="cwltest:conformance_tests#8">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmp1co6ec57/stdout_1e89e4c0&quot;,
+    &quot;path&quot;: &quot;/tmp/tmp1co6ec57/stdout_1e89e4c0&quot;,
+    &quot;basename&quot;: &quot;stdout_1e89e4c0&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmp1co6ec57&quot;,
+    &quot;nameroot&quot;: &quot;stdout_1e89e4c0&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  }
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test command execution in Docker with mediumcut stdout redirection" time="10.049089" class="docker, command_line_tool" file="stdout_redirect_mediumcut_docker" url="cwltest:conformance_tests#9">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmp25a4rd9n/cat-out&quot;,
+    &quot;path&quot;: &quot;/tmp/tmp25a4rd9n/cat-out&quot;,
+    &quot;basename&quot;: &quot;cat-out&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmp25a4rd9n&quot;,
+    &quot;nameroot&quot;: &quot;cat-out&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  }
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test command line with stderr redirection" time="10.059995" class="shell_command, command_line_tool" file="stderr_redirect" url="cwltest:conformance_tests#10">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpzko72_dg/error.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpzko72_dg/error.txt&quot;,
+    &quot;basename&quot;: &quot;error.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpzko72_dg&quot;,
+    &quot;nameroot&quot;: &quot;error&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+			<system-err>foo
+
+</system-err>
+		</testcase>
+		<testcase name="Test command line with stderr redirection, brief syntax" time="10.051164" class="shell_command, command_line_tool" file="stderr_redirect_shortcut" url="cwltest:conformance_tests#11">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpqpqo_djg/stderr_25bcd09b&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpqpqo_djg/stderr_25bcd09b&quot;,
+    &quot;basename&quot;: &quot;stderr_25bcd09b&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpqpqo_djg&quot;,
+    &quot;nameroot&quot;: &quot;stderr_25bcd09b&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+			<system-err>foo
+
+</system-err>
+		</testcase>
+		<testcase name="Test command line with stderr redirection, named brief syntax" time="10.057070" class="shell_command, command_line_tool" file="stderr_redirect_mediumcut" url="cwltest:conformance_tests#12">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpp2407erk/std.err&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpp2407erk/std.err&quot;,
+    &quot;basename&quot;: &quot;std.err&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpp2407erk&quot;,
+    &quot;nameroot&quot;: &quot;std&quot;,
+    &quot;nameext&quot;: &quot;.err&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+			<system-err>foo
+
+</system-err>
+		</testcase>
+		<testcase name="Test command execution in Docker with stdin and stdout redirection" time="10.050835" class="required, command_line_tool" file="stdinout_redirect_docker" url="cwltest:conformance_tests#13">
+			<system-out>{
+  &quot;output_txt&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpkapawyp2/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpkapawyp2/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpkapawyp2&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  }
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test default usage of Any in expressions." time="0.018011" class="inline_javascript, expression_tool" file="expression_any" url="cwltest:conformance_tests#14">
+			<system-out>{
+  &quot;output&quot;: 1
+}
+</system-out>
+		</testcase>
+		<testcase name="Test explicitly passing null to Any type inputs with default values." time="0.018094" class="inline_javascript, expression_tool" file="expression_any_null" url="cwltest:conformance_tests#15">
+			<system-out>{
+  &quot;output&quot;: 1
+}
+</system-out>
+		</testcase>
+		<testcase name="Testing the string 'null' does not trip up an Any with a default value." time="0.018048" class="inline_javascript, expression_tool" file="expression_any_string" url="cwltest:conformance_tests#16">
+			<system-out>{
+  &quot;output&quot;: 2
+}
+</system-out>
+		</testcase>
+		<testcase name="Test Any without defaults cannot be unspecified." time="0.015524" class="inline_javascript, expression_tool" file="expression_any_nodefaultany" url="cwltest:conformance_tests#17">
+			<system-err>Error: Value Any(Null) is not valid for `i1`, expected One(CWLType(Any))
+</system-err>
+		</testcase>
+		<testcase name="Test explicitly passing null to Any type without a default value." time="0.015665" class="inline_javascript, expression_tool" file="expression_any_null_nodefaultany" url="cwltest:conformance_tests#18">
+			<system-err>Error: Value Any(Null) is not valid for `i1`, expected One(CWLType(Any))
+</system-err>
+		</testcase>
+		<testcase name="Testing the string 'null' does not trip up an Any without a default value." time="0.016768" class="inline_javascript, expression_tool" file="expression_any_nullstring_nodefaultany" url="cwltest:conformance_tests#19">
+			<system-out>{
+  &quot;output&quot;: 2
+}
+</system-out>
+		</testcase>
+		<testcase name="Testing Any type compatibility in outputSource" time="0.014707" class="required, workflow" file="any_outputSource_compatibility" url="cwltest:conformance_tests#20">
+			<system-out>{
+  &quot;output3&quot;: &quot;hello&quot;,
+  &quot;output1&quot;: [
+    &quot;hello&quot;,
+    &quot;world&quot;
+  ],
+  &quot;output2&quot;: [
+    &quot;foo&quot;,
+    &quot;bar&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test command execution in with stdin and stdout redirection" time="10.050204" class="required, command_line_tool" file="stdinout_redirect" url="cwltest:conformance_tests#21">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpgadb3xdj/output&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpgadb3xdj/output&quot;,
+    &quot;basename&quot;: &quot;output&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpgadb3xdj&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  }
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test ExpressionTool with Javascript engine" time="0.017826" class="inline_javascript, expression_tool" file="expression_parseint" url="cwltest:conformance_tests#22">
+			<system-out>{
+  &quot;output&quot;: 42
+}
+</system-out>
+		</testcase>
+		<testcase name="Test outputEval to transform output" time="10.048331" class="inline_javascript, command_line_tool" file="expression_outputEval" url="cwltest:conformance_tests#23">
+			<system-out>{
+  &quot;output&quot;: 16
+}
+</system-out>
+			<system-err>  16  198 1111 /mnt/task/inputs/file1-stg0f7fa0a6/whale.txt
+
+</system-err>
+		</testcase>
+		<testcase name="Test two step workflow with imported tools" time="10.053899" class="inline_javascript, workflow" file="wf_wc_parseInt" url="cwltest:conformance_tests#24">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test two step workflow with inline tools" time="10.051454" class="inline_javascript, workflow" file="wf_wc_expressiontool" url="cwltest:conformance_tests#25">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test single step workflow with Scatter step" time="10.065484" class="scatter, inline_javascript, workflow" file="wf_wc_scatter" url="cwltest:conformance_tests#26">
+			<system-out>{
+  &quot;count_output&quot;: [
+    16,
+    1
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test single step workflow with Scatter step and two data links connected to same input, default merge behavior" time="10.061160" class="scatter, multiple_input, inline_javascript, workflow" file="wf_wc_scatter_multiple_merge" url="cwltest:conformance_tests#27">
+			<failure type="failure">Command 'target/release/conformance --outdir=/tmp/tmpupn46b1i --quiet testdata/cwl/tests/count-lines4-wf.cwl testdata/cwl/tests/count-lines4-job.json' returned non-zero exit status 1.</failure>
+			<system-err>Error: Step execution failed
+
+Caused by:
+    Output value Any(Null) does not match output type One(CWLType(Int))
+</system-err>
+		</testcase>
+		<testcase name="Test single step workflow with Scatter step and two data links connected to same input, nested merge behavior" time="10.067009" class="scatter, multiple_input, inline_javascript, workflow" file="wf_wc_scatter_multiple_nested" url="cwltest:conformance_tests#28">
+			<failure type="failure">Command 'target/release/conformance --outdir=/tmp/tmpd0gihgkn --quiet testdata/cwl/tests/count-lines6-wf.cwl testdata/cwl/tests/count-lines6-job.json' returned non-zero exit status 1.</failure>
+			<system-err>Error: Step execution failed
+
+Caused by:
+    Output value Any(Null) does not match output type One(CWLType(Int))
+</system-err>
+		</testcase>
+		<testcase name="Test single step workflow with Scatter step and two data links connected to same input, flattened merge behavior" time="10.059991" class="multiple_input, inline_javascript, workflow" file="wf_wc_scatter_multiple_flattened" url="cwltest:conformance_tests#29">
+			<system-out>{
+  &quot;count_output&quot;: 34
+}
+</system-out>
+			<system-err>  16  198 1111 /mnt/task/inputs/file1-stgdc654144/stg-1dc76076/whale.txt
+  16  198 1111 /mnt/task/inputs/file1-stgdc654144/stg-57a0dfb7/whale.txt
+   1    2   13 /mnt/task/inputs/file1-stgdc654144/stg-5d059c6b/hello.txt
+   1    2   13 /mnt/task/inputs/file1-stgdc654144/stg-25c42dc1/hello.txt
+  34  400 2248 total
+
+</system-err>
+		</testcase>
+		<testcase name="Test when step source is a single-item list and there is no linkMerge, then it not wrapped in a list, and that MultipleInputFeatureRequirement is not required." time="10.054946" class="inline_javascript, workflow" file="wf_wc_nomultiple" url="cwltest:conformance_tests#30">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test when step source is a single-item list and linkMerge is listed, then it is wrapped in a list." time="10.059263" class="inline_javascript, workflow" file="wf_wc_nomultiple_merge_nested" url="cwltest:conformance_tests#31">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow with default value for input parameter (missing)" time="10.052061" class="inline_javascript, workflow" file="wf_input_default_missing" url="cwltest:conformance_tests#32">
+			<system-out>{
+  &quot;count_output&quot;: 1
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow with default value for input parameter (provided)" time="10.061475" class="inline_javascript, workflow" file="wf_input_default_provided" url="cwltest:conformance_tests#33">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+			<system-err>  16  198 1111 /mnt/task/inputs/file1-stgd5915bc4/whale.txt
+
+</system-err>
+		</testcase>
+		<testcase name="Test that workflow defaults override tool defaults" time="10.062793" class="required, workflow" file="wf_default_tool_default" url="cwltest:conformance_tests#34">
+			<system-out>{
+  &quot;default_output&quot;: &quot;workflow_default&quot;
+}
+</system-out>
+			<system-err>workflow_default
+</system-err>
+		</testcase>
+		<testcase name="Test EnvVarRequirement" time="10.074411" class="env_var, command_line_tool" file="envvar_req" url="cwltest:conformance_tests#35">
+			<system-out>{
+  &quot;out&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpuh5uh8ab/out&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpuh5uh8ab/out&quot;,
+    &quot;basename&quot;: &quot;out&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpuh5uh8ab&quot;,
+    &quot;nameroot&quot;: &quot;out&quot;,
+    &quot;checksum&quot;: &quot;sha1$b3ec4ed1749c207e52b3a6d08c59f31d83bff519&quot;,
+    &quot;size&quot;: 15
+  }
+}
+</system-out>
+			<system-err>hello test env
+
+</system-err>
+		</testcase>
+		<testcase name="Test workflow scatter with single scatter parameter" time="10.074482" class="scatter, workflow" file="wf_scatter_single_param" url="cwltest:conformance_tests#36">
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;foo one&quot;,
+    &quot;foo two&quot;,
+    &quot;foo three&quot;,
+    &quot;foo four&quot;
+  ]
+}
+</system-out>
+			<system-err>foo two
+foo four
+</system-err>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and nested_crossproduct join method" time="10.098820" class="scatter, workflow" file="wf_scatter_two_nested_crossproduct" url="cwltest:conformance_tests#37">
+			<failure type="failure">expected: {
+    &quot;out&quot;: [
+        [
+            &quot;foo one three&quot;,
+            &quot;foo one four&quot;
+        ],
+        [
+            &quot;foo two three&quot;,
+            &quot;foo two four&quot;
+        ]
+    ]
+}
+got: {
+    &quot;out&quot;: [
+        [
+            &quot;foo one three&quot;,
+            &quot;&quot;
+        ],
+        [
+            &quot;foo two three&quot;,
+            &quot;foo two four&quot;
+        ]
+    ]
+}
+caused by: failed comparison for key 'out': expected: [
+    [
+        &quot;foo one three&quot;,
+        &quot;foo one four&quot;
+    ],
+    [
+        &quot;foo two three&quot;,
+        &quot;foo two four&quot;
+    ]
+]
+got: [
+    [
+        &quot;foo one three&quot;,
+        &quot;&quot;
+    ],
+    [
+        &quot;foo two three&quot;,
+        &quot;foo two four&quot;
+    ]
+]
+caused by: expected: [
+    &quot;foo one three&quot;,
+    &quot;foo one four&quot;
+]
+got: [
+    &quot;foo one three&quot;,
+    &quot;&quot;
+]
+caused by: expected: &quot;foo one four&quot;
+got: &quot;&quot;</failure>
+			<system-out>{
+  &quot;out&quot;: [
+    [
+      &quot;foo one three&quot;,
+      &quot;&quot;
+    ],
+    [
+      &quot;foo two three&quot;,
+      &quot;foo two four&quot;
+    ]
+  ]
+}
+</system-out>
+			<system-err>foo two three
+</system-err>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and flat_crossproduct join method" time="10.077426" class="scatter, workflow" file="wf_scatter_two_flat_crossproduct" url="cwltest:conformance_tests#38">
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;foo one three&quot;,
+    &quot;foo one four&quot;,
+    &quot;foo two three&quot;,
+    &quot;foo two four&quot;
+  ]
+}
+</system-out>
+			<system-err>foo one four
+foo two four
+</system-err>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and dotproduct join method" time="10.066486" class="scatter, workflow" file="wf_scatter_two_dotproduct" url="cwltest:conformance_tests#39">
+			<failure type="failure">expected: {
+    &quot;out&quot;: [
+        &quot;foo one three&quot;,
+        &quot;foo two four&quot;
+    ]
+}
+got: {
+    &quot;out&quot;: [
+        &quot;&quot;,
+        &quot;foo two four&quot;
+    ]
+}
+caused by: failed comparison for key 'out': expected: [
+    &quot;foo one three&quot;,
+    &quot;foo two four&quot;
+]
+got: [
+    &quot;&quot;,
+    &quot;foo two four&quot;
+]
+caused by: expected: &quot;foo one three&quot;
+got: &quot;&quot;</failure>
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;&quot;,
+    &quot;foo two four&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with single empty list parameter" time="0.015776" class="scatter, workflow" file="wf_scatter_emptylist" url="cwltest:conformance_tests#40">
+			<system-out>{
+  &quot;out&quot;: []
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and nested_crossproduct join method with second list empty" time="0.015776" class="scatter, workflow" file="wf_scatter_nested_crossproduct_secondempty" url="cwltest:conformance_tests#41">
+			<system-out>{
+  &quot;out&quot;: [
+    [],
+    []
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and nested_crossproduct join method with first list empty" time="0.015788" class="scatter, workflow" file="wf_scatter_nested_crossproduct_firstempty" url="cwltest:conformance_tests#42">
+			<system-out>{
+  &quot;out&quot;: []
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters, one of which is empty and flat_crossproduct join method" time="0.015584" class="scatter, workflow" file="wf_scatter_flat_crossproduct_oneempty" url="cwltest:conformance_tests#43">
+			<system-out>{
+  &quot;out&quot;: []
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with two empty scatter parameters and dotproduct join method" time="0.015347" class="scatter, workflow" file="wf_scatter_dotproduct_twoempty" url="cwltest:conformance_tests#44">
+			<system-out>{
+  &quot;out&quot;: []
+}
+</system-out>
+		</testcase>
+		<testcase name="Test Any type input parameter" time="10.064938" class="required, command_line_tool" file="any_input_param" url="cwltest:conformance_tests#45">
+			<system-out>{
+  &quot;out&quot;: &quot;hello test env\n&quot;
+}
+</system-out>
+			<system-err>hello test env
+
+</system-err>
+		</testcase>
+		<testcase name="Test nested workflow" time="10.054754" class="subworkflow, workflow, inline_javascript" file="nested_workflow" url="cwltest:conformance_tests#46">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test requirement priority" time="10.099457" class="env_var, workflow" file="requirement_priority" url="cwltest:conformance_tests#47">
+			<system-out>{
+  &quot;out&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpnaup573p/out&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpnaup573p/out&quot;,
+    &quot;basename&quot;: &quot;out&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpnaup573p&quot;,
+    &quot;nameroot&quot;: &quot;out&quot;,
+    &quot;checksum&quot;: &quot;sha1$b3ec4ed1749c207e52b3a6d08c59f31d83bff519&quot;,
+    &quot;size&quot;: 15
+  }
+}
+</system-out>
+			<system-err>hello test env
+
+</system-err>
+		</testcase>
+		<testcase name="Test requirements override hints" time="10.066876" class="env_var, workflow" file="requirement_override_hints" url="cwltest:conformance_tests#48">
+			<system-out>{
+  &quot;out&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpkyruaf1t/out&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpkyruaf1t/out&quot;,
+    &quot;basename&quot;: &quot;out&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpkyruaf1t&quot;,
+    &quot;nameroot&quot;: &quot;out&quot;,
+    &quot;checksum&quot;: &quot;sha1$cdc1e84968261d6a7575b5305945471f8be199b6&quot;,
+    &quot;size&quot;: 9
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test requirements on workflow steps" time="10.069487" class="env_var, workflow" file="requirement_workflow_steps" url="cwltest:conformance_tests#49">
+			<system-out>{
+  &quot;out&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpq0mu1mn4/out&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpq0mu1mn4/out&quot;,
+    &quot;basename&quot;: &quot;out&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpq0mu1mn4&quot;,
+    &quot;nameroot&quot;: &quot;out&quot;,
+    &quot;checksum&quot;: &quot;sha1$cdc1e84968261d6a7575b5305945471f8be199b6&quot;,
+    &quot;size&quot;: 9
+  }
+}
+</system-out>
+			<system-err>override
+
+</system-err>
+		</testcase>
+		<testcase name="Test default value on step input parameter" time="10.060894" class="inline_javascript, workflow" file="step_input_default_value" url="cwltest:conformance_tests#50">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test use default value on step input parameter with empty source" time="10.085524" class="inline_javascript, workflow" file="step_input_default_value_nosource" url="cwltest:conformance_tests#51">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test use default value on step input parameter with null source" time="10.063570" class="inline_javascript, workflow" file="step_input_default_value_nullsource" url="cwltest:conformance_tests#52">
+			<failure type="failure">Command 'target/release/conformance --outdir=/tmp/tmp96ns33af --quiet testdata/cwl/tests/count-lines11-wf.cwl testdata/cwl/tests/file1-null.json' returned non-zero exit status 1.</failure>
+			<system-err>Error: Invalid value for count_output. One(CWLType(Int)) does not match Any(Null)
+</system-err>
+		</testcase>
+		<testcase name="Test default value on step input parameter overridden by provided source" time="10.055675" class="inline_javascript, workflow" file="step_input_default_value_overriden" url="cwltest:conformance_tests#53">
+			<system-out>{
+  &quot;count_output&quot;: 1
+}
+</system-out>
+			<system-err>1
+
+</system-err>
+		</testcase>
+		<testcase name="Test simple workflow" time="20.056821" class="required, workflow" file="wf_simple" url="cwltest:conformance_tests#54">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpuymbzevz/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpuymbzevz/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpuymbzevz&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$b9214658cc453331b62c2282b772a5c063dbd284&quot;,
+    &quot;size&quot;: 1111
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test unknown hints are ignored." time="10.054545" class="required, command_line_tool" file="hints_unknown_ignored" url="cwltest:conformance_tests#55">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpwpbcdq9w/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpwpbcdq9w/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpwpbcdq9w&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  }
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test InitialWorkDirRequirement linking input files and capturing secondaryFiles on input and output. Also tests the use of a variety of parameter references and expressions in the secondaryFiles field." time="20.067954" class="initial_work_dir, inline_javascript, workflow" file="initial_workdir_secondary_files_expr" url="cwltest:conformance_tests#56">
+			<system-out>{
+  &quot;outfile&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/result.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/result.txt&quot;,
+    &quot;basename&quot;: &quot;result.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+    &quot;nameroot&quot;: &quot;result&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$e2dc9daaef945ac15f01c238ed2f1660f60909a0&quot;,
+    &quot;size&quot;: 142
+  },
+  &quot;indexedfile&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt&quot;,
+    &quot;basename&quot;: &quot;input.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+    &quot;nameroot&quot;: &quot;input&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$327fc7aedf4f6b69a42a7c8b808dc5a7aff61376&quot;,
+    &quot;size&quot;: 1111,
+    &quot;secondaryFiles&quot;: [
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt.idx1&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt.idx1&quot;,
+        &quot;basename&quot;: &quot;input.txt.idx1&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;input.txt&quot;,
+        &quot;nameext&quot;: &quot;.idx1&quot;,
+        &quot;checksum&quot;: &quot;sha1$1f6fe811644355974cdd06d9eb695d6e859f3b44&quot;,
+        &quot;size&quot;: 1500
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.idx2&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.idx2&quot;,
+        &quot;basename&quot;: &quot;input.idx2&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;input&quot;,
+        &quot;nameext&quot;: &quot;.idx2&quot;,
+        &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+        &quot;size&quot;: 0
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt.idx3&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt.idx3&quot;,
+        &quot;basename&quot;: &quot;input.txt.idx3&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;input.txt&quot;,
+        &quot;nameext&quot;: &quot;.idx3&quot;,
+        &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+        &quot;size&quot;: 0
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt.idx4&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt.idx4&quot;,
+        &quot;basename&quot;: &quot;input.txt.idx4&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;input.txt&quot;,
+        &quot;nameext&quot;: &quot;.idx4&quot;,
+        &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+        &quot;size&quot;: 0
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt.idx5&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt.idx5&quot;,
+        &quot;basename&quot;: &quot;input.txt.idx5&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+        &quot;size&quot;: 0
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.idx6.txt&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.idx6.txt&quot;,
+        &quot;basename&quot;: &quot;input.idx6.txt&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;input.idx6&quot;,
+        &quot;nameext&quot;: &quot;.txt&quot;,
+        &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+        &quot;size&quot;: 0
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt.idx7&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt.idx7&quot;,
+        &quot;basename&quot;: &quot;input.txt.idx7&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;input.txt&quot;,
+        &quot;nameext&quot;: &quot;.idx7&quot;,
+        &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+        &quot;size&quot;: 0
+      },
+      {
+        &quot;class&quot;: &quot;File&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/hello.txt&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/hello.txt&quot;,
+        &quot;basename&quot;: &quot;hello.txt&quot;,
+        &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll&quot;,
+        &quot;nameroot&quot;: &quot;hello&quot;,
+        &quot;nameext&quot;: &quot;.txt&quot;,
+        &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+        &quot;size&quot;: 13,
+        &quot;secondaryFiles&quot;: []
+      },
+      {
+        &quot;class&quot;: &quot;Directory&quot;,
+        &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt_idx8&quot;,
+        &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt_idx8&quot;,
+        &quot;basename&quot;: &quot;input.txt_idx8&quot;,
+        &quot;listing&quot;: [
+          {
+            &quot;class&quot;: &quot;File&quot;,
+            &quot;location&quot;: &quot;file:///tmp/tmpk5y8m8ll/input.txt_idx8/index&quot;,
+            &quot;path&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt_idx8/index&quot;,
+            &quot;basename&quot;: &quot;index&quot;,
+            &quot;dirname&quot;: &quot;/tmp/tmpk5y8m8ll/input.txt_idx8&quot;,
+            &quot;nameroot&quot;: &quot;index&quot;,
+            &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+            &quot;size&quot;: 0
+          }
+        ]
+      }
+    ]
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test InitialWorkDirRequirement with expression in filename." time="10.060782" class="initial_work_dir, command_line_tool" file="rename" url="cwltest:conformance_tests#57">
+			<system-out>{
+  &quot;outfile&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpshlqmto5/fish.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpshlqmto5/fish.txt&quot;,
+    &quot;basename&quot;: &quot;fish.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpshlqmto5&quot;,
+    &quot;nameroot&quot;: &quot;fish&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$327fc7aedf4f6b69a42a7c8b808dc5a7aff61376&quot;,
+    &quot;size&quot;: 1111
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test if trailing newline is present in file entry in InitialWorkDir" time="10.052130" class="initial_work_dir, command_line_tool" file="initial_workdir_trailingnl" url="cwltest:conformance_tests#58">
+			<system-out>{
+  &quot;out&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmp6ig2q4qe/example.conf&quot;,
+    &quot;path&quot;: &quot;/tmp/tmp6ig2q4qe/example.conf&quot;,
+    &quot;basename&quot;: &quot;example.conf&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmp6ig2q4qe&quot;,
+    &quot;nameroot&quot;: &quot;example&quot;,
+    &quot;nameext&quot;: &quot;.conf&quot;,
+    &quot;checksum&quot;: &quot;sha1$6a47aa22b2a9d13a66a24b3ee5eaed95ce4753cf&quot;,
+    &quot;size&quot;: 16
+  }
+}
+</system-out>
+			<system-err>CONFIGVAR=hello
+
+</system-err>
+		</testcase>
+		<testcase name="Test inline expressions" time="10.057262" class="inline_javascript, command_line_tool" file="inline_expressions" url="cwltest:conformance_tests#59">
+			<system-out>{
+  &quot;output&quot;: 16
+}
+</system-out>
+			<system-err>  16  198 1111 /mnt/task/inputs/file1-stg09ad2916/whale.txt
+
+</system-err>
+		</testcase>
+		<testcase name="Test SchemaDefRequirement definition used in tool parameter" time="10.067065" class="schema_def, command_line_tool" file="schemadef_req_tool_param" url="cwltest:conformance_tests#60">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpmtlj_7kg/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpmtlj_7kg/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpmtlj_7kg&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$f12e6cfe70f3253f70b0dbde17c692e7fb0f1e5e&quot;,
+    &quot;size&quot;: 12
+  }
+}
+</system-out>
+			<system-err>hello/world
+
+</system-err>
+		</testcase>
+		<testcase name="Test SchemaDefRequirement definition used in workflow parameter" time="10.066302" class="schema_def, workflow" file="schemadef_req_wf_param" url="cwltest:conformance_tests#61">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmp59t99h24/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmp59t99h24/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmp59t99h24&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$f12e6cfe70f3253f70b0dbde17c692e7fb0f1e5e&quot;,
+    &quot;size&quot;: 12
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test parameter evaluation, no support for JS expressions" time="10.066716" class="required, command_line_tool" file="param_evaluation_noexpr" url="cwltest:conformance_tests#62">
+			<system-out>{
+  &quot;t23&quot;: &quot;true true&quot;,
+  &quot;t11&quot;: true,
+  &quot;t9&quot;: 2,
+  &quot;t18&quot;: &quot;zab1 zab1&quot;,
+  &quot;t25&quot;: &quot;b&quot;,
+  &quot;t13&quot;: &quot;-zab1&quot;,
+  &quot;t8&quot;: &quot;zab1&quot;,
+  &quot;t15&quot;: &quot;-zab1&quot;,
+  &quot;t12&quot;: null,
+  &quot;t6&quot;: &quot;zab1&quot;,
+  &quot;t16&quot;: &quot;-zab1&quot;,
+  &quot;t22&quot;: &quot;true true&quot;,
+  &quot;t14&quot;: &quot;-zab1&quot;,
+  &quot;t3&quot;: {
+    &quot;b az&quot;: 2,
+    &quot;b\&quot;az&quot;: null,
+    &quot;b'az&quot;: true,
+    &quot;baz&quot;: &quot;zab1&quot;,
+    &quot;buz&quot;: [
+      &quot;a&quot;,
+      &quot;b&quot;,
+      &quot;c&quot;
+    ]
+  },
+  &quot;t20&quot;: &quot;zab1 zab1&quot;,
+  &quot;t21&quot;: &quot;2 2&quot;,
+  &quot;t24&quot;: &quot;null null&quot;,
+  &quot;t26&quot;: &quot;b b&quot;,
+  &quot;t27&quot;: null,
+  &quot;t28&quot;: 3,
+  &quot;t5&quot;: &quot;zab1&quot;,
+  &quot;t2&quot;: {
+    &quot;b az&quot;: 2,
+    &quot;b\&quot;az&quot;: null,
+    &quot;b'az&quot;: true,
+    &quot;baz&quot;: &quot;zab1&quot;,
+    &quot;buz&quot;: [
+      &quot;a&quot;,
+      &quot;b&quot;,
+      &quot;c&quot;
+    ]
+  },
+  &quot;t7&quot;: &quot;zab1&quot;,
+  &quot;t1&quot;: {
+    &quot;bar&quot;: {
+      &quot;b az&quot;: 2,
+      &quot;b\&quot;az&quot;: null,
+      &quot;b'az&quot;: true,
+      &quot;baz&quot;: &quot;zab1&quot;,
+      &quot;buz&quot;: [
+        &quot;a&quot;,
+        &quot;b&quot;,
+        &quot;c&quot;
+      ]
+    }
+  },
+  &quot;t4&quot;: {
+    &quot;b az&quot;: 2,
+    &quot;b\&quot;az&quot;: null,
+    &quot;b'az&quot;: true,
+    &quot;baz&quot;: &quot;zab1&quot;,
+    &quot;buz&quot;: [
+      &quot;a&quot;,
+      &quot;b&quot;,
+      &quot;c&quot;
+    ]
+  },
+  &quot;t17&quot;: &quot;zab1 zab1&quot;,
+  &quot;t10&quot;: true,
+  &quot;t19&quot;: &quot;zab1 zab1&quot;
+}
+</system-out>
+		</testcase>
+		<testcase name="Test parameter evaluation, with support for JS expressions" time="10.067591" class="inline_javascript, command_line_tool" file="param_evaluation_expr" url="cwltest:conformance_tests#63">
+			<system-out>{
+  &quot;t27&quot;: null,
+  &quot;t14&quot;: &quot;-zab1&quot;,
+  &quot;t28&quot;: 3,
+  &quot;t23&quot;: &quot;true true&quot;,
+  &quot;t9&quot;: 2,
+  &quot;t11&quot;: true,
+  &quot;t17&quot;: &quot;zab1 zab1&quot;,
+  &quot;t4&quot;: {
+    &quot;b az&quot;: 2,
+    &quot;b\&quot;az&quot;: null,
+    &quot;b'az&quot;: true,
+    &quot;baz&quot;: &quot;zab1&quot;,
+    &quot;buz&quot;: [
+      &quot;a&quot;,
+      &quot;b&quot;,
+      &quot;c&quot;
+    ]
+  },
+  &quot;t10&quot;: true,
+  &quot;t21&quot;: &quot;2 2&quot;,
+  &quot;t5&quot;: &quot;zab1&quot;,
+  &quot;t18&quot;: &quot;zab1 zab1&quot;,
+  &quot;t22&quot;: &quot;true true&quot;,
+  &quot;t7&quot;: &quot;zab1&quot;,
+  &quot;t1&quot;: {
+    &quot;bar&quot;: {
+      &quot;b az&quot;: 2,
+      &quot;b\&quot;az&quot;: null,
+      &quot;b'az&quot;: true,
+      &quot;baz&quot;: &quot;zab1&quot;,
+      &quot;buz&quot;: [
+        &quot;a&quot;,
+        &quot;b&quot;,
+        &quot;c&quot;
+      ]
+    }
+  },
+  &quot;t12&quot;: null,
+  &quot;t19&quot;: &quot;zab1 zab1&quot;,
+  &quot;t8&quot;: &quot;zab1&quot;,
+  &quot;t15&quot;: &quot;-zab1&quot;,
+  &quot;t20&quot;: &quot;zab1 zab1&quot;,
+  &quot;t24&quot;: &quot;null null&quot;,
+  &quot;t13&quot;: &quot;-zab1&quot;,
+  &quot;t3&quot;: {
+    &quot;b az&quot;: 2,
+    &quot;b\&quot;az&quot;: null,
+    &quot;b'az&quot;: true,
+    &quot;baz&quot;: &quot;zab1&quot;,
+    &quot;buz&quot;: [
+      &quot;a&quot;,
+      &quot;b&quot;,
+      &quot;c&quot;
+    ]
+  },
+  &quot;t16&quot;: &quot;-zab1&quot;,
+  &quot;t2&quot;: {
+    &quot;b az&quot;: 2,
+    &quot;b\&quot;az&quot;: null,
+    &quot;b'az&quot;: true,
+    &quot;baz&quot;: &quot;zab1&quot;,
+    &quot;buz&quot;: [
+      &quot;a&quot;,
+      &quot;b&quot;,
+      &quot;c&quot;
+    ]
+  },
+  &quot;t6&quot;: &quot;zab1&quot;,
+  &quot;t25&quot;: &quot;b&quot;,
+  &quot;t26&quot;: &quot;b b&quot;
+}
+</system-out>
+		</testcase>
+		<testcase name="Test metadata" time="10.059751" class="required, command_line_tool" file="metadata" url="cwltest:conformance_tests#64">
+			<system-out>{}
+</system-out>
+		</testcase>
+		<testcase name="Test simple format checking." time="10.053890" class="required, command_line_tool" file="format_checking" url="cwltest:conformance_tests#65">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpdoauojb1/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpdoauojb1/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpdoauojb1&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$97fe1b50b4582cebc7d853796ebd62e3e163aa3f&quot;,
+    &quot;size&quot;: 1111,
+    &quot;format&quot;: &quot;http://edamontology.org/format_2330&quot;
+  }
+}
+</system-out>
+			<system-err>gnivah--ylesicerp gnol woh dnim reven--oga sraey emoS .leamhsI em llaC
+no em tseretni ot ralucitrap gnihton dna ,esrup ym ni yenom on ro elttil
+fo trap yretaw eht ees dna elttil a tuoba lias dluow I thguoht I ,erohs
+gnitaluger dna neelps eht ffo gnivird fo evah I yaw a si tI .dlrow eht
+;htuom eht tuoba mirg gniworg flesym dnif I revenehW .noitalucric eht
+dnif I revenehw ;luos ym ni rebmevoN ylzzird ,pmad a si ti revenehw
+pu gnignirb dna ,sesuoheraw niffoc erofeb gnisuap yliratnulovni flesym
+teg sopyh ym revenehw yllaicepse dna ;teem I larenuf yreve fo raer eht
+ot elpicnirp larom gnorts a seriuqer ti taht ,em fo dnah reppu na hcus
+yllacidohtem dna ,teerts eht otni gnippets yletarebiled morf em tneverp
+aes ot teg ot emit hgih ti tnuocca I ,neht--ffo stah s'elpoep gnikconk
+a htiW .llab dna lotsip rof etutitsbus ym si sihT .nac I sa noos sa
+ylteiuq I ;drows sih nopu flesmih sworht otaC hsiruolf lacihposolihp
+wenk tub yeht fI .siht ni gnisirprus gnihton si erehT .pihs eht ot ekat
+yrev hsirehc ,rehto ro emit emos ,eerged rieht ni nem lla tsomla ,ti
+.em htiw naeco eht sdrawot sgnileef emas eht ylraen
+
+</system-err>
+		</testcase>
+		<testcase name="Test format checking against ontology using subclassOf." time="10.070060" class="required, command_line_tool" file="format_checking_subclass" url="cwltest:conformance_tests#66">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpdwgi42r9/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpdwgi42r9/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpdwgi42r9&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$971d88faeda85a796752ecf752b7e2e34f1337ce&quot;,
+    &quot;size&quot;: 12010,
+    &quot;format&quot;: &quot;http://edamontology.org/format_1929&quot;
+  }
+}
+</system-out>
+			<system-err>86411$1009$1rhc$0&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTATTAGGCGGTCATGACAACCTCGTTCTCCCGGGCCGTCACAGGGGTCGACGGTCGTCCACCCGCACGACGGTGATGTGGAACTCGTTCTCCTGGGACGTTACAGGGATCGACGGTCGTCCGCCGCACGGTGGTGATATGTCATTCGTTCTCCCGGGACGTCACGGGGCCGCGGTCGTCCCCCGCGACCGGTGGTGAGATTCGTTCTCTCGGGACGTCAACGGGATCAGCGGTCGTCCCCCGCGGGACCGTGTCGTGGCACTCGTTCGCCCAGGACATCACGGGCCGACGTTCGTTCCCCGCCAGCTAGGGCCGAAAAGCCTAATGACTCCAAGATGGGCAGAGACGCGGCGCGGTGGCACTGCACTCAAAGACGCGCACGTGCCGCGGTGGGAGGGGGGCGGGGTCGGGCCGCGGCACGCTGAAACGAGGACGTTGTGTGCGGGGGGGTTGGGGGCGGGCATCCGAACGCAGAGACGCGGACGCGGTGCGGAGGTGGGGACCTGCGCGATCGTACACAGAGACGCGGACGCGGCCGCGCCACGCGGAGAGACGCGGACGCGGTGCGGAGGTGGGGACCTGCGCCATCGTACACAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGTGCGGAGGTGGGGCTGCGCGATCGTACACAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAAACGTTGCCGCCTCAACGCAAGAGGAGTCGTGTCTGGGCCTCTCGTGGCGCTCCCGCCTCGACGCAACAGGAGACGTGTCTAAAGCCACCATGAGACTTCCGCCTCGTGTCAAGAGGAGTCCAGTCTGGGCCCGCCCGCCCGGCCGACTCCCATGGCGCTCCCAATCCCAATCCCAATCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCATCCCAATCCCAATCCCAATCCCCAATCCCAACCCCAACCCCAACCCCAACCCCAACCCCAACCCCAATCCCAATCCCAATCCCAATCCCAATCCCAAATCCCAAATCCCAATCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCAATCCCAATCCCAATCCCAATCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAACCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+71855$31735$1rhc$1&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTGCTGTTTCAGGACGAGTACAACTTGAATTTTACGTTACTCCTTCTGTAGTGACTTACTTTTTAAAACTCCCGACAATCAGAATGTTTTCTCCATTATCCATCACGATCTCCTTATATGTTACCTTCCTTGAGAAGACCTGAGTCCAAGACCCTCCGGAGGGACCATTTTACTACTTTGACTTTCGACTCTACAATTCTCCGTTTTGTACTTCCTGTTTATAACATATGTTTTACTAATCGATCACCTTTCGGGGTCTCAACTATCTAAAACCTCAAAGGTCCGTTCATTTTCTTTTGGTTTAACCTAGACCTCAACGTCCCTTTCTCATACAATAAGAGACTCTGACTTTTTTTCCTTCCTTCGGTCCAGAACCTACCGGATGATATGGTACTATTGTATGGTCAAATTCCCGTGTCTTCGTTCACTTCACAGAAGTCGTTTTCTTAATGTATGAATCTAATTTTTAAAAAAAAGAAAATGACTTCGCATTTATCATCCTAAAATTCACCCTTCCAGCGTATCCACTGATATAAGAGAAGGTTTTTACTGTATCCATCCGAATCTGTCCTTATCACCACAATGTCTACTTTTATTTCCTTGTATACATTCCGAGAAACCTTCCATCTTATTCTGAACTACTAAATAACTAAACCCCCATGATACCTCTTTCTTTAGATAATAAAAAGGGTCTAAAACCCAACACGTTGATCCATTGATCAACCATGTTTAATAACACTGACTCTTGTGACTTTCTTCTCATCCAAACTTTTCTCCTTCCGATCAAATCAACGTCTGAACAACTCACCTTCTAGAACACACCGTAGGTCCTTTCATCCTCCAATCTAGACACCTAGTCCTTGAGTTCTTTATCATGGTCCCAGTCCACGTTACCGAACAGGGACATAAGAGTCGATGAACCCTCCGACTTCGTCTGTCTAACGAACTCCAGTCCTCAAACTCTGGTCGGAGTCGTTGTATCACTCTGGGACGGGGAATTTTTTCTTTCTTTCTTACTTTCTTTCTTTTCCTTTCTTTTCCTCCTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTTTATGTTCCAAACTCTCGGGGATCACAAATCTACCACTAATTTCGACACCCTTACCCACTATGCATCCCTATCTTAGATTCACTTTTGTCCGGTTTCTAGTTTAATCCCCGTTATCCAACTAACCATCAATTCGTCTACTCCTTGTGAGTTGTTTTCTGTGTCCCTTCCTGAACGGGTCCTCCATCCTCTTTTTCGGTCCTTCGACACCACAAGGTCTTCGGGCCATCTCATAAACTTCTACCCCCTCTAATCGTCGTTAATTCTCTTCTTTAAGGGTAAGTATACTCACTATTTCGTTAATTCATCTTATTGAATCCTTCCAAGAACCTCTTAGTGTCCTGTTTTATCGTATCCATGCCAAAGAGAATTAACTCGACAATATTAAATGTTTCGTCATCTTTGTTTATGTACTTTTTTCATACACATTGAAGTTATCTCAAAAATAAAACTTACGTCTTTAGAAGTTACTTTAACTTATACGGAGTGGTAAAGATCGAAATAAGAATAGGGTTTTATAGTTGGTGTCTACGTATTCGAGGTCCCTTAGAAAACGGACTGATCTTTTGGAATAAATTCTTTGGTCATGGAGATTTGTGTATAGGAACCCGCTAATCAGAGGACACTTTGTTGACAATAAAGATGTGTAGATAAATCTTATTTGAACCTACCAACTGAAAACCTTACAAGAGTAAAAATCTTATTATCTCTACATCCTTTTTCACTTTTACGAGACAGACATAGATAAATTTCAGAACTGTCGTAATTTCTTTAAATAAGAGAAGGACGTTAGTGAGTTTAGACTCGTGTTTTGACTTTATCGTAGCATTTGACTGTTTCGAGTTCCATTTCAGTTTAGAGTCAAGTCCCGAAACGTGTGCATAATGTATCAACAAAAACAAAGAATAAGATTAAATTTGTCTTTAATTTTACCTTTAAAATTTTTATATGAAATAATTAAATATTAAATGGATTCAAGTGTAAAATAAATAAGGTAGATANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+03676$16156$1rhc$2&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTTATTTTCCACAGGACTTTCACTCTGTATCGGTATAATTGTTAGAAACCTAATCCATATTCTCAATTACCCGTTCATTCTACATTTTCTCTCTTCACCTTTAACTAGTGATTGTAAGGTGCCCTCTGTACTTCCATATCTCAAATGTGAACGGTAGAAAAAACCTCCTTATGACAATAAACTAAAAACGACAAAAAATTTCTTGTCATTAAGTATCACGAACCTTTAAGGTGAAAAGAGAAATGATGAGACTTAGGGTAAAGAATCAGGATGTGTGAGTTTCGTCGTGTAATGACAAAAATTTCAGGATATTTTTAAATCACTAGAATTTATAAAAATTCTTATTTCTCTTCAGATTATCACCTTATTTAGTACTTGTAAGTGAAGTAAAGAGAAGACGAATCGTGCCATTATTTATATTAGTATGATTAGTAACTGTCATGTTTGCTATCCTAAAAATAACACTCTATTAAAGACAGGACTGACCAACCAACCTGACAAAGAAAACTTAGTTTCACACGTTAAATCTTATCTGGAATTTATACGTAACTGTATTTTAATTAAGTAAAGTAACTATCCGTTCCTGTTAGAACTTCAATATAGAAGTGTACTTTATACGGTTCCTACTCCAACTGGGCTCCCAAGAGTAGACATCGTTTTCTGAAAGATAGTACCGACAATCATTCTTAAGTCCTTACGATAAGAAATCGTTTTCCTTAAAGAACGATTGCATCAATTCTGTAGAGAGAGGACTTAAACACGACGACTCCCCTAGGAAGTGGTGGTATTAAGAAAGTTTCGAGTAAAGACTGAAAAATTTTTAATAAGTTTTTTTTAATCTTCTTAACATAAATAAGATTCAACTTGTAATTCAAATCCGAATAATTTCCTCAGGAAGTCTTAGAATGTGTGAGTAACATCGTTGGTACTTCTCGGTCGGTGACAACTGTCCATTTTAGAAAGTACGGTATCTAATAAGAACCTTAAGTTGGTAATCTTAATATATATTATATATATAAATATATTATATATTTATATAAATATATTATATATAATATGTATAAAATATATTATTATATACAATATATATTTATATTATATATAATATATTATATATAATATATTATTTTATATATAATATAAGATATTTATATATTATATATAATATATTATTTTATATATAATATATTATATTATATATAAATATATTATTTTATATAATATAATATATTATATATAATATAATATATTAAATATATAATATAAATATATTATATATAATATAATATATTATTTTATATATAATATAAATATATTAAATATAATATAAATATAATATATAATATATTATATTAAATATAATATAAATATAATATATAATATATTATATTATATATAATATATTATATATAATATATATATTATACATTATATATATTTATATATCATATATATTATATATATATATATTTACGGAATACAGGAATATCATTCAGAGTCACTCTACCCTCATCCGTAAACCCAAGACCGTGTTTAAGTGTCACACTAGTACCCTTATAGTAAATTTTTAGAGACCCGGAATCGAAAGGACAAAAATTTTACTCAAATAAGAAAGTTTTCGACATTTTTAGGAGTGTTGAGATCGTCATACTAAACATGGAAATACACTTTCTTTACGAGGTTTGGTTCAAAGTGACCATAATATTTTTCCTCCCTTCCTCCACCCATTCTTTTGTGGCCTGGACCCCTTTCTACCCCTTTTCCTGATAATTTACCCCTCTTTTCTTGTTTAATCGGGTCTTCTCACTCCTCCTCCTGAGCTGTTAACAACGGTCGTATTATGAATATTGTTCCCAATAAGAACGATTGTAATAAGTATAATTAAAGAGATTCATAAATTCAATTGGTATGTCTTAGGAAAGTAAAAAGGTCTTCCATTTGTGTTTTACCTTAATACGTCTTATCTAAGGATGATTATCTTGGTAGAGTAACAGTTATTTTACGATGTTAAAGTAAGTAAGAAGATTATATACACAAAACAGAAACAAAGGTGGATGGAAGAAGTATTGACCTTCTCTGATGTCGTTAAAAGTGTCTTACTCCGTATTTTTGACATTCTCTTATTATACATCACTTAACAGGAAAAATCATTTGGTGAACCAATTAATTTTCGGGAAATACTTACCTGATCTACATGGACTTCTCTAGACCCTTATCGGTCAGACTCGAAACACATGACTCTGATTGAAAATATCAGAGTGTTCAAAAGGGAACCGGTAATCTCTTTTGTGTGTCTTAAAAGGACTCACTCTCCTGTAACGGTGTTAAAAAACCGGATAAACCTATAAAAACGATAGAGTGACTCAGATTTCCACGAAAAATTTCTTAGTGTCGTTTTGTTTATATTATTTCAATGTTTTAATTTTAGGTCTATCCAATTGTTCTCTCATTCATTATTACGAAGCTAAANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+14058$29728$1rhc$3&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTCAACCCAAAAGTTTACGGGTTGTTAAAAGCACCTTAACAGACAGAGAGGGAAATTAAGAGAGTTACCAATGTAATATATAAAACCTCGGGACAATCAACCACATGTATATAAATATTAACAATATAGAAGAATTAATTAAAACTTTAGTTATATATGACAAGAAACATAAAACATTGTCAAAAACTGAATTTCAGATAAAACAGACTATATTCATATAAACGGAGTCTAGAGGAAACCAATAATGAATGTACCTTATAAAAGAGGGTAGGAAAGTAAAGTTGAGTAACACATAAAACTAGATTTCACTCATAGAACACCTGTTATATCAACCTAGTAAAAATTTTTTAGGTAAGACAATTAGAGAAAGAAACCTAACCTCTCAAATTAAGTAAACATAAATTACATTAATGACTATTTCTCCCCGAATGAGGATGGTAAAACGAAAACAAAAGACATACAGAATATGGAGGAAACAAGGATTAAAGGAGTTAATAGCGGAAGAAAACACAAATCAACGATAAAACATCGTATAGTGACACAAATGGGACACGAAAGGAAAAGACATAAAAGTTTTCTATAATTGAATCACCAATGGTACCCCTAAATGTTAATTGTAAGAATTAAACCTTGTTAAATCTCATTTAACTTTGTTGAAGTTATCATATGTTTTAGAGATAATAATAAATCAAAGGATACTTAAAGAAATACAACCATTAAAGTGTTTGGTGTAGACATATGTAGTACGAAGTAATTGTATCTAAATATCAGTAATAAAATGTGTAAACAAAATTTTGTATATCTTATAATTTTTTCTGAATGTTTTTTACACTATTAACGAAAATATAAATGGATACATCAATAGAAATGACCTCAATAAAGAAATACACCAAAACTCAATGAAAGATCACAAAAAATCAAACATAGACTTCCTCAGAAAAAAAATTTTCACATAGAACTTCATGTCGGATGGTTTGTACTTGAAAATTTCGAACGAACGAAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAAAGAAAGAAAAAAGAAAGAAAGAAAGAAAGGAAGAAAAAGAAAGAGAGAGAAAGAGAGAGAGAAAGAAAGAAAGAAAGAGAAAGAAGAAAGAAAGAAAGAGAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAGAAAGAAAGAAAGAGAAAGAGAGAGAGAGAGAAAGAAAAAAAATTAGACCCTTACACATTAAATAGGAATTATGAACTTCCCCGTAGAAGGTTCAATATCTTAAAAACCAACTGTCACAAAAAAAGAAAGTCTTGAAATTTTACAGTAGGATTCGAGAAGACCGTGGGTACCAAATATTACTCGAGAGACGACAGTTTGAATGACTCCTAGGAAACATTTACTGCGCAACGGAAAAAGGATTCGAGAAGACCGTAGGTACCGAATATTACGTGATAGACGACAGTTTGAATAACTCCTAGGAAACATTTACTGCGCAACGGAAAGAGAACGACGAAAGTTTGTAAGCGAAACGGAAAACTGTTAAACTTTGTATCACACAGAACCACACTTATAGAAACATATAAAGGAACTACTTCAAGTGACTCGAAAAACTTACATATATAAACAAAAATCACTTTAAACCCTTCGAAAGTTTGTGTAAAGAAGTTTATCAGAAGGACGGGGAGTGAGGGGTGGTCCTAAGACATACATCCGTAAGAACTACAACAATGTGTCCAGAAATCCGAGATAAGAAAAAACAACAGTAAGAAAGTAAAAGGACGAGAAGTCTGACTTAGTAAAGTAAACTAGATAGTTCAAGTGACTAAGAAAAAAGGTCGACGAGTTTAGAAGATAACCTTGGGATTCATTTTTCATTGAAAAATGAATAACATGAAAAGTCGGAGTCTTAAAAAAACATGGAAATTTTTTTAAGTATAAAGAATAAATAAATATACAGTAAGAGAACCCAAAGAAATCGAGAAATTCAAATAAATTCTGTCAATATATTTCAAAAACAGATTATAAAAGTTATAGACGAATGAGTCCCTCTCAGAGTAAATAAAGAAGACATTTACCCGGTATCAAAACACAAATAAACGTACGAAGAATTAAAAACAACTTTTGACCTGTAAAACCTATAATATTACACAAATAAGACCTTTGGTTTAAAAAGGGAAGAAGTTCCAATAAAAACAATGGGTGACACCCTACATCANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+611001$00089$1rhc$4&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTCTCAGACATGATCCGTACCGCTACGAATGTACAGTCGGACACACTGACGTTCTCAGAGTCATGTTAAACTATTGTACCGTGAGTCTAAGATCTGTAATAAGAGACACACGAATCACTCACACTACTGTATTGGAAGTCTTTCTAAGTAGGAAAGAGTGTATAACTATTTAGTTGAAAATGTAGATGTTTCAACTCTCGGTCTTTAATTTTGGAATAATTAAGTGATTCCGTAGGGATACTGCCGTCAGAAGGTTGATCGAGGTAAGACCCCGTGAGACTGTAGTAATATGTGAAAGGTTACTTTCGTCCCTCACATACACTAATTTCCCTCTCGGGACACCGTGAGGACTTTTTAGAGGGGAGGGTCAAGTGTAACTGAATAATTGGTTGTGAGTGCTAGTACACTTTGAGATCTTGACCTAGACCCACGGACCGTCCTACTGTACCACACTCCGAGTTCGTCGTGACACCCTTAAGTTCGTAGACGAATAAAGACTCTCTTTTTCACATTTCGTTTTATTATAGAAAATTGTTTGCAAACATAAACTGATTTCTCCTTCGTTCGTGAATTAAATACTTAAACGATTAACGAGAAGACTCGACTCTTATAGACACAACCTATAATCAGTAATAGGTATAAACCGTGTCTTATTAGGGCTCCCAATTTACTGTAACAAGGATGTCACCCGTGGACTTCTGACCGACATTTTCGTTAGGACCGGTCCCCGCCACCGAGTGCGGACATTAGGGTCGTGAAACCCTCCGGTTGCACCCACCTAGTACTCCAGTCCTCAAACTCTGGTCGGACCGGTTGTATCACTTTGGAGTAGAGATGATTTTTATGTTTTTTTAATCGATCCGTGCCACCGTCTGTGGACATTAGGGTCGATGAACCCGCCGACTCCGTCCTCTTAGTGAACTTGGACCCTCCGTCTTCAACGTCACTCAGCTCTAACGTGGTTACGTGAGGTCGGGTCCACTGTCACACTCTGAGACAGGTTTTTTTTTTTTTTTTTTTTTTTTCTTTCTTTTCTTTTTTTTTTCTTCTTTTTTTCTCTTTCTTTTTTTTCCTTTTTATTTATTTATTTATTTATTTATTTATTTATTTATTTATTTTCGTTGGGATTGTGATGACTCCGATAACTGTCACCGTGAAACGAGAAGACAATCCTGGAACCCTTTTAAAAAAGGGGGACTTATGTCATATTATTTGAACCAAGAATAAAGAGAAAGAGAGGGGGAGGAAAAAAGAAGGGAGGGGTGATGGTGTACGTGTGTGTGTTTATCTGTCTAAACAAATATAAACTGAAAGATTTTTGGACAATGATCTTTCCGTGTAATTATGTAAAGAGGACACGACTATCATTAGTCCGTTGAGACCAAAGATAACCTCCGTTAAAGAATGCATAATTTACGGTCTTTTTCCCGTAGGGAGGCAAAAACATCTCTCGGAAAGAAATACTTCTGATTACTGGTGTAATCAATCAGTCAGTCAGTTATTATGAATGGTTTACAGTCATCTCGACTTCACTTGTGGTTGTCTTTTAGTGTAAAATGTTTACGTTAAATGAACCATAGGATTGTACGGTACAGTATTATTAATAACTCCGAAAAGAAGAGACGACGTAACCAGATTACTTTCACCGATCTTTTTATACCCACGGGTACATCGGAGGACCTTCGTGGACATACTGAAAAGATCTTCGCTCCAAGGACCTATTTCTACTTAAAAATTTTTGACCTTACTTACTCGTCGTTATCGTCTTCCTCTTTTCACTCACTCCCGAGAGGTTCTTCGGTAGACCGTCCGATTCCCAAGACTCCCTTCGAGACCAAAGTCTTCGTTGAGTCCTTAATGAAGACAGTATAATCCTACCCTACCATCCTCTAACCCTTGAGATCCCTGATCTTCAGTAAATTAAAGGACAGATGTTAGGAATCTTCTCCAAAACTCTGAACGTTGGATCCTGGAATTGATCAGTAGAAGGGAGTCGTAACTATCTTAAGAAATAATATGTACAATTATAGTCTAATCAGTCCTACCCGACCTAATACGACACAATTGTCGGTAAGAGATTTAGAGACACCGAGTTGTCCCTCGAGACGGACAGTACCNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+
+</system-err>
+		</testcase>
+		<testcase name="Test format checking against ontology using equivalentClass." time="10.065314" class="required, command_line_tool" file="format_checking_equivalentclass" url="cwltest:conformance_tests#67">
+			<system-out>{
+  &quot;output&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmp6ycvm5tk/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmp6ycvm5tk/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmp6ycvm5tk&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$971d88faeda85a796752ecf752b7e2e34f1337ce&quot;,
+    &quot;size&quot;: 12010,
+    &quot;format&quot;: &quot;http://edamontology.org/format_1929&quot;
+  }
+}
+</system-out>
+			<system-err>86411$1009$1rhc$0&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTATTAGGCGGTCATGACAACCTCGTTCTCCCGGGCCGTCACAGGGGTCGACGGTCGTCCACCCGCACGACGGTGATGTGGAACTCGTTCTCCTGGGACGTTACAGGGATCGACGGTCGTCCGCCGCACGGTGGTGATATGTCATTCGTTCTCCCGGGACGTCACGGGGCCGCGGTCGTCCCCCGCGACCGGTGGTGAGATTCGTTCTCTCGGGACGTCAACGGGATCAGCGGTCGTCCCCCGCGGGACCGTGTCGTGGCACTCGTTCGCCCAGGACATCACGGGCCGACGTTCGTTCCCCGCCAGCTAGGGCCGAAAAGCCTAATGACTCCAAGATGGGCAGAGACGCGGCGCGGTGGCACTGCACTCAAAGACGCGCACGTGCCGCGGTGGGAGGGGGGCGGGGTCGGGCCGCGGCACGCTGAAACGAGGACGTTGTGTGCGGGGGGGTTGGGGGCGGGCATCCGAACGCAGAGACGCGGACGCGGTGCGGAGGTGGGGACCTGCGCGATCGTACACAGAGACGCGGACGCGGCCGCGCCACGCGGAGAGACGCGGACGCGGTGCGGAGGTGGGGACCTGCGCCATCGTACACAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGTGCGGAGGTGGGGCTGCGCGATCGTACACAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAGAGACGCGGACGCGGCCGCGCCGCGCGGAAACGTTGCCGCCTCAACGCAAGAGGAGTCGTGTCTGGGCCTCTCGTGGCGCTCCCGCCTCGACGCAACAGGAGACGTGTCTAAAGCCACCATGAGACTTCCGCCTCGTGTCAAGAGGAGTCCAGTCTGGGCCCGCCCGCCCGGCCGACTCCCATGGCGCTCCCAATCCCAATCCCAATCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCATCCCAATCCCAATCCCAATCCCCAATCCCAACCCCAACCCCAACCCCAACCCCAACCCCAACCCCAATCCCAATCCCAATCCCAATCCCAATCCCAAATCCCAAATCCCAATCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCAATCCCAATCCCAATCCCAATCCCAATCCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAACCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATCCCAATNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+71855$31735$1rhc$1&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTGCTGTTTCAGGACGAGTACAACTTGAATTTTACGTTACTCCTTCTGTAGTGACTTACTTTTTAAAACTCCCGACAATCAGAATGTTTTCTCCATTATCCATCACGATCTCCTTATATGTTACCTTCCTTGAGAAGACCTGAGTCCAAGACCCTCCGGAGGGACCATTTTACTACTTTGACTTTCGACTCTACAATTCTCCGTTTTGTACTTCCTGTTTATAACATATGTTTTACTAATCGATCACCTTTCGGGGTCTCAACTATCTAAAACCTCAAAGGTCCGTTCATTTTCTTTTGGTTTAACCTAGACCTCAACGTCCCTTTCTCATACAATAAGAGACTCTGACTTTTTTTCCTTCCTTCGGTCCAGAACCTACCGGATGATATGGTACTATTGTATGGTCAAATTCCCGTGTCTTCGTTCACTTCACAGAAGTCGTTTTCTTAATGTATGAATCTAATTTTTAAAAAAAAGAAAATGACTTCGCATTTATCATCCTAAAATTCACCCTTCCAGCGTATCCACTGATATAAGAGAAGGTTTTTACTGTATCCATCCGAATCTGTCCTTATCACCACAATGTCTACTTTTATTTCCTTGTATACATTCCGAGAAACCTTCCATCTTATTCTGAACTACTAAATAACTAAACCCCCATGATACCTCTTTCTTTAGATAATAAAAAGGGTCTAAAACCCAACACGTTGATCCATTGATCAACCATGTTTAATAACACTGACTCTTGTGACTTTCTTCTCATCCAAACTTTTCTCCTTCCGATCAAATCAACGTCTGAACAACTCACCTTCTAGAACACACCGTAGGTCCTTTCATCCTCCAATCTAGACACCTAGTCCTTGAGTTCTTTATCATGGTCCCAGTCCACGTTACCGAACAGGGACATAAGAGTCGATGAACCCTCCGACTTCGTCTGTCTAACGAACTCCAGTCCTCAAACTCTGGTCGGAGTCGTTGTATCACTCTGGGACGGGGAATTTTTTCTTTCTTTCTTACTTTCTTTCTTTTCCTTTCTTTTCCTCCTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTCTTTTTATGTTCCAAACTCTCGGGGATCACAAATCTACCACTAATTTCGACACCCTTACCCACTATGCATCCCTATCTTAGATTCACTTTTGTCCGGTTTCTAGTTTAATCCCCGTTATCCAACTAACCATCAATTCGTCTACTCCTTGTGAGTTGTTTTCTGTGTCCCTTCCTGAACGGGTCCTCCATCCTCTTTTTCGGTCCTTCGACACCACAAGGTCTTCGGGCCATCTCATAAACTTCTACCCCCTCTAATCGTCGTTAATTCTCTTCTTTAAGGGTAAGTATACTCACTATTTCGTTAATTCATCTTATTGAATCCTTCCAAGAACCTCTTAGTGTCCTGTTTTATCGTATCCATGCCAAAGAGAATTAACTCGACAATATTAAATGTTTCGTCATCTTTGTTTATGTACTTTTTTCATACACATTGAAGTTATCTCAAAAATAAAACTTACGTCTTTAGAAGTTACTTTAACTTATACGGAGTGGTAAAGATCGAAATAAGAATAGGGTTTTATAGTTGGTGTCTACGTATTCGAGGTCCCTTAGAAAACGGACTGATCTTTTGGAATAAATTCTTTGGTCATGGAGATTTGTGTATAGGAACCCGCTAATCAGAGGACACTTTGTTGACAATAAAGATGTGTAGATAAATCTTATTTGAACCTACCAACTGAAAACCTTACAAGAGTAAAAATCTTATTATCTCTACATCCTTTTTCACTTTTACGAGACAGACATAGATAAATTTCAGAACTGTCGTAATTTCTTTAAATAAGAGAAGGACGTTAGTGAGTTTAGACTCGTGTTTTGACTTTATCGTAGCATTTGACTGTTTCGAGTTCCATTTCAGTTTAGAGTCAAGTCCCGAAACGTGTGCATAATGTATCAACAAAAACAAAGAATAAGATTAAATTTGTCTTTAATTTTACCTTTAAAATTTTTATATGAAATAATTAAATATTAAATGGATTCAAGTGTAAAATAAATAAGGTAGATANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+03676$16156$1rhc$2&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTTTATTTTCCACAGGACTTTCACTCTGTATCGGTATAATTGTTAGAAACCTAATCCATATTCTCAATTACCCGTTCATTCTACATTTTCTCTCTTCACCTTTAACTAGTGATTGTAAGGTGCCCTCTGTACTTCCATATCTCAAATGTGAACGGTAGAAAAAACCTCCTTATGACAATAAACTAAAAACGACAAAAAATTTCTTGTCATTAAGTATCACGAACCTTTAAGGTGAAAAGAGAAATGATGAGACTTAGGGTAAAGAATCAGGATGTGTGAGTTTCGTCGTGTAATGACAAAAATTTCAGGATATTTTTAAATCACTAGAATTTATAAAAATTCTTATTTCTCTTCAGATTATCACCTTATTTAGTACTTGTAAGTGAAGTAAAGAGAAGACGAATCGTGCCATTATTTATATTAGTATGATTAGTAACTGTCATGTTTGCTATCCTAAAAATAACACTCTATTAAAGACAGGACTGACCAACCAACCTGACAAAGAAAACTTAGTTTCACACGTTAAATCTTATCTGGAATTTATACGTAACTGTATTTTAATTAAGTAAAGTAACTATCCGTTCCTGTTAGAACTTCAATATAGAAGTGTACTTTATACGGTTCCTACTCCAACTGGGCTCCCAAGAGTAGACATCGTTTTCTGAAAGATAGTACCGACAATCATTCTTAAGTCCTTACGATAAGAAATCGTTTTCCTTAAAGAACGATTGCATCAATTCTGTAGAGAGAGGACTTAAACACGACGACTCCCCTAGGAAGTGGTGGTATTAAGAAAGTTTCGAGTAAAGACTGAAAAATTTTTAATAAGTTTTTTTTAATCTTCTTAACATAAATAAGATTCAACTTGTAATTCAAATCCGAATAATTTCCTCAGGAAGTCTTAGAATGTGTGAGTAACATCGTTGGTACTTCTCGGTCGGTGACAACTGTCCATTTTAGAAAGTACGGTATCTAATAAGAACCTTAAGTTGGTAATCTTAATATATATTATATATATAAATATATTATATATTTATATAAATATATTATATATAATATGTATAAAATATATTATTATATACAATATATATTTATATTATATATAATATATTATATATAATATATTATTTTATATATAATATAAGATATTTATATATTATATATAATATATTATTTTATATATAATATATTATATTATATATAAATATATTATTTTATATAATATAATATATTATATATAATATAATATATTAAATATATAATATAAATATATTATATATAATATAATATATTATTTTATATATAATATAAATATATTAAATATAATATAAATATAATATATAATATATTATATTAAATATAATATAAATATAATATATAATATATTATATTATATATAATATATTATATATAATATATATATTATACATTATATATATTTATATATCATATATATTATATATATATATATTTACGGAATACAGGAATATCATTCAGAGTCACTCTACCCTCATCCGTAAACCCAAGACCGTGTTTAAGTGTCACACTAGTACCCTTATAGTAAATTTTTAGAGACCCGGAATCGAAAGGACAAAAATTTTACTCAAATAAGAAAGTTTTCGACATTTTTAGGAGTGTTGAGATCGTCATACTAAACATGGAAATACACTTTCTTTACGAGGTTTGGTTCAAAGTGACCATAATATTTTTCCTCCCTTCCTCCACCCATTCTTTTGTGGCCTGGACCCCTTTCTACCCCTTTTCCTGATAATTTACCCCTCTTTTCTTGTTTAATCGGGTCTTCTCACTCCTCCTCCTGAGCTGTTAACAACGGTCGTATTATGAATATTGTTCCCAATAAGAACGATTGTAATAAGTATAATTAAAGAGATTCATAAATTCAATTGGTATGTCTTAGGAAAGTAAAAAGGTCTTCCATTTGTGTTTTACCTTAATACGTCTTATCTAAGGATGATTATCTTGGTAGAGTAACAGTTATTTTACGATGTTAAAGTAAGTAAGAAGATTATATACACAAAACAGAAACAAAGGTGGATGGAAGAAGTATTGACCTTCTCTGATGTCGTTAAAAGTGTCTTACTCCGTATTTTTGACATTCTCTTATTATACATCACTTAACAGGAAAAATCATTTGGTGAACCAATTAATTTTCGGGAAATACTTACCTGATCTACATGGACTTCTCTAGACCCTTATCGGTCAGACTCGAAACACATGACTCTGATTGAAAATATCAGAGTGTTCAAAAGGGAACCGGTAATCTCTTTTGTGTGTCTTAAAAGGACTCACTCTCCTGTAACGGTGTTAAAAAACCGGATAAACCTATAAAAACGATAGAGTGACTCAGATTTCCACGAAAAATTTCTTAGTGTCGTTTTGTTTATATTATTTCAATGTTTTAATTTTAGGTCTATCCAATTGTTCTCTCATTCATTATTACGAAGCTAAANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+14058$29728$1rhc$3&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTCAACCCAAAAGTTTACGGGTTGTTAAAAGCACCTTAACAGACAGAGAGGGAAATTAAGAGAGTTACCAATGTAATATATAAAACCTCGGGACAATCAACCACATGTATATAAATATTAACAATATAGAAGAATTAATTAAAACTTTAGTTATATATGACAAGAAACATAAAACATTGTCAAAAACTGAATTTCAGATAAAACAGACTATATTCATATAAACGGAGTCTAGAGGAAACCAATAATGAATGTACCTTATAAAAGAGGGTAGGAAAGTAAAGTTGAGTAACACATAAAACTAGATTTCACTCATAGAACACCTGTTATATCAACCTAGTAAAAATTTTTTAGGTAAGACAATTAGAGAAAGAAACCTAACCTCTCAAATTAAGTAAACATAAATTACATTAATGACTATTTCTCCCCGAATGAGGATGGTAAAACGAAAACAAAAGACATACAGAATATGGAGGAAACAAGGATTAAAGGAGTTAATAGCGGAAGAAAACACAAATCAACGATAAAACATCGTATAGTGACACAAATGGGACACGAAAGGAAAAGACATAAAAGTTTTCTATAATTGAATCACCAATGGTACCCCTAAATGTTAATTGTAAGAATTAAACCTTGTTAAATCTCATTTAACTTTGTTGAAGTTATCATATGTTTTAGAGATAATAATAAATCAAAGGATACTTAAAGAAATACAACCATTAAAGTGTTTGGTGTAGACATATGTAGTACGAAGTAATTGTATCTAAATATCAGTAATAAAATGTGTAAACAAAATTTTGTATATCTTATAATTTTTTCTGAATGTTTTTTACACTATTAACGAAAATATAAATGGATACATCAATAGAAATGACCTCAATAAAGAAATACACCAAAACTCAATGAAAGATCACAAAAAATCAAACATAGACTTCCTCAGAAAAAAAATTTTCACATAGAACTTCATGTCGGATGGTTTGTACTTGAAAATTTCGAACGAACGAAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAAAGAAAGAAAAAAGAAAGAAAGAAAGAAAGGAAGAAAAAGAAAGAGAGAGAAAGAGAGAGAGAAAGAAAGAAAGAAAGAGAAAGAAGAAAGAAAGAAAGAGAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAAAGAGAAAGAAAGAAAGAGAAAGAGAGAGAGAGAGAAAGAAAAAAAATTAGACCCTTACACATTAAATAGGAATTATGAACTTCCCCGTAGAAGGTTCAATATCTTAAAAACCAACTGTCACAAAAAAAGAAAGTCTTGAAATTTTACAGTAGGATTCGAGAAGACCGTGGGTACCAAATATTACTCGAGAGACGACAGTTTGAATGACTCCTAGGAAACATTTACTGCGCAACGGAAAAAGGATTCGAGAAGACCGTAGGTACCGAATATTACGTGATAGACGACAGTTTGAATAACTCCTAGGAAACATTTACTGCGCAACGGAAAGAGAACGACGAAAGTTTGTAAGCGAAACGGAAAACTGTTAAACTTTGTATCACACAGAACCACACTTATAGAAACATATAAAGGAACTACTTCAAGTGACTCGAAAAACTTACATATATAAACAAAAATCACTTTAAACCCTTCGAAAGTTTGTGTAAAGAAGTTTATCAGAAGGACGGGGAGTGAGGGGTGGTCCTAAGACATACATCCGTAAGAACTACAACAATGTGTCCAGAAATCCGAGATAAGAAAAAACAACAGTAAGAAAGTAAAAGGACGAGAAGTCTGACTTAGTAAAGTAAACTAGATAGTTCAAGTGACTAAGAAAAAAGGTCGACGAGTTTAGAAGATAACCTTGGGATTCATTTTTCATTGAAAAATGAATAACATGAAAAGTCGGAGTCTTAAAAAAACATGGAAATTTTTTTAAGTATAAAGAATAAATAAATATACAGTAAGAGAACCCAAAGAAATCGAGAAATTCAAATAAATTCTGTCAATATATTTCAAAAACAGATTATAAAAGTTATAGACGAATGAGTCCCTCTCAGAGTAAATAAAGAAGACATTTACCCGGTATCAAAACACAAATAAACGTACGAAGAATTAAAAACAACTTTTGACCTGTAAAACCTATAATATTACACAAATAAGACCTTTGGTTTAAAAAGGGAAGAAGTTCCAATAAAAACAATGGGTGACACCCTACATCANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+611001$00089$1rhc$4&gt;
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNTCTCAGACATGATCCGTACCGCTACGAATGTACAGTCGGACACACTGACGTTCTCAGAGTCATGTTAAACTATTGTACCGTGAGTCTAAGATCTGTAATAAGAGACACACGAATCACTCACACTACTGTATTGGAAGTCTTTCTAAGTAGGAAAGAGTGTATAACTATTTAGTTGAAAATGTAGATGTTTCAACTCTCGGTCTTTAATTTTGGAATAATTAAGTGATTCCGTAGGGATACTGCCGTCAGAAGGTTGATCGAGGTAAGACCCCGTGAGACTGTAGTAATATGTGAAAGGTTACTTTCGTCCCTCACATACACTAATTTCCCTCTCGGGACACCGTGAGGACTTTTTAGAGGGGAGGGTCAAGTGTAACTGAATAATTGGTTGTGAGTGCTAGTACACTTTGAGATCTTGACCTAGACCCACGGACCGTCCTACTGTACCACACTCCGAGTTCGTCGTGACACCCTTAAGTTCGTAGACGAATAAAGACTCTCTTTTTCACATTTCGTTTTATTATAGAAAATTGTTTGCAAACATAAACTGATTTCTCCTTCGTTCGTGAATTAAATACTTAAACGATTAACGAGAAGACTCGACTCTTATAGACACAACCTATAATCAGTAATAGGTATAAACCGTGTCTTATTAGGGCTCCCAATTTACTGTAACAAGGATGTCACCCGTGGACTTCTGACCGACATTTTCGTTAGGACCGGTCCCCGCCACCGAGTGCGGACATTAGGGTCGTGAAACCCTCCGGTTGCACCCACCTAGTACTCCAGTCCTCAAACTCTGGTCGGACCGGTTGTATCACTTTGGAGTAGAGATGATTTTTATGTTTTTTTAATCGATCCGTGCCACCGTCTGTGGACATTAGGGTCGATGAACCCGCCGACTCCGTCCTCTTAGTGAACTTGGACCCTCCGTCTTCAACGTCACTCAGCTCTAACGTGGTTACGTGAGGTCGGGTCCACTGTCACACTCTGAGACAGGTTTTTTTTTTTTTTTTTTTTTTTTCTTTCTTTTCTTTTTTTTTTCTTCTTTTTTTCTCTTTCTTTTTTTTCCTTTTTATTTATTTATTTATTTATTTATTTATTTATTTATTTATTTTCGTTGGGATTGTGATGACTCCGATAACTGTCACCGTGAAACGAGAAGACAATCCTGGAACCCTTTTAAAAAAGGGGGACTTATGTCATATTATTTGAACCAAGAATAAAGAGAAAGAGAGGGGGAGGAAAAAAGAAGGGAGGGGTGATGGTGTACGTGTGTGTGTTTATCTGTCTAAACAAATATAAACTGAAAGATTTTTGGACAATGATCTTTCCGTGTAATTATGTAAAGAGGACACGACTATCATTAGTCCGTTGAGACCAAAGATAACCTCCGTTAAAGAATGCATAATTTACGGTCTTTTTCCCGTAGGGAGGCAAAAACATCTCTCGGAAAGAAATACTTCTGATTACTGGTGTAATCAATCAGTCAGTCAGTTATTATGAATGGTTTACAGTCATCTCGACTTCACTTGTGGTTGTCTTTTAGTGTAAAATGTTTACGTTAAATGAACCATAGGATTGTACGGTACAGTATTATTAATAACTCCGAAAAGAAGAGACGACGTAACCAGATTACTTTCACCGATCTTTTTATACCCACGGGTACATCGGAGGACCTTCGTGGACATACTGAAAAGATCTTCGCTCCAAGGACCTATTTCTACTTAAAAATTTTTGACCTTACTTACTCGTCGTTATCGTCTTCCTCTTTTCACTCACTCCCGAGAGGTTCTTCGGTAGACCGTCCGATTCCCAAGACTCCCTTCGAGACCAAAGTCTTCGTTGAGTCCTTAATGAAGACAGTATAATCCTACCCTACCATCCTCTAACCCTTGAGATCCCTGATCTTCAGTAAATTAAAGGACAGATGTTAGGAATCTTCTCCAAAACTCTGAACGTTGGATCCTGGAATTGATCAGTAGAAGGGAGTCGTAACTATCTTAAGAAATAATATGTACAATTATAGTCTAATCAGTCCTACCCGACCTAATACGACACAATTGTCGGTAAGAGATTTAGAGACACCGAGTTGTCCCTCGAGACGGACAGTACCNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+
+</system-err>
+		</testcase>
+		<testcase name="Test optional output file and optional secondaryFile on output." time="10.051802" class="docker, command_line_tool" file="output_secondaryfile_optional" url="cwltest:conformance_tests#68">
+			<system-out>{
+  &quot;output_file&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpr614m2ok/output.txt&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpr614m2ok/output.txt&quot;,
+    &quot;basename&quot;: &quot;output.txt&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpr614m2ok&quot;,
+    &quot;nameroot&quot;: &quot;output&quot;,
+    &quot;nameext&quot;: &quot;.txt&quot;,
+    &quot;checksum&quot;: &quot;sha1$47a013e660d408619d894b20806b1d5086aab03b&quot;,
+    &quot;size&quot;: 13
+  },
+  &quot;optional_file&quot;: null
+}
+</system-out>
+			<system-err>Hello world!
+
+</system-err>
+		</testcase>
+		<testcase name="Test that valueFrom is ignored when the parameter is null" time="10.057083" class="inline_javascript, command_line_tool" file="valuefrom_ignored_null" url="cwltest:conformance_tests#69">
+			<system-out>{
+  &quot;out&quot;: &quot;\n&quot;
+}
+</system-out>
+			<system-err>
+
+</system-err>
+		</testcase>
+		<testcase name="Test that second expression in concatenated valueFrom is not ignored" time="10.055841" class="inline_javascript, command_line_tool" file="valuefrom_secondexpr_ignored" url="cwltest:conformance_tests#70">
+			<system-out>{
+  &quot;out&quot;: &quot;a string\n&quot;
+}
+</system-out>
+			<system-err>a string
+
+</system-err>
+		</testcase>
+		<testcase name="Test valueFrom on workflow step." time="10.060406" class="step_input, inline_javascript, workflow" file="valuefrom_wf_step" url="cwltest:conformance_tests#71">
+			<system-out>{
+  &quot;count_output&quot;: 16
+}
+</system-out>
+		</testcase>
+		<testcase name="Test valueFrom on workflow step with multiple sources" time="10.061282" class="step_input, inline_javascript, multiple_input, workflow" file="valuefrom_wf_step_multiple" url="cwltest:conformance_tests#72">
+			<system-out>{
+  &quot;val&quot;: &quot;3\n&quot;
+}
+</system-out>
+			<system-err>3
+
+</system-err>
+		</testcase>
+		<testcase name="Test valueFrom on workflow step referencing other inputs" time="10.060289" class="step_input, inline_javascript, workflow" file="valuefrom_wf_step_other" url="cwltest:conformance_tests#73">
+			<system-out>{
+  &quot;val&quot;: &quot;3\n&quot;
+}
+</system-out>
+			<system-err>3
+
+</system-err>
+		</testcase>
+		<testcase name="Test record type output binding." time="10.055872" class="shell_command, command_line_tool" file="record_output_binding" url="cwltest:conformance_tests#74">
+			<system-out>{
+  &quot;orec&quot;: {
+    &quot;ofoo&quot;: {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpxii5qi4c/foo&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpxii5qi4c/foo&quot;,
+      &quot;basename&quot;: &quot;foo&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpxii5qi4c&quot;,
+      &quot;nameroot&quot;: &quot;foo&quot;,
+      &quot;checksum&quot;: &quot;sha1$327fc7aedf4f6b69a42a7c8b808dc5a7aff61376&quot;,
+      &quot;size&quot;: 1111
+    },
+    &quot;obar&quot;: {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpxii5qi4c/bar&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpxii5qi4c/bar&quot;,
+      &quot;basename&quot;: &quot;bar&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpxii5qi4c&quot;,
+      &quot;nameroot&quot;: &quot;bar&quot;,
+      &quot;checksum&quot;: &quot;sha1$aeb3d11bdf536511649129f4077d5cda6a324118&quot;,
+      &quot;size&quot;: 12010
+    }
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test support for reading cwl.output.json when running in a Docker container and just 'path' is provided." time="10.062009" class="shell_command, command_line_tool" file="docker_json_output_path" url="cwltest:conformance_tests#75">
+			<system-out>{
+  &quot;foo&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpl1fybzsp/foo&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpl1fybzsp/foo&quot;,
+    &quot;basename&quot;: &quot;foo&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpl1fybzsp&quot;,
+    &quot;nameroot&quot;: &quot;foo&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test support for reading cwl.output.json when running in a Docker container and just 'location' is provided." time="10.062695" class="shell_command, command_line_tool" file="docker_json_output_location" url="cwltest:conformance_tests#76">
+			<system-out>{
+  &quot;foo&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpgrmme191/foo&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpgrmme191/foo&quot;,
+    &quot;basename&quot;: &quot;foo&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpgrmme191&quot;,
+    &quot;nameroot&quot;: &quot;foo&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+		</testcase>
+		<testcase name="Test support for reading cwl.output.json where 'path' is relative path in output dir." time="10.059350" class="required, command_line_tool" file="json_output_path_relative" url="cwltest:conformance_tests#77">
+			<system-out>{
+  &quot;foo&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpnrp6np8c/foo&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpnrp6np8c/foo&quot;,
+    &quot;basename&quot;: &quot;foo&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpnrp6np8c&quot;,
+    &quot;nameroot&quot;: &quot;foo&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+			<system-err>{&quot;foo&quot;: {&quot;path&quot;: &quot;foo&quot;, &quot;class&quot;: &quot;File&quot;} }
+
+</system-err>
+		</testcase>
+		<testcase name="Test support for reading cwl.output.json where 'location' is relative reference to output dir." time="10.060887" class="required, command_line_tool" file="json_output_location_relative" url="cwltest:conformance_tests#78">
+			<system-out>{
+  &quot;foo&quot;: {
+    &quot;class&quot;: &quot;File&quot;,
+    &quot;location&quot;: &quot;file:///tmp/tmpj2ooz9gb/foo&quot;,
+    &quot;path&quot;: &quot;/tmp/tmpj2ooz9gb/foo&quot;,
+    &quot;basename&quot;: &quot;foo&quot;,
+    &quot;dirname&quot;: &quot;/tmp/tmpj2ooz9gb&quot;,
+    &quot;nameroot&quot;: &quot;foo&quot;,
+    &quot;checksum&quot;: &quot;sha1$f1d2d2f924e986ac86fdf7b36c94bcdf32beec15&quot;,
+    &quot;size&quot;: 4
+  }
+}
+</system-out>
+			<system-err>{&quot;foo&quot;: {&quot;location&quot;: &quot;foo&quot;, &quot;class&quot;: &quot;File&quot;} }
+
+</system-err>
+		</testcase>
+		<testcase name="Test support for returning multiple glob patterns from expression" time="10.059716" class="required, command_line_tool" file="multiple_glob_expr_list" url="cwltest:conformance_tests#79">
+			<system-out>{
+  &quot;files&quot;: [
+    {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpszyitezd/a&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpszyitezd/a&quot;,
+      &quot;basename&quot;: &quot;a&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpszyitezd&quot;,
+      &quot;nameroot&quot;: &quot;a&quot;,
+      &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+      &quot;size&quot;: 0
+    },
+    {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpszyitezd/b&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpszyitezd/b&quot;,
+      &quot;basename&quot;: &quot;b&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpszyitezd&quot;,
+      &quot;nameroot&quot;: &quot;b&quot;,
+      &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+      &quot;size&quot;: 0
+    },
+    {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpszyitezd/c&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpszyitezd/c&quot;,
+      &quot;basename&quot;: &quot;c&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpszyitezd&quot;,
+      &quot;nameroot&quot;: &quot;c&quot;,
+      &quot;checksum&quot;: &quot;sha1$da39a3ee5e6b4b0d3255bfef95601890afd80709&quot;,
+      &quot;size&quot;: 0
+    }
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with single scatter parameter and two valueFrom on step input (first and current el)" time="10.072128" class="scatter, step_input, workflow" file="wf_scatter_oneparam_valuefrom" url="cwltest:conformance_tests#80">
+			<failure type="failure">expected: {
+    &quot;out&quot;: [
+        &quot;foo one one&quot;,
+        &quot;foo one two&quot;,
+        &quot;foo one three&quot;,
+        &quot;foo one four&quot;
+    ]
+}
+got: {
+    &quot;out&quot;: [
+        &quot;foo one one&quot;,
+        &quot;&quot;,
+        &quot;foo one three&quot;,
+        &quot;foo one four&quot;
+    ]
+}
+caused by: failed comparison for key 'out': expected: [
+    &quot;foo one one&quot;,
+    &quot;foo one two&quot;,
+    &quot;foo one three&quot;,
+    &quot;foo one four&quot;
+]
+got: [
+    &quot;foo one one&quot;,
+    &quot;&quot;,
+    &quot;foo one three&quot;,
+    &quot;foo one four&quot;
+]
+caused by: expected: &quot;foo one two&quot;
+got: &quot;&quot;</failure>
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;foo one one&quot;,
+    &quot;&quot;,
+    &quot;foo one three&quot;,
+    &quot;foo one four&quot;
+  ]
+}
+</system-out>
+			<system-err>foo one three
+foo one one
+</system-err>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and nested_crossproduct join method and valueFrom on step input" time="10.074722" class="scatter, step_input, workflow" file="wf_scatter_twoparam_nested_crossproduct_valuefrom" url="cwltest:conformance_tests#81">
+			<system-out>{
+  &quot;out&quot;: [
+    [
+      &quot;foo one one three&quot;,
+      &quot;foo one one four&quot;
+    ],
+    [
+      &quot;foo one two three&quot;,
+      &quot;foo one two four&quot;
+    ]
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and flat_crossproduct join method and valueFrom on step input" time="10.067991" class="scatter, step_input, workflow" file="wf_scatter_twoparam_flat_crossproduct_valuefrom" url="cwltest:conformance_tests#82">
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;foo one one three&quot;,
+    &quot;foo one one four&quot;,
+    &quot;foo one two three&quot;,
+    &quot;foo one two four&quot;
+  ]
+}
+</system-out>
+			<system-err>foo one two four
+</system-err>
+		</testcase>
+		<testcase name="Test workflow scatter with two scatter parameters and dotproduct join method and valueFrom on step input" time="10.076910" class="scatter, step_input, workflow" file="wf_scatter_twoparam_dotproduct_valuefrom" url="cwltest:conformance_tests#83">
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;foo one one three&quot;,
+    &quot;foo one two four&quot;
+  ]
+}
+</system-out>
+		</testcase>
+		<testcase name="Test workflow scatter with single scatter parameter and two valueFrom on step input (current el twice)" time="10.108954" class="scatter, step_input, workflow" file="wf_scatter_oneparam_valuefrom_twice_current_el" url="cwltest:conformance_tests#84">
+			<failure type="failure">expected: {
+    &quot;out&quot;: [
+        &quot;foo one one&quot;,
+        &quot;foo two two&quot;,
+        &quot;foo three three&quot;,
+        &quot;foo four four&quot;
+    ]
+}
+got: {
+    &quot;out&quot;: [
+        &quot;foo one one&quot;,
+        &quot;foo two two&quot;,
+        &quot;&quot;,
+        &quot;foo four four&quot;
+    ]
+}
+caused by: failed comparison for key 'out': expected: [
+    &quot;foo one one&quot;,
+    &quot;foo two two&quot;,
+    &quot;foo three three&quot;,
+    &quot;foo four four&quot;
+]
+got: [
+    &quot;foo one one&quot;,
+    &quot;foo two two&quot;,
+    &quot;&quot;,
+    &quot;foo four four&quot;
+]
+caused by: expected: &quot;foo three three&quot;
+got: &quot;&quot;</failure>
+			<system-out>{
+  &quot;out&quot;: [
+    &quot;foo one one&quot;,
+    &quot;foo two two&quot;,
+    &quot;&quot;,
+    &quot;foo four four&quot;
+  ]
+}
+</system-out>
+			<system-err>foo one one
+</system-err>
+		</testcase>
+		<testcase name="Test valueFrom eval on scattered input parameter" time="10.074870" class="scatter, step_input, workflow" file="wf_scatter_oneparam_valueFrom" url="cwltest:conformance_tests#85">
+			<system-out>{
+  &quot;out_message&quot;: [
+    {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpq9t4ss77/stdout_f6e20161&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpq9t4ss77/stdout_f6e20161&quot;,
+      &quot;basename&quot;: &quot;stdout_f6e20161&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpq9t4ss77&quot;,
+      &quot;nameroot&quot;: &quot;stdout_f6e20161&quot;,
+      &quot;checksum&quot;: &quot;sha1$98030575f6fc40e5021be5a8803a6bef94aee11f&quot;,
+      &quot;size&quot;: 16
+    },
+    {
+      &quot;class&quot;: &quot;File&quot;,
+      &quot;location&quot;: &quot;file:///tmp/tmpq9t4ss77/stdout_dd1910bc&quot;,
+      &quot;path&quot;: &quot;/tmp/tmpq9t4ss77/stdout_dd1910bc&quot;,
+      &quot;basename&quot;: &quot;stdout_dd1910bc&quot;,
+      &quot;dirname&quot;: &quot;/tmp/tmpq9t4ss77&quot;,
+      &quot;nameroot&quot;: &quot;stdout_dd1910bc&quot;,
+      &quot;checksum&quot;: &quot;sha1$edcacd50778d98ae113015406b3195c165059dd8&quot;,
+      &quot;size&quot;: 16
+    }
+  ]
+}
+</system-out>
+			<system-err>Hello message b
+
+Hello message a
+
+</system-err>
+		</testcase>
+	</testsuite>
+</testsuites>
