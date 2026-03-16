@@ -7,7 +7,25 @@ on:
     branches:
       - main
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: "true"
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: Swatinem/rust-cache@v2
+      - name: Build conformance binary
+        run: cargo build --release
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: conformance
+          path: target/release/conformance
+          retention-days: 1
+
   ci-pipeline:
+    needs: build
     permissions:
       contents: read
       pull-requests: write
@@ -20,16 +38,25 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: "true"
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: conformance
+          path: target/release
+      - run: chmod +x target/release/conformance
+
       - name: Start rustfs
         if: matrix.variant == 'tes'
         run: |
           mkdir logs data
-          sudo chown 10001:10001 logs
-          sudo chown 10001:10001 data
-          docker run -d --name rustfs -p 9000:9000 -p 9001:9001 -v $(pwd)/data:/data -v $(pwd)/logs:/logs rustfs/rustfs:latest
+          sudo chown 10001:10001 logs data
+          docker run -d -p 9000:9000 -p 9001:9001 \
+            -v $(pwd)/data:/data \
+            -v $(pwd)/logs:/logs \
+            rustfs/rustfs:latest
           sleep 10
           curl -sf http://localhost:9000/health
+
       - name: Create S3 bucket
         if: matrix.variant == 'tes'
         env:
@@ -39,6 +66,7 @@ jobs:
           aws s3 mb s3://test-bucket \
             --endpoint-url http://localhost:9000 \
             --region us-east-1
+
       - name: Start Funnel
         if: matrix.variant == 'tes'
         run: |
@@ -47,11 +75,12 @@ jobs:
           curl -sL "https://github.com/ohsu-comp-bio/funnel/releases/download/${FUNNEL_VERSION}/funnel-linux-amd64-${FUNNEL_VERSION}.tar.gz" \
             | tar -xz
           chmod +x funnel
-          ./funnel server run --config ./.github/funnel-config.yaml & 
+          ./funnel server run --config ./.github/funnel-config.yaml &
           FUNNEL_PID=$!
           echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
           sleep 10
           curl -sf http://localhost:8000/v1/tasks
+
       - name: Run Conformance Tests
         continue-on-error: true
         env:
@@ -65,16 +94,19 @@ jobs:
           source .venv/bin/activate
           pip install cwltest
           mkdir badges
-          cargo build --release && cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance --badgedir badges/$BACKEND
+          cwltest --test testdata/cwl/conformance_tests.yaml \
+            --tool target/release/conformance \
+            --badgedir badges/$BACKEND
           exit 0
 
       - name: Stop Funnel
-        if: matrix.variant == 'tes' && always()
+        if: always() && matrix.variant == 'tes'
         run: |
-          curl -s http://localhost:8000/v1/tasks?view=FULL | jq '.tasks[] | {id, state, logs}'
+          curl -s "http://localhost:8000/v1/tasks?view=FULL" | jq '.tasks[] | {id, state, logs}'
           [ -n "$FUNNEL_PID" ] && kill "$FUNNEL_PID" || true
+
       - name: Stop rustfs
-        if: matrix.variant == 'tes' && always()
+        if: always() && matrix.variant == 'tes'
         run: docker rm -f rustfs || true
 
       - name: Generate Summary
@@ -85,11 +117,11 @@ jobs:
           TABLE="| Subject        | Status | Badge                                      |"
           TABLE="$TABLE\n|----------------|--------|--------------------------------------------|"
           for file in badges/$BACKEND/*.json; do
-                  SUBJECT=$(jq -r '.subject' $file)
-                  STATUS=$(jq -r '.status' $file)
-                  COLOR=$(jq -r '.color' $file)
-                  BADGE_URL="https://img.shields.io/badge/$SUBJECT-${STATUS}25-$COLOR"
-                  TABLE="$TABLE\n| $SUBJECT       | $STATUS | ![$SUBJECT]( $BADGE_URL )                  |"
+            SUBJECT=$(jq -r '.subject' $file)
+            STATUS=$(jq -r '.status' $file)
+            COLOR=$(jq -r '.color' $file)
+            BADGE_URL="https://img.shields.io/badge/$SUBJECT-${STATUS}25-$COLOR"
+            TABLE="$TABLE\n| $SUBJECT       | $STATUS | ![$SUBJECT]($BADGE_URL)                  |"
           done
           echo -e "$TABLE"
           echo -e "$TABLE" >> $GITHUB_STEP_SUMMARY
