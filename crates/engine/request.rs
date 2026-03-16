@@ -229,10 +229,9 @@ pub fn load_input_file_from_file(
 fn adjust_path_to_base(
     value: &mut serde_yaml::Value,
     diff_path: &Path,
-    visited: &mut HashSet<*const serde_yaml::Value>,
+    visited: &mut HashSet<serde_yaml::Value>,
 ) {
-    let ptr = value as *const _;
-    if !visited.insert(ptr) {
+    if !visited.insert(value.clone()) {
         return; // already visited → break cycle
     }
 
