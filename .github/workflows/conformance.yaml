@@ -78,8 +78,10 @@ jobs:
           ./funnel server run --config ./.github/funnel-config.yaml &
           FUNNEL_PID=$!
           echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
-          sleep 10
-          curl -sf http://localhost:8000/v1/tasks
+          
+          until curl -sf http://localhost:8000/v1/tasks; do
+            sleep 1
+          done
 
       - name: Run Conformance Tests
         continue-on-error: true
