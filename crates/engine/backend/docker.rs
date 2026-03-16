@@ -151,16 +151,18 @@ impl TaskBackend for DockerBackend {
         }
 
         for mount in request.mounts {
-            mount_workdir_item(
+            let inputs = mount_workdir_item(
                 mount.clone(),
                 request.outdir,
                 request.staged_dir,
                 request.use_container,
-                &mut task,
                 self.storage(),
                 MountStrategy::Local,
             )
             .await?;
+            for input in inputs {
+                task.add_input(input);
+            }
         }
 
         //add outdir mount

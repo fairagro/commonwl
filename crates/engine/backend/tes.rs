@@ -20,10 +20,11 @@ use crankshaft::{
         task::{Execution, Output, Resources, output},
     },
 };
-use cwl_core::IntegerOrExpression;
+use cwl_core::{IntegerOrExpression, files::FileOrDirectory};
 use cwl_engine_storage::{Storage, StorageBackend};
 use nonempty::nonempty;
 use std::{
+    collections::HashMap,
     path::Path,
     sync::{Arc, Mutex},
     time::Duration,
@@ -132,37 +133,42 @@ impl TaskBackend for TesBackend {
 
         //add file inputs to task
         let mut inputs = request.inputs.to_vec();
-        for input in &mut inputs {
-            if let Some(location) = input.location()
-                && let Some(path) = location.strip_prefix("file://")
-            {
-                //file is local and needs to be uploaded
-                let dest = Url::parse(&format!(
-                    "s3://test-bucket/{}/{}{}",
-                    request.id,
-                    &Uuid::new_v4().to_string()[..8],
-                    input.basename().unwrap()
-                ))?;
-                self.storage.upload(Path::new(path), &dest).await?;
+        let mut new_destinations = self.upload_files_parallel(&inputs, request.id).await?;
+        for (i, input) in inputs.iter_mut().enumerate() {
+            if let Some(dest) = new_destinations.remove(&i) {
                 input.set_location(Some(dest.to_string()));
             }
             mount_input(&mut task, input)?;
         }
 
         let s3_workdir = Url::parse(&format!("s3://test-bucket/{}/workdir/", request.id))?;
-        for mount in request.mounts {
-            mount_workdir_item(
-                mount.clone(),
-                request.outdir,
-                request.staged_dir,
-                request.use_container,
-                &mut task,
-                self.storage(),
-                MountStrategy::Remote {
-                    base_url: s3_workdir.clone(),
-                },
-            )
-            .await?;
+        let mut set = tokio::task::JoinSet::new();
+        let sem = Arc::new(tokio::sync::Semaphore::new(32));
+        for mount in request.mounts.iter().cloned() {
+            let outdir = request.outdir.to_owned();
+            let workdir = request.staged_dir.to_owned();
+            let use_container = request.use_container;
+            let storage = self.storage();
+            let base_url = s3_workdir.clone();
+            let permit = sem.clone().acquire_owned().await?;
+            set.spawn(async move {
+                let _permit = permit;
+                mount_workdir_item(
+                    mount,
+                    &outdir,
+                    &workdir,
+                    use_container,
+                    storage,
+                    MountStrategy::Remote { base_url },
+                )
+                .await
+            });
+        }
+
+        while let Some(res) = set.join_next().await {
+            for input in res?? {
+                task.add_input(input);
+            }
         }
 
         //add outdir mount
@@ -261,8 +267,11 @@ impl TaskBackend for TesBackend {
         };
 
         //download results
-        self.storage.download(&stdout_remote, &stdout_local).await?;
-        self.storage.download(&stderr_remote, &stderr_local).await?;
+        tokio::try_join!(
+            self.storage.download(&stdout_remote, &stdout_local),
+            self.storage.download(&stderr_remote, &stderr_local),
+        )?;
+        
         self.storage
             .download(&s3_workdir, request.outdir)
             .await
@@ -308,5 +317,51 @@ impl TesBackend {
         //    return Ok(Some(entrypoint));
         //}
         Ok(None)
+    }
+
+    async fn upload_files_parallel(
+        &self,
+        inputs: &[FileOrDirectory],
+        request_id: &str,
+    ) -> anyhow::Result<HashMap<usize, Url>> {
+        //create a list of upload tasks (the new urls)
+        let upload_tasks: Vec<(usize, String, Url)> = inputs
+            .iter()
+            .enumerate()
+            .filter_map(|(i, input)| {
+                let location = input.location()?;
+                let path = location.strip_prefix("file://")?.to_owned();
+                let dest = Url::parse(&format!(
+                    "s3://test-bucket/{}/{}{}",
+                    request_id,
+                    &Uuid::new_v4().to_string()[..8],
+                    input.basename()?
+                ))
+                .ok()?;
+                Some((i, path, dest))
+            })
+            .collect();
+
+        //run uploads
+        let mut set = tokio::task::JoinSet::new();
+        let sem = Arc::new(tokio::sync::Semaphore::new(32));
+        for (i, path, dest) in upload_tasks {
+            let permit = sem.clone().acquire_owned().await?;
+            let storage = self.storage.clone();
+            set.spawn(async move {
+                let _permit = permit; //reference semaphore
+                storage.upload(Path::new(&path), &dest).await?;
+                anyhow::Ok((i, dest))
+            });
+        }
+
+        //fech results
+        let mut dest_updates: HashMap<usize, Url> = HashMap::new();
+        while let Some(res) = set.join_next().await {
+            let (i, dest) = res??;
+            dest_updates.insert(i, dest);
+        }
+
+        Ok(dest_updates)
     }
 }

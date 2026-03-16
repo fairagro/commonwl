@@ -79,16 +79,15 @@ pub(crate) async fn mount_workdir_item(
     outdir: &Path,
     workdir: &str,
     use_container: bool,
-    task: &mut Task,
     backend: Arc<StorageBackend>,
     strategy: MountStrategy,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<Input>> {
     match strategy {
         MountStrategy::Local => {
-            mount_workdir_item_local(mount, outdir, use_container, task, backend).await
+            mount_workdir_item_local(mount, outdir, use_container, backend).await
         }
         MountStrategy::Remote { base_url } => {
-            mount_workdir_item_remote(mount, outdir, workdir, task, backend, &base_url).await
+            mount_workdir_item_remote(mount, outdir, workdir, backend, &base_url).await
         }
     }
 }
@@ -97,9 +96,9 @@ async fn mount_workdir_item_local(
     mount: WorkDirMount,
     outdir: &Path,
     use_container: bool,
-    task: &mut Task,
     backend: Arc<StorageBackend>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<Input>> {
+    let mut inputs = vec![];
     if mount.target.starts_with(outdir) {
         if let Some(parent) = mount.target.parent()
             && !parent.exists()
@@ -130,7 +129,7 @@ async fn mount_workdir_item_local(
             }
         }
     } else if use_container {
-        task.add_input(
+        inputs.push(
             Input::builder()
                 .path(mount.target.to_string_lossy())
                 .contents(match mount.source {
@@ -150,17 +149,17 @@ async fn mount_workdir_item_local(
             mount.target.display()
         );
     }
-    Ok(())
+    Ok(inputs)
 }
 
 async fn mount_workdir_item_remote(
     mount: WorkDirMount,
     outdir: &Path,
     workdir: &str,
-    task: &mut Task,
     backend: Arc<StorageBackend>,
     base_url: &Url,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<Input>> {
+    let mut inputs = vec![];
     let rel = mount.target.strip_prefix(outdir).unwrap_or(&mount.target);
     let guest_path = if mount.target.starts_with(outdir) {
         format!("{}/{}", workdir, rel.display())
@@ -178,7 +177,7 @@ async fn mount_workdir_item_remote(
             } else {
                 url // already remote, use directly
             };
-            task.add_input(
+            inputs.push(
                 Input::builder()
                     .path(&guest_path)
                     .contents(Contents::Url(dest))
@@ -190,7 +189,7 @@ async fn mount_workdir_item_remote(
         (MountType::File, Source::Contents(data)) => {
             let dest = base_url.join(&rel.to_string_lossy())?;
             backend.upload_bytes(&data, &dest).await?;
-            task.add_input(
+            inputs.push(
                 Input::builder()
                     .path(&guest_path)
                     .contents(Contents::Url(dest))
@@ -208,7 +207,7 @@ async fn mount_workdir_item_remote(
             } else {
                 url
             };
-            task.add_input(
+            inputs.push(
                 Input::builder()
                     .path(&guest_path)
                     .contents(Contents::Url(dest))
@@ -220,7 +219,7 @@ async fn mount_workdir_item_remote(
         (MountType::Directory, Source::Contents(_)) => {}
     }
 
-    Ok(())
+    Ok(inputs)
 }
 
 pub(crate) fn remove_materialized_inputs(
