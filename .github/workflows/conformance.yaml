@@ -28,11 +28,7 @@ jobs:
           sudo chown 10001:10001 logs
           sudo chown 10001:10001 data
           docker run -d -p 9000:9000 -p 9001:9001 -v $(pwd)/data:/data -v $(pwd)/logs:/logs rustfs/rustfs:latest
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:9000/health && break
-            echo "Waiting for rustfs... ($i/30)"
-            sleep 2
-          done
+          sleep 10
       - name: Create S3 bucket
         if: matrix.variant == 'tes'
         env:
@@ -52,13 +48,8 @@ jobs:
           chmod +x funnel
           ./funnel server run --config ./.github/funnel-config.yaml & 
           FUNNEL_PID=$!
-           echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
-
-          for i in $(seq 1 30); do
-            curl -sf http://localhost:8000/v1/tasks && break
-            echo "Waiting for Funnel... ($i/30)"
-            sleep 2
-          done
+          echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
+          sleep 2
       - name: Run Conformance Tests
         continue-on-error: true
         env:
