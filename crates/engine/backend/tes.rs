@@ -193,7 +193,7 @@ impl TaskBackend for TesBackend {
         let bucket_url = Url::parse(&format!("s3://test-bucket/{}/", request.id))?;
         let (stderr_local, stderr_remote) = if let Some(stderr) = request.stderr_file {
             let filename = do_eval_to_string(stderr, request.eval_context);
-            (request.outdir.join(&filename), s3_workdir.join(&filename)?)
+            (request.outdir.join(&filename), bucket_url.join(&filename)?)
         } else {
             let filename = format!("stderr_{}", &Uuid::new_v4().to_string()[..8]);
             (request.outdir.join(&filename), bucket_url.join(&filename)?)
@@ -219,7 +219,7 @@ impl TaskBackend for TesBackend {
         //handle stdout output
         let (stdout_local, stdout_remote) = if let Some(stdout) = request.stdout_file {
             let filename = do_eval_to_string(stdout, request.eval_context);
-            (request.outdir.join(&filename), s3_workdir.join(&filename)?)
+            (request.outdir.join(&filename), bucket_url.join(&filename)?)
         } else {
             let filename = format!("stdout_{}", &Uuid::new_v4().to_string()[..8]);
             (request.outdir.join(&filename), bucket_url.join(&filename)?)
