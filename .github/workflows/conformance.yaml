@@ -33,6 +33,15 @@ jobs:
             echo "Waiting for rustfs... ($i/30)"
             sleep 2
           done
+      - name: Create S3 bucket
+        if: matrix.variant == 'tes'
+        env:
+          AWS_ACCESS_KEY_ID: rustfsadmin
+          AWS_SECRET_ACCESS_KEY: rustfsadmin
+        run: |
+          aws s3 mb s3://test-bucket \
+            --endpoint-url http://localhost:9000 \
+            --region us-east-1
       - name: Start Funnel
         if: matrix.variant == 'tes'
         run: |
