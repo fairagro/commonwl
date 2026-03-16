@@ -182,7 +182,7 @@ async fn mount_workdir_item_remote(
                     .path(&guest_path)
                     .contents(Contents::Url(dest))
                     .ty(input::Type::File)
-                    .read_only(true)
+                    .read_only(mount.readonly)
                     .build(),
             );
         }
@@ -194,7 +194,7 @@ async fn mount_workdir_item_remote(
                     .path(&guest_path)
                     .contents(Contents::Url(dest))
                     .ty(input::Type::File)
-                    .read_only(true)
+                    .read_only(mount.readonly)
                     .build(),
             );
         }
@@ -212,7 +212,7 @@ async fn mount_workdir_item_remote(
                     .path(&guest_path)
                     .contents(Contents::Url(dest))
                     .ty(input::Type::Directory)
-                    .read_only(true)
+                    .read_only(mount.readonly)
                     .build(),
             );
         }
