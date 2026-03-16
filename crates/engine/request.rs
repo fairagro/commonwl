@@ -11,6 +11,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     path::{Path, PathBuf},
+    ptr,
 };
 
 #[derive(Debug, Clone)]
@@ -229,9 +230,10 @@ pub fn load_input_file_from_file(
 fn adjust_path_to_base(
     value: &mut serde_yaml::Value,
     diff_path: &Path,
-    visited: &mut HashSet<serde_yaml::Value>,
+    visited: &mut HashSet<*const serde_yaml::Value>,
 ) {
-    if !visited.insert(value.clone()) {
+    let ptr = ptr::from_ref(value);
+    if !visited.insert(ptr) {
         return; // already visited → break cycle
     }
 
