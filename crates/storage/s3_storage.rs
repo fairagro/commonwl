@@ -16,13 +16,14 @@ pub struct S3Storage {
 }
 
 impl S3Storage {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             client: OnceCell::new(),
         }
     }
 
-    pub async fn client(&self) -> anyhow::Result<&s3::Client> {
+    async fn client(&self) -> anyhow::Result<&s3::Client> {
         self.client
             .get_or_try_init(|| async {
                 dotenvy::dotenv().ok();
@@ -40,7 +41,7 @@ impl S3Storage {
             .await
     }
 
-    /// Parses "s3://bucket/key" or "bucket/key" into (bucket, key)
+    /// Parses <s3://bucket/key> or "bucket/key" into (bucket, key)
     fn parse_uri(uri: &Url) -> anyhow::Result<(String, String)> {
         let bucket = uri
             .host_str()
@@ -67,7 +68,7 @@ impl Storage for S3Storage {
                 let dir_dest = if dest.path().ends_with('/') {
                     dest.clone()
                 } else {
-                    Url::parse(&format!("{}/", dest))?
+                    Url::parse(&format!("{dest}/"))?
                 };
                 let item = item?;
                 let path = item.path();

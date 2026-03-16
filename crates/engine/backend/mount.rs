@@ -28,9 +28,9 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
         && let Some(location) = input.location()
     {
         let location = if input.is_dir() && !location.ends_with('/') {
-            format!("{}/", location)
+            format!("{location}/")
         } else {
-            location.to_string()
+            location.clone()
         };
         let contents = if location.starts_with("file://") {
             let location = location.strip_prefix("file://").unwrap();
@@ -118,7 +118,7 @@ async fn mount_workdir_item_local(
                     .with_context(|| format!("Could not write to {}", mount.target.display()))?;
             }
             (MountType::Directory, Source::Url(path)) => {
-                backend.download(&path, &mount.target).await?
+                backend.download(&path, &mount.target).await?;
             }
             (MountType::Directory, Source::Contents(_)) => {
                 fs::create_dir_all(&mount.target).with_context(|| {

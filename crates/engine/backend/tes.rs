@@ -21,7 +21,7 @@ use crankshaft::{
     },
 };
 use cwl_core::IntegerOrExpression;
-use cwl_engine_storage::Storage;
+use cwl_engine_storage::{Storage, StorageBackend};
 use nonempty::nonempty;
 use std::{
     path::Path,
@@ -41,6 +41,7 @@ const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
 
 #[derive(Debug, Clone)]
 pub struct TesBackend {
+    storage: Arc<StorageBackend>,
     backend: Arc<tes::Backend>,
 }
 
@@ -48,7 +49,7 @@ impl TesBackend {
     /// Creates a new instance of `TesBackend`
     /// # Errors
     /// ??
-    pub async fn new(config: Config) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, storage: Arc<StorageBackend>) -> anyhow::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
@@ -56,7 +57,7 @@ impl TesBackend {
         )));
         let backend = Arc::new(tes::Backend::initialize(config, names, None).await);
 
-        Ok(Self { backend })
+        Ok(Self { storage, backend })
     }
 }
 
@@ -142,7 +143,7 @@ impl TaskBackend for TesBackend {
                     &Uuid::new_v4().to_string()[..8],
                     input.basename().unwrap()
                 ))?;
-                request.storage.upload(Path::new(path), &dest).await?;
+                self.storage.upload(Path::new(path), &dest).await?;
                 input.set_location(Some(dest.to_string()));
             }
             mount_input(&mut task, input)?;
@@ -156,7 +157,7 @@ impl TaskBackend for TesBackend {
                 request.staged_dir,
                 request.use_container,
                 &mut task,
-                request.storage.clone(),
+                self.storage(),
                 MountStrategy::Remote {
                     base_url: s3_workdir.clone(),
                 },
@@ -260,16 +261,9 @@ impl TaskBackend for TesBackend {
         };
 
         //download results
-        request
-            .storage
-            .download(&stdout_remote, &stdout_local)
-            .await?;
-        request
-            .storage
-            .download(&stderr_remote, &stderr_local)
-            .await?;
-        request
-            .storage
+        self.storage.download(&stdout_remote, &stdout_local).await?;
+        self.storage.download(&stderr_remote, &stderr_local).await?;
+        self.storage
             .download(&s3_workdir, request.outdir)
             .await
             .ok(); //errors if workdir is empty as such thing as empty does not exist in s3
@@ -283,6 +277,10 @@ impl TaskBackend for TesBackend {
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend> {
         Arc::clone(&Arc::new(self.clone())) as Arc<dyn TaskBackend>
+    }
+
+    fn storage(&self) -> Arc<StorageBackend> {
+        self.storage.clone()
     }
 
     fn input_dir(&self) -> String {

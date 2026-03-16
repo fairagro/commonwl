@@ -20,6 +20,7 @@ pub struct StorageBackend {
 }
 
 impl StorageBackend {
+    #[must_use]
     pub fn new() -> Self {
         let mut backends: HashMap<String, Box<dyn Storage>> = HashMap::new();
         backends.insert("file".to_string(), Box::new(LocalStorage {}));
@@ -27,6 +28,9 @@ impl StorageBackend {
         Self { inner: backends }
     }
 
+    /// Uploads a file by its contents as byte slice
+    /// # Errors
+    /// Fails if tempfile can not be written or uploaded
     pub async fn upload_bytes(&self, data: &[u8], dest: &Url) -> anyhow::Result<()> {
         let mut tmp = NamedTempFile::new()?;
         std::io::Write::write_all(&mut tmp, data)?;

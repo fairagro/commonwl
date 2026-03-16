@@ -27,6 +27,7 @@ use crankshaft::{
     },
 };
 use cwl_core::IntegerOrExpression;
+use cwl_engine_storage::StorageBackend;
 use nonempty::nonempty;
 use std::{
     sync::{Arc, Mutex},
@@ -47,6 +48,7 @@ const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
 pub struct DockerBackend {
     //wrapper to Bollard Docker client
     client: Docker,
+    storage: Arc<StorageBackend>,
     //wrapper to crankshaft backend
     backend: Arc<docker::Backend>,
 }
@@ -55,7 +57,7 @@ impl DockerBackend {
     /// Creates a new instance of `DockerBackend`
     /// # Errors
     /// Throws if the docker client is not reachable
-    pub async fn new(config: Config) -> anyhow::Result<Self> {
+    pub async fn new(config: Config, storage: Arc<StorageBackend>) -> anyhow::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
@@ -66,7 +68,11 @@ impl DockerBackend {
 
         let client = Docker::with_defaults()?;
 
-        Ok(Self { client, backend })
+        Ok(Self {
+            client,
+            backend,
+            storage,
+        })
     }
 }
 
@@ -151,7 +157,7 @@ impl TaskBackend for DockerBackend {
                 request.staged_dir,
                 request.use_container,
                 &mut task,
-                request.storage.clone(),
+                self.storage(),
                 MountStrategy::Local,
             )
             .await?;
@@ -251,6 +257,10 @@ impl TaskBackend for DockerBackend {
         })
     }
 
+    fn storage(&self) -> Arc<StorageBackend> {
+        self.storage.clone()
+    }
+
     fn task_scoped(&self) -> Arc<dyn TaskBackend> {
         Arc::clone(&Arc::new(self.clone())) as Arc<dyn TaskBackend>
     }
@@ -295,7 +305,8 @@ mod tests {
     #[tokio::test]
     async fn test_docker_backend_creation() {
         let config = Config::default();
-        let backend = DockerBackend::new(config).await;
+        let storage = Arc::new(StorageBackend::new());
+        let backend = DockerBackend::new(config, storage).await;
         assert!(backend.is_ok());
     }
 
@@ -309,13 +320,13 @@ mod tests {
         let inputs_path = base_dir.join("cat-job.json");
 
         let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+        let storage = Arc::new(StorageBackend::new());
+        let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
         let tmpdir = tempdir().unwrap();
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let storage = Arc::new(StorageBackend::new());
-        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
 
         //check if output file exists
@@ -333,13 +344,13 @@ mod tests {
         let inputs_path = base_dir.join("dir3-job.yml");
 
         let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+        let storage = Arc::new(StorageBackend::new());
+        let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
         let tmpdir = tempdir().unwrap();
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let storage = Arc::new(StorageBackend::new());
-        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
         assert!(result.is_ok());
     }
 
@@ -353,13 +364,13 @@ mod tests {
         let inputs_path = base_dir.join("cat-from-dir-job.yaml");
 
         let config = Config::default();
-        let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+        let storage = Arc::new(StorageBackend::new());
+        let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
         let tmpdir = tempdir().unwrap();
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let storage = Arc::new(StorageBackend::new());
-        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
 
         assert!(result.is_ok());
         //check if output file exists

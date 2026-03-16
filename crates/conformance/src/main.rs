@@ -43,18 +43,20 @@ async fn main() -> anyhow::Result<()> {
             .with_max_level(Level::DEBUG)
             .init();
     }
+
+    let storage = Arc::new(StorageBackend::new());
     let backend_select = env::var("BACKEND").unwrap_or("docker".to_string());
     let backend: Arc<dyn TaskBackend> = if backend_select == "docker" {
         let config = Config::default();
-        Arc::new(DockerBackend::new(config).await?)
+        Arc::new(DockerBackend::new(config, storage).await?)
     } else if backend_select == "local" {
-        Arc::new(LocalBackend::new(ContainerEngine::Docker))
+        Arc::new(LocalBackend::new(ContainerEngine::Docker, storage))
     } else if backend_select == "tes" {
         let config = tes::Config::builder()
             .url(Url::parse("http://localhost:8000")?)
             .interval(10)
             .build();
-        Arc::new(TesBackend::new(config).await?)
+        Arc::new(TesBackend::new(config, storage).await?)
     } else {
         panic!()
     };
@@ -66,8 +68,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let cancellation_token = CancellationToken::new();
-    let storage = Arc::new(StorageBackend::new());
-    let result = execute(backend, storage, &request, cancellation_token).await?;
+    let result = execute(backend, &request, cancellation_token).await?;
     let exit_status = result.exit_status;
 
     let evaluated_code = evaluate_exitcodes(&exit_status, &request.specification);

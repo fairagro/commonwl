@@ -19,6 +19,7 @@ use crankshaft::engine::{
     },
 };
 use cwl_core::{IntegerOrExpression, files::FileOrDirectory};
+use cwl_engine_storage::StorageBackend;
 use nonempty::nonempty;
 use std::{fs, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
@@ -32,19 +33,21 @@ pub mod command;
 pub struct LocalBackend {
     uuid: String,
     container_engine: ContainerEngine,
+    storage: Arc<StorageBackend>,
     //wrapper to crankshaft backend
     backend: Arc<CommandBackend>,
 }
 
 impl LocalBackend {
     #[must_use]
-    pub fn new(container_engine: ContainerEngine) -> Self {
+    pub fn new(container_engine: ContainerEngine, storage: Arc<StorageBackend>) -> Self {
         let backend = Arc::new(CommandBackend {});
 
         Self {
             uuid: Uuid::new_v4().to_string()[..8].to_string(),
-            backend,
             container_engine,
+            storage,
+            backend,
         }
     }
 }
@@ -159,7 +162,7 @@ impl TaskBackend for LocalBackend {
                 request.staged_dir,
                 request.use_container,
                 &mut task,
-                request.storage.clone(),
+                self.storage(),
                 MountStrategy::Local,
             )
             .await?;
@@ -269,7 +272,11 @@ impl TaskBackend for LocalBackend {
     }
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend> {
-        Arc::new(LocalBackend::new(self.container_engine)) as Arc<dyn TaskBackend>
+        Arc::new(LocalBackend::new(self.container_engine, self.storage())) as Arc<dyn TaskBackend>
+    }
+
+    fn storage(&self) -> Arc<StorageBackend> {
+        self.storage.clone()
     }
 
     fn input_dir(&self) -> String {

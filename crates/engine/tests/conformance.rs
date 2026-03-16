@@ -35,7 +35,8 @@ async fn test_conformance_docker_clt() {
 
     //create docker backend
     let config = Config::default();
-    let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+    let storage = Arc::new(StorageBackend::new());
+    let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
 
     execute_conformance_test(backend, before.iter().copied().chain(after.iter().copied())).await;
 }
@@ -50,7 +51,8 @@ async fn test_conformance_local_clt() {
         .collect::<Vec<_>>();
 
     //create local backend
-    let backend = Arc::new(LocalBackend::new(ContainerEngine::Docker));
+    let storage = Arc::new(StorageBackend::new());
+    let backend = Arc::new(LocalBackend::new(ContainerEngine::Docker, storage));
 
     execute_conformance_test(backend, selected_tests.into_iter().take(178)).await;
 }
@@ -65,7 +67,8 @@ async fn test_conformance_docker_et() {
 
     //create docker backend
     let config = Config::default();
-    let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+    let storage = Arc::new(StorageBackend::new());
+    let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
 
     //all expression tools pass! :)
     execute_conformance_test(backend, selected_tests).await;
@@ -81,7 +84,8 @@ async fn test_conformance_docker_wf() {
 
     //create docker backend
     let config = Config::default();
-    let backend = Arc::new(DockerBackend::new(config).await.unwrap());
+    let storage = Arc::new(StorageBackend::new());
+    let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
 
     //all workflow pass! :)
     execute_conformance_test(backend, selected_tests).await;
@@ -236,8 +240,7 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
 
         eprintln!("Running Test {}", test.id);
         let backend = backend.task_scoped();
-        let storage = Arc::new(StorageBackend::new());
-        let result = execute(backend, storage, &request, cancellation_token).await;
+        let result = execute(backend, &request, cancellation_token).await;
         if test.should_fail {
             if result.is_ok() {
                 dbg!(&result);
