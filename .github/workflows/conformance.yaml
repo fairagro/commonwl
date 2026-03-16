@@ -95,7 +95,7 @@ jobs:
           pip install cwltest
           mkdir badges
           cwltest --test testdata/cwl/conformance_tests.yaml \
-            -j 8 \
+            -j 4 \
             --tool target/release/conformance \
             --badgedir badges/$BACKEND
           exit 0
