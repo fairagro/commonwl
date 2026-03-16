@@ -6,7 +6,6 @@ use sha1::Sha1;
 use std::fs;
 use std::path::Path;
 
-pub mod deserialize;
 pub mod documents;
 pub mod files;
 pub mod inputs;

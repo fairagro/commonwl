@@ -1,7 +1,3 @@
-use crate::deserialize::{
-    FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
-    deserialize_with_type_dsl, make_shorthand_impl,
-};
 use crate::files::File;
 use crate::outputs::{LinkMergeMethod, PickValueMethod};
 use crate::types::{CWLType, SecondaryFileSchema};
@@ -12,6 +8,11 @@ use crate::{
 };
 use bon::Builder;
 use commonwl_salad::Identifiable;
+use commonwl_salad::deserialize::{
+    FromShortHand, deserialize_map_list_option_name, deserialize_with_secondary_files_dsl,
+    deserialize_with_type_dsl,
+};
+use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
@@ -723,7 +724,7 @@ make_shorthand_impl!(WorkflowStepInput, "id", "source");
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deserialize::deserialize_map_list_id;
+    use commonwl_salad::deserialize::deserialize_map_list_id;
 
     #[test]
     #[allow(unused)]

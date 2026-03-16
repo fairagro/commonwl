@@ -979,6 +979,8 @@ name = "commonwl_salad"
 version = "0.1.2"
 dependencies = [
  "commonwl_salad_derive",
+ "serde",
+ "serde_yaml",
 ]
 
 [[package]]

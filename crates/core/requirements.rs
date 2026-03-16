@@ -1,15 +1,13 @@
-use std::collections::HashMap;
-
-use crate::deserialize::{
-    deserialize_map_list_envname, deserialize_map_list_package, make_shorthand_impl,
-};
 use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
-use crate::{
-    BoolOrExpression, IntegerOrExpression, NumberOrExpression, deserialize::FromShortHand,
-};
+use crate::{BoolOrExpression, IntegerOrExpression, NumberOrExpression};
 use crate::{ExtractFromEnum, OneOrMany};
 use bon::Builder;
+use commonwl_salad::deserialize::{
+    FromShortHand, deserialize_map_list_envname, deserialize_map_list_package,
+};
+use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 macro_rules! impl_conversion_methods {
     ($enum:ident, $variant:ident) => {
@@ -83,7 +81,7 @@ pub enum WorkflowRequirements {
     ScatterFeatureRequirement(ScatterFeatureRequirement),
     MultipleInputFeatureRequirement(MultipleInputFeatureRequirement),
     StepInputExpressionRequirement(StepInputExpressionRequirement),
-    WorkReuse(WorkReuse)
+    WorkReuse(WorkReuse),
 }
 
 impl FromShortHand for WorkflowRequirements {}
@@ -104,7 +102,6 @@ impl_conversion_methods!(WorkflowRequirements, ScatterFeatureRequirement);
 impl_conversion_methods!(WorkflowRequirements, MultipleInputFeatureRequirement);
 impl_conversion_methods!(WorkflowRequirements, StepInputExpressionRequirement);
 impl_conversion_methods!(WorkflowRequirements, WorkReuse);
-
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
@@ -316,7 +313,7 @@ pub struct StepInputExpressionRequirement;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::deserialize::deserialize_map_list_class;
+    use commonwl_salad::deserialize::deserialize_map_list_class;
 
     #[derive(Serialize, Deserialize, Debug)]
     struct RequirementsBag {

@@ -1,4 +1,4 @@
-use crate::types::{secondary_files_dsl, type_dsl};
+use crate::dsl::{secondary_files_dsl, type_dsl};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use serde_yaml::Value;
@@ -90,6 +90,7 @@ make_deserialize_map_list!(deserialize_map_list_envname, "envName");
 make_deserialize_map_list_option!(deserialize_map_list_option_name, "name");
 make_deserialize_map_list_option!(deserialize_map_list_option_class, "class");
 
+#[macro_export]
 macro_rules! make_shorthand_impl {
     ($class:ident, $id:expr, $type:expr) => {
         impl FromShortHand for $class {
@@ -102,7 +103,6 @@ macro_rules! make_shorthand_impl {
         }
     };
 }
-pub(crate) use make_shorthand_impl;
 
 /// Deserializes a type with the cwl typedsl
 /// # Errors

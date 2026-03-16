@@ -1,21 +1,20 @@
 use crate::ExtractFromEnum;
 use crate::OneOrMany;
-use crate::deserialize::FromShortHand;
 use crate::inputs::{
     CommandInputParameter, CommandLineBinding, OperationInputParameter, WorkflowInputParameter,
     WorkflowStepInput,
 };
+use crate::outputs::CommandOutputParameter;
 use crate::outputs::{
     ExpressionToolOutputParameter, OperationOutputParameter, StringOrWorkflowStepOutput,
     WorkflowOutputParameter,
 };
 use crate::requirements::{ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements};
-use crate::{
-    deserialize::deserialize_map_list_id, deserialize::deserialize_map_list_option_class,
-    outputs::CommandOutputParameter,
-};
 use bon::Builder;
-use commonwl_salad::Identifiable;
+use commonwl_salad::{
+    Identifiable,
+    deserialize::{FromShortHand, deserialize_map_list_id, deserialize_map_list_option_class},
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
