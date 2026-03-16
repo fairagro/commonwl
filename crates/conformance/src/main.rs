@@ -1,10 +1,12 @@
 use clap::{Arg, ArgMatches, Command, builder::ValueParser};
 use commonwl::engine::{
     ContainerEngine, DockerBackend, EngineStatus, InputObject, LocalBackend, TaskBackend,
-    create_execution_request, create_execution_request_with_inputs, evaluate_exitcodes, execute,
+    TesBackend, create_execution_request, create_execution_request_with_inputs, evaluate_exitcodes,
+    execute,
 };
 use core::panic;
-use crankshaft::config::backend::docker::Config;
+use crankshaft::config::backend::{docker::Config, tes};
+use cwl_engine_storage::StorageBackend;
 use std::{
     env,
     path::{Path, PathBuf},
@@ -13,6 +15,7 @@ use std::{
 };
 use tokio_util::sync::CancellationToken;
 use tracing::Level;
+use url::Url;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -46,6 +49,12 @@ async fn main() -> anyhow::Result<()> {
         Arc::new(DockerBackend::new(config).await?)
     } else if backend_select == "local" {
         Arc::new(LocalBackend::new(ContainerEngine::Docker))
+    } else if backend_select == "tes" {
+        let config = tes::Config::builder()
+            .url(Url::parse("http://localhost:8000")?)
+            .interval(10)
+            .build();
+        Arc::new(TesBackend::new(config).await?)
     } else {
         panic!()
     };
@@ -57,7 +66,8 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let cancellation_token = CancellationToken::new();
-    let result = execute(backend, &request, cancellation_token).await?;
+    let storage = Arc::new(StorageBackend::new());
+    let result = execute(backend, storage, &request, cancellation_token).await?;
     let exit_status = result.exit_status;
 
     let evaluated_code = evaluate_exitcodes(&exit_status, &request.specification);

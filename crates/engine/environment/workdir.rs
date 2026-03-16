@@ -3,20 +3,20 @@ use crate::{
     io::json::to_string_dump,
     io::{directory::move_dir, file::move_file},
 };
-use anyhow::Context;
 use cwl_core::{
     OneOrMany,
     files::{Dirent, FileOrDirectory},
     inputs::DefaultValue,
     requirements::{InitialWorkDirRequirement, ListingItems, WorkDirItems},
 };
-use dircpy::copy_dir;
+use cwl_engine_storage::{Storage, StorageBackend};
 use std::{
     collections::HashMap,
-    fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tracing::debug;
+use url::Url;
 
 #[derive(Debug, Clone)]
 pub enum MountType {
@@ -26,7 +26,7 @@ pub enum MountType {
 
 #[derive(Debug, Clone)]
 pub enum Source {
-    File(PathBuf),
+    Url(Url),
     Contents(Vec<u8>),
 }
 
@@ -216,8 +216,8 @@ fn stage_dirent(
                     workdir.join(&path)
                 };
                 return Ok(vec![WorkDirMount {
-                    source: Source::File(absolute_path),
-                    target: staged_path,
+                    source: Source::Url(Url::from_file_path(absolute_path).unwrap()),
+                    target: staged_path.clone(),
                     ty: MountType::File,
                     readonly: !dirent.writable.unwrap_or(false),
                 }]);
@@ -245,7 +245,7 @@ fn stage_dirent(
 
     Ok(vec![WorkDirMount {
         source: Source::Contents(string_content.into_bytes()),
-        target: staged_path,
+        target: staged_path.clone(),
         ty: MountType::File,
         readonly: !dirent.writable.unwrap_or(false),
     }])
@@ -280,14 +280,14 @@ fn stage_files(
         }
         if item.is_file() {
             mounts.push(WorkDirMount {
-                source: Source::File(path.clone()),
+                source: Source::Url(Url::from_file_path(&path).unwrap()),
                 target: staged_path.clone(),
                 ty: MountType::File,
                 readonly,
             });
         } else if item.is_dir() {
             mounts.push(WorkDirMount {
-                source: Source::File(path.clone()),
+                source: Source::Url(Url::from_file_path(&path).unwrap()),
                 target: staged_path.clone(),
                 ty: MountType::Directory,
                 readonly,
@@ -343,31 +343,15 @@ fn update_inputs(
     }
 }
 
-pub(crate) fn handle_inplace_update(mounts: Vec<WorkDirMount>) -> anyhow::Result<()> {
+pub(crate) async fn handle_inplace_update(
+    mounts: Vec<WorkDirMount>,
+    backend: Arc<StorageBackend>,
+) -> anyhow::Result<()> {
     for mount in mounts {
         if !mount.readonly
-            && let Source::File(src_path) = &mount.source
+            && let Source::Url(src_path) = &mount.source
         {
-            match mount.ty {
-                MountType::File => {
-                    fs::copy(&mount.target, src_path).with_context(|| {
-                        format!(
-                            "Could not copy {} to {}",
-                            mount.target.display(),
-                            src_path.display()
-                        )
-                    })?;
-                }
-                MountType::Directory => {
-                    copy_dir(&mount.target, src_path).with_context(|| {
-                        format!(
-                            "Could not copy {} to {}",
-                            mount.target.display(),
-                            src_path.display()
-                        )
-                    })?;
-                }
-            }
+            backend.upload(&mount.target, src_path).await?;
         }
     }
     Ok(())

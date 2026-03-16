@@ -1,4 +1,7 @@
-use crate::environment::workdir::{MountType, Source, WorkDirMount};
+use crate::{
+    environment::workdir::{MountType, Source, WorkDirMount},
+    io::normalize_url,
+};
 use anyhow::Context;
 use crankshaft::engine::{
     Task,
@@ -8,10 +11,11 @@ use crankshaft::engine::{
     },
 };
 use cwl_core::files::FileOrDirectory;
-use dircpy::copy_dir;
+use cwl_engine_storage::{Storage, StorageBackend};
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use url::Url;
 
@@ -23,11 +27,16 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
     if let Some(path) = input.path()
         && let Some(location) = input.location()
     {
+        let location = if input.is_dir() && !location.ends_with('/') {
+            format!("{}/", location)
+        } else {
+            location.to_string()
+        };
         let contents = if location.starts_with("file://") {
             let location = location.strip_prefix("file://").unwrap();
             Contents::Path(PathBuf::from(location))
         } else {
-            Contents::Url(Url::parse(location)?)
+            Contents::Url(Url::parse(&location)?)
         };
 
         task.add_input(
@@ -60,11 +69,36 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
     Ok(())
 }
 
-pub(crate) fn mount_workdir_item(
+pub enum MountStrategy {
+    Local,
+    Remote { base_url: Url },
+}
+
+pub(crate) async fn mount_workdir_item(
+    mount: WorkDirMount,
+    outdir: &Path,
+    workdir: &str,
+    use_container: bool,
+    task: &mut Task,
+    backend: Arc<StorageBackend>,
+    strategy: MountStrategy,
+) -> anyhow::Result<()> {
+    match strategy {
+        MountStrategy::Local => {
+            mount_workdir_item_local(mount, outdir, use_container, task, backend).await
+        }
+        MountStrategy::Remote { base_url } => {
+            mount_workdir_item_remote(mount, outdir, workdir, task, backend, &base_url).await
+        }
+    }
+}
+
+async fn mount_workdir_item_local(
     mount: WorkDirMount,
     outdir: &Path,
     use_container: bool,
     task: &mut Task,
+    backend: Arc<StorageBackend>,
 ) -> anyhow::Result<()> {
     if mount.target.starts_with(outdir) {
         if let Some(parent) = mount.target.parent()
@@ -78,27 +112,14 @@ pub(crate) fn mount_workdir_item(
             })?;
         }
         match (mount.ty, mount.source) {
-            (MountType::File, Source::File(path)) => {
-                fs::copy(&path, &mount.target).with_context(|| {
-                    format!(
-                        "Could not copy from {} to {}",
-                        path.display(),
-                        mount.target.display()
-                    )
-                })?;
-            }
+            (MountType::File, Source::Url(path)) => backend.download(&path, &mount.target).await?,
             (MountType::File, Source::Contents(items)) => {
                 fs::write(&mount.target, &items)
                     .with_context(|| format!("Could not write to {}", mount.target.display()))?;
             }
-            (MountType::Directory, Source::File(path)) => copy_dir(&path, &mount.target)
-                .with_context(|| {
-                    format!(
-                        "Could not copy from {} to {}",
-                        path.display(),
-                        mount.target.display()
-                    )
-                })?,
+            (MountType::Directory, Source::Url(path)) => {
+                backend.download(&path, &mount.target).await?
+            }
             (MountType::Directory, Source::Contents(_)) => {
                 fs::create_dir_all(&mount.target).with_context(|| {
                     format!(
@@ -113,7 +134,7 @@ pub(crate) fn mount_workdir_item(
             Input::builder()
                 .path(mount.target.to_string_lossy())
                 .contents(match mount.source {
-                    Source::File(path) => Contents::Path(path),
+                    Source::Url(path) => Contents::Url(path),
                     Source::Contents(data) => Contents::Literal(data),
                 })
                 .ty(match mount.ty {
@@ -132,6 +153,76 @@ pub(crate) fn mount_workdir_item(
     Ok(())
 }
 
+async fn mount_workdir_item_remote(
+    mount: WorkDirMount,
+    outdir: &Path,
+    workdir: &str,
+    task: &mut Task,
+    backend: Arc<StorageBackend>,
+    base_url: &Url,
+) -> anyhow::Result<()> {
+    let rel = mount.target.strip_prefix(outdir).unwrap_or(&mount.target);
+    let guest_path = if mount.target.starts_with(outdir) {
+        format!("{}/{}", workdir, rel.display())
+    } else {
+        mount.target.to_string_lossy().to_string()
+    };
+
+    match (mount.ty, mount.source) {
+        (MountType::File, Source::Url(url)) => {
+            let dest = if url.scheme() == "file" {
+                let local = Path::new(url.path());
+                let dest = base_url.join(&rel.to_string_lossy())?;
+                backend.upload(local, &dest).await?;
+                dest
+            } else {
+                url // already remote, use directly
+            };
+            task.add_input(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::File)
+                    .read_only(true)
+                    .build(),
+            );
+        }
+        (MountType::File, Source::Contents(data)) => {
+            let dest = base_url.join(&rel.to_string_lossy())?;
+            backend.upload_bytes(&data, &dest).await?;
+            task.add_input(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::File)
+                    .read_only(true)
+                    .build(),
+            );
+        }
+        (MountType::Directory, Source::Url(url)) => {
+            let dest = if url.scheme() == "file" {
+                let local = Path::new(url.path());
+                let dest = base_url.join(&format!("{}/", rel.display()))?;
+                backend.upload(local, &dest).await?;
+                dest
+            } else {
+                url
+            };
+            task.add_input(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::Directory)
+                    .read_only(true)
+                    .build(),
+            );
+        }
+        (MountType::Directory, Source::Contents(_)) => {}
+    }
+
+    Ok(())
+}
+
 pub(crate) fn remove_materialized_inputs(
     flattened_inputs: Vec<FileOrDirectory>,
     mounts: &[WorkDirMount],
@@ -146,11 +237,11 @@ pub(crate) fn remove_materialized_inputs(
             let Some(location) = input.location() else {
                 continue;
             };
-            let loc_path = location.strip_prefix("file://").unwrap();
-            let Source::File(mount_path) = &mount.source else {
+            let loc_url = Url::parse(location).unwrap();
+            let Source::Url(mount_path) = &mount.source else {
                 continue;
             };
-            if loc_path == mount_path {
+            if loc_url == normalize_url(mount_path) {
                 materialized = true;
                 break;
             }

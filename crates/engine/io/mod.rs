@@ -148,6 +148,29 @@ fn file_checksum(path: &Path) -> std::io::Result<[u8; 20]> {
     Ok(hasher.finalize().into())
 }
 
+pub(crate) fn normalize_url(url: &Url) -> Url {
+    let mut normalized = url.clone();
+
+    let mut stack: Vec<&str> = Vec::new();
+
+    if let Some(segments) = url.path_segments() {
+        for seg in segments {
+            match seg {
+                "" | "." => {}
+                ".." => {
+                    stack.pop();
+                }
+                _ => stack.push(seg),
+            }
+        }
+    }
+
+    let new_path = format!("/{}", stack.join("/"));
+    normalized.set_path(&new_path);
+
+    normalized
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

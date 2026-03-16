@@ -142,10 +142,11 @@ pub(crate) fn get_processor_count() -> usize {
     SYSTEM.cpus().iter().count()
 }
 
+//Gets available RAM in mebibytes
 pub(crate) fn get_available_ram() -> u64 {
-    SYSTEM.free_memory() / 1024
+    SYSTEM.free_memory() / 1024 / 1024
 }
 
 pub(crate) fn get_available_disk_space() -> u64 {
-    DISKS[0].available_space() / 1024
+    DISKS[0].available_space() / 1024 / 1024
 }

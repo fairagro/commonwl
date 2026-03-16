@@ -1,6 +1,8 @@
 use crate::{
-    backend::mount::{mount_input, mount_workdir_item},
-    backend::{TaskBackend, TaskExecutionRequest, TaskExecutionResult},
+    backend::{
+        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        mount::{MountStrategy, mount_input, mount_workdir_item},
+    },
     docker::build_container,
     expression::{do_eval, do_eval_to_string},
 };
@@ -146,9 +148,13 @@ impl TaskBackend for DockerBackend {
             mount_workdir_item(
                 mount.clone(),
                 request.outdir,
+                request.staged_dir,
                 request.use_container,
                 &mut task,
-            )?;
+                request.storage.clone(),
+                MountStrategy::Local,
+            )
+            .await?;
         }
 
         //add outdir mount
@@ -283,6 +289,7 @@ mod tests {
 
     use super::*;
     use crate::{backend::execute_commandline_tool, request::create_execution_request};
+    use cwl_engine_storage::StorageBackend;
     use tempfile::tempdir;
 
     #[tokio::test]
@@ -307,7 +314,8 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
         assert!(result.is_ok());
 
         //check if output file exists
@@ -330,7 +338,8 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
         assert!(result.is_ok());
     }
 
@@ -349,7 +358,8 @@ mod tests {
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute_commandline_tool(backend, storage, &request, cancellation_token).await;
 
         assert!(result.is_ok());
         //check if output file exists

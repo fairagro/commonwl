@@ -139,12 +139,12 @@ pub fn build_container_command(
     }
 
     for mount in options.mounts {
-        let workdir::Source::File(loc) = mount.source else {
+        let workdir::Source::Url(loc) = mount.source else {
             continue;
         };
         let mount = format!(
             "--mount=type=bind,source={},target={}",
-            loc.to_string_lossy(),
+            loc.path(), //dangerous
             mount.target.to_string_lossy()
         );
         args.push(mount);

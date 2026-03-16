@@ -5,6 +5,7 @@ use cwl_engine::{
     TaskBackend, create_execution_request_with_inputs, evaluate_exitcodes, execute,
     load_input_file_from_file,
 };
+use cwl_engine_storage::StorageBackend;
 use serde::Deserialize;
 use std::{
     fs,
@@ -235,7 +236,8 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
 
         eprintln!("Running Test {}", test.id);
         let backend = backend.task_scoped();
-        let result = execute(backend, &request, cancellation_token).await;
+        let storage = Arc::new(StorageBackend::new());
+        let result = execute(backend, storage, &request, cancellation_token).await;
         if test.should_fail {
             if result.is_ok() {
                 dbg!(&result);

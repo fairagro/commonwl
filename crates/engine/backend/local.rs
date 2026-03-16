@@ -2,7 +2,7 @@ use crate::{
     backend::{
         TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         local::command::CommandBackend,
-        mount::{mount_input, mount_workdir_item},
+        mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
     expression::{do_eval, do_eval_to_string},
@@ -156,9 +156,13 @@ impl TaskBackend for LocalBackend {
             mount_workdir_item(
                 mount.clone(),
                 request.outdir,
+                request.staged_dir,
                 request.use_container,
                 &mut task,
-            )?;
+                request.storage.clone(),
+                MountStrategy::Local,
+            )
+            .await?;
         }
 
         //add outdir mount
