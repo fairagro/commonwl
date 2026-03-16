@@ -1,4 +1,4 @@
-Database: boltdb
+Database: badger
 Compute: local
 
 Server:

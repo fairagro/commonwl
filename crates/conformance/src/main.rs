@@ -54,7 +54,7 @@ async fn main() -> anyhow::Result<()> {
     } else if backend_select == "tes" {
         let config = tes::Config::builder()
             .url(Url::parse("http://localhost:8000")?)
-            .interval(10)
+            .interval(1)
             .build();
         Arc::new(TesBackend::new(config, storage).await?)
     } else {

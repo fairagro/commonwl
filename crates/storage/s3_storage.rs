@@ -13,7 +13,7 @@ use url::Url;
 
 #[derive(Debug, Clone)]
 pub struct S3Storage {
-    client: OnceCell<s3::Client>,
+    client: OnceCell<Arc<s3::Client>>,
 }
 
 impl S3Storage {
@@ -24,22 +24,23 @@ impl S3Storage {
         }
     }
 
-    async fn client(&self) -> anyhow::Result<&s3::Client> {
+    async fn client(&self) -> anyhow::Result<Arc<s3::Client>> {
         self.client
             .get_or_try_init(|| async {
                 dotenvy::dotenv().ok();
 
                 let endpoint_url = std::env::var("S3_ENDPOINT_URL")?;
                 let config = aws_config::load_from_env().await;
-                Ok(aws_sdk_s3::Client::from_conf(
+                Ok(Arc::new(aws_sdk_s3::Client::from_conf(
                     s3::config::Builder::from(&config)
                         .endpoint_url(endpoint_url)
                         .force_path_style(true)
                         .request_checksum_calculation(RequestChecksumCalculation::WhenRequired)
                         .build(),
-                ))
+                )))
             })
             .await
+            .cloned()
     }
 
     /// Parses <s3://bucket/key> or "bucket/key" into (bucket, key)
