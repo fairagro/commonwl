@@ -18,7 +18,7 @@ jobs:
       - name: Build conformance binary
         run: cargo build --release
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: conformance
           path: target/release/conformance
@@ -39,7 +39,7 @@ jobs:
         with:
           submodules: "true"
       - name: Download binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: conformance
           path: target/release
