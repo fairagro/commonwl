@@ -25,6 +25,8 @@ jobs:
         if: matrix.variant == 'tes'
         run: |
           mkdir logs data
+          chown 10001:10001 logs
+          chown 10001:10001 data
           docker run  -p 9000:9000 -p 9001:9001 -v $(pwd)/data:/data -v $(pwd)/logs:/logs rustfs/rustfs:latest
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/health && break

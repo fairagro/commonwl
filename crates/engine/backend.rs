@@ -299,7 +299,7 @@ pub async fn execute_workflow(
                     let backend_clone = backend.task_scoped();
                     let job_outdir = collection_dir
                         .path()
-                        .join(format!("{}_{}", step_id_clone, job_index));
+                        .join(format!("{step_id_clone}_{job_index}"));
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
