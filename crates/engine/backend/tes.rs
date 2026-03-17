@@ -196,7 +196,7 @@ impl TaskBackend for TesBackend {
             (request.outdir.join(&filename), bucket_url.join(&filename)?)
         } else {
             let filename = format!("stderr_{}", &Uuid::new_v4().to_string()[..8]);
-            (request.outdir.join(&filename), bucket_url.join(&filename)?)
+            (request.tmpdir.join(&filename), bucket_url.join(&filename)?)
         };
         task.add_output(
             Output::builder()
@@ -222,7 +222,7 @@ impl TaskBackend for TesBackend {
             (request.outdir.join(&filename), bucket_url.join(&filename)?)
         } else {
             let filename = format!("stdout_{}", &Uuid::new_v4().to_string()[..8]);
-            (request.outdir.join(&filename), bucket_url.join(&filename)?)
+            (request.tmpdir.join(&filename), bucket_url.join(&filename)?)
         };
         task.add_output(
             Output::builder()
