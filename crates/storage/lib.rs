@@ -81,6 +81,7 @@ pub enum StoragePath {
 }
 
 impl StoragePath {
+    #[must_use]
     pub fn from_url(url: Url) -> Self {
         if url.scheme() == "file"
             && let Ok(path) = url.to_file_path()
@@ -91,14 +92,19 @@ impl StoragePath {
         Self::Remote(url)
     }
 
+    #[must_use]
     pub fn from_local(path: &Path) -> Self {
         Self::Local(path.to_path_buf())
     }
 
+    #[must_use]
     pub fn is_local(&self) -> bool {
         matches!(self, Self::Local(_)) || matches!(self, Self::Remote(r) if r.scheme() == "file")
     }
 
+    /// Returns an owned `PathBuf`
+    /// # Errors
+    /// Returns an error if either `Url::to_file_path` fails or self is not local
     pub fn as_local_path(&self) -> anyhow::Result<PathBuf> {
         if let Self::Local(path) = self {
             Ok(path.clone())
@@ -106,25 +112,31 @@ impl StoragePath {
             && url.scheme() == "file"
         {
             url.to_file_path()
-                .map_err(|_| anyhow::anyhow!("Not a local path: {}", url))
+                .map_err(|()| anyhow::anyhow!("Not a local path: {url}"))
         } else {
             anyhow::bail!("URL {self:?} is not local!")
         }
     }
 
+    /// Returns an `Url` representation
+    /// # Errors
+    /// if `Url::from_file_path` fails
     pub fn as_url(&self) -> anyhow::Result<Url> {
         match self {
             Self::Remote(url) => Ok(url.clone()),
             Self::Local(path) => Url::from_file_path(path)
-                .map_err(|_| anyhow::anyhow!("Could not convert path to URL: {}", path.display())),
+                .map_err(|()| anyhow::anyhow!("Could not convert path to URL: {}", path.display())),
         }
     }
 
+    /// Creates an owned copy with segmnet adjoined to self.
+    /// # Errors
+    /// if `Url::join` fails
     pub fn join(&self, segment: &str) -> anyhow::Result<Self> {
         match self {
             Self::Local(path) => Ok(Self::Local(path.join(segment))),
             Self::Remote(url) => {
-                let base = if url.path().ends_with("/") {
+                let base = if url.path().ends_with('/') {
                     url.clone()
                 } else {
                     let mut u = url.clone();

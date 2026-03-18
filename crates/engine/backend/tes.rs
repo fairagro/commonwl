@@ -65,8 +65,8 @@ impl TesBackend {
 
         Ok(Self {
             storage,
-            backend,
             data_store,
+            backend,
         })
     }
 }

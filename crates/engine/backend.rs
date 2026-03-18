@@ -82,7 +82,7 @@ pub trait TaskBackend: Send + Sync + 'static {
     /// provides the path where the tmpdir is located in the container
     fn container_tmp_dir(&self) -> String;
 
-    /// where files are stored by the backend. e.g. /tmp/ for local backends or s3://my-bucket for remote
+    /// where files are stored by the backend. e.g. /tmp for local backends or <s3://my-bucket> for remote
     fn data_store(&self) -> &StoragePath;
 }
 
