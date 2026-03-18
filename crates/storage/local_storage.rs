@@ -67,6 +67,6 @@ impl Storage for LocalStorage {
 
         tokio::fs::remove_dir_all(uri)
             .await
-            .with_context(|| format!("Can not remove directory: {uri:?}"))
+            .with_context(|| format!("Can not remove directory: {}", uri.display()))
     }
 }

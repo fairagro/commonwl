@@ -166,6 +166,9 @@ pub struct RemoteTempDir {
     storage: Arc<StorageBackend>,
 }
 impl RemoteTempDir {
+    /// creates a new tempdir at a base path
+    /// # Errors
+    /// if dir is local and can not be created
     pub async fn new_under(
         base: &StoragePath,
         storage: Arc<StorageBackend>,
