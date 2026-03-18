@@ -72,8 +72,14 @@ pub trait TaskBackend: Send + Sync + 'static {
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend>;
     fn storage(&self) -> Arc<StorageBackend>;
+
+    /// provides the path where the inputs are stored in the container
     fn container_input_dir(&self) -> String;
+
+    /// provides the path where the workdir (iwdr) is stored in the container
     fn container_work_dir(&self) -> String;
+
+    /// provides the path where the tmpdir is located in the container
     fn container_tmp_dir(&self) -> String;
 }
 
