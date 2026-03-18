@@ -21,7 +21,7 @@ use crankshaft::{
     },
 };
 use cwl_core::{IntegerOrExpression, files::FileOrDirectory};
-use cwl_engine_storage::{Storage, StorageBackend};
+use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::{
     collections::HashMap,
@@ -43,6 +43,7 @@ const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
 #[derive(Debug, Clone)]
 pub struct TesBackend {
     storage: Arc<StorageBackend>,
+    data_store: StoragePath,
     backend: Arc<tes::Backend>,
 }
 
@@ -50,7 +51,11 @@ impl TesBackend {
     /// Creates a new instance of `TesBackend`
     /// # Errors
     /// ??
-    pub async fn new(config: Config, storage: Arc<StorageBackend>) -> anyhow::Result<Self> {
+    pub async fn new(
+        config: Config,
+        storage: Arc<StorageBackend>,
+        data_store: StoragePath,
+    ) -> anyhow::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
@@ -58,7 +63,11 @@ impl TesBackend {
         )));
         let backend = Arc::new(tes::Backend::initialize(config, names, None).await);
 
-        Ok(Self { storage, backend })
+        Ok(Self {
+            storage,
+            backend,
+            data_store,
+        })
     }
 }
 
@@ -108,7 +117,7 @@ impl TaskBackend for TesBackend {
             .maybe_description(request.description)
             .executions(nonempty![
                 Execution::builder()
-                    .work_dir(request.staged_dir)
+                    .work_dir(request.execution_path)
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
@@ -142,7 +151,7 @@ impl TaskBackend for TesBackend {
         let sem = Arc::new(tokio::sync::Semaphore::new(32));
         for mount in request.mounts.iter().cloned() {
             let outdir = request.outdir.to_owned();
-            let workdir = request.staged_dir.to_owned();
+            let workdir = request.execution_path.to_owned();
             let use_container = request.use_container;
             let storage = self.storage();
             let base_url = s3_workdir.clone();
@@ -298,6 +307,10 @@ impl TaskBackend for TesBackend {
 
     fn container_tmp_dir(&self) -> String {
         CONTAINER_TMPDIR.to_string()
+    }
+
+    fn data_store(&self) -> &StoragePath {
+        &self.data_store
     }
 }
 

@@ -37,7 +37,7 @@ use cwl_core::{
         ScatterFeatureRequirement, ToolTimeLimit,
     },
 };
-use cwl_engine_storage::StorageBackend;
+use cwl_engine_storage::{StorageBackend, StoragePath};
 use futures_util::{
     FutureExt,
     future::{BoxFuture, join_all},
@@ -81,6 +81,9 @@ pub trait TaskBackend: Send + Sync + 'static {
 
     /// provides the path where the tmpdir is located in the container
     fn container_tmp_dir(&self) -> String;
+
+    /// where files are stored by the backend. e.g. /tmp/ for local backends or s3://my-bucket for remote
+    fn data_store(&self) -> &StoragePath;
 }
 
 #[derive(Debug, Clone, Default)]
@@ -115,8 +118,9 @@ pub struct TaskExecutionRequest<'a> {
 
     pub outdir: &'a Path,
     pub tmpdir: &'a Path,
-    pub working_dir: &'a Path,
-    pub staged_dir: &'a str,
+
+    // The container side mounted workdir
+    pub execution_path: &'a str,
 }
 
 #[derive(Debug, Clone)]
@@ -650,8 +654,7 @@ pub async fn execute_commandline_tool(
 
                     outdir: outdir.path(),
                     tmpdir: tmpdir.path(),
-                    working_dir: &request.working_dir,
-                    staged_dir: workdir,
+                    execution_path: workdir,
                 },
                 token,
             )

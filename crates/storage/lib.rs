@@ -1,6 +1,9 @@
 use crate::{local_storage::LocalStorage, s3_storage::S3Storage};
 use async_trait::async_trait;
-use std::{collections::HashMap, path::Path};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 use tempfile::NamedTempFile;
 use url::Url;
 
@@ -68,5 +71,69 @@ impl Storage for StorageBackend {
             .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
             .exists(uri)
             .await
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum StoragePath {
+    Local(PathBuf),
+    Remote(Url),
+}
+
+impl StoragePath {
+    pub fn from_url(url: Url) -> Self {
+        if url.scheme() == "file"
+            && let Ok(path) = url.to_file_path()
+        {
+            return Self::Local(path);
+        }
+
+        Self::Remote(url)
+    }
+
+    pub fn from_local(path: &Path) -> Self {
+        Self::Local(path.to_path_buf())
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self, Self::Local(_)) || matches!(self, Self::Remote(r) if r.scheme() == "file")
+    }
+
+    pub fn as_local_path(&self) -> anyhow::Result<PathBuf> {
+        if let Self::Local(path) = self {
+            Ok(path.clone())
+        } else if let Self::Remote(url) = self
+            && url.scheme() == "file"
+        {
+            url.to_file_path()
+                .map_err(|_| anyhow::anyhow!("Not a local path: {}", url))
+        } else {
+            anyhow::bail!("URL {self:?} is not local!")
+        }
+    }
+
+    pub fn as_url(&self) -> anyhow::Result<Url> {
+        match self {
+            Self::Remote(url) => Ok(url.clone()),
+            Self::Local(path) => Url::from_file_path(path)
+                .map_err(|_| anyhow::anyhow!("Could not convert path to URL: {}", path.display())),
+        }
+    }
+
+    pub fn join(&self, segment: &str) -> anyhow::Result<Self> {
+        match self {
+            Self::Local(path) => Ok(Self::Local(path.join(segment))),
+            Self::Remote(url) => {
+                let base = if url.path().ends_with("/") {
+                    url.clone()
+                } else {
+                    let mut u = url.clone();
+                    u.set_path(&format!("{}/", url.path()));
+                    u
+                };
+
+                Ok(Self::Remote(base.join(segment)?))
+            }
+        }
     }
 }

@@ -5,7 +5,7 @@ use cwl_engine::{
     TaskBackend, create_execution_request_with_inputs, evaluate_exitcodes, execute,
     load_input_file_from_file,
 };
-use cwl_engine_storage::StorageBackend;
+use cwl_engine_storage::{StorageBackend, StoragePath};
 use serde::Deserialize;
 use std::{
     fs,
@@ -36,7 +36,12 @@ async fn test_conformance_docker_clt() {
     //create docker backend
     let config = Config::default();
     let storage = Arc::new(StorageBackend::new());
-    let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
+    let data_store = StoragePath::from_local(Path::new("/tmp"));
+    let backend = Arc::new(
+        DockerBackend::new(config, storage, data_store)
+            .await
+            .unwrap(),
+    );
 
     execute_conformance_test(backend, before.iter().copied().chain(after.iter().copied())).await;
 }
@@ -52,7 +57,12 @@ async fn test_conformance_local_clt() {
 
     //create local backend
     let storage = Arc::new(StorageBackend::new());
-    let backend = Arc::new(LocalBackend::new(ContainerEngine::Docker, storage));
+    let data_store = StoragePath::from_local(Path::new("/tmp"));
+    let backend = Arc::new(LocalBackend::new(
+        ContainerEngine::Docker,
+        storage,
+        data_store,
+    ));
 
     execute_conformance_test(backend, selected_tests.into_iter().take(178)).await;
 }
@@ -68,7 +78,12 @@ async fn test_conformance_docker_et() {
     //create docker backend
     let config = Config::default();
     let storage = Arc::new(StorageBackend::new());
-    let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
+    let data_store = StoragePath::from_local(Path::new("/tmp"));
+    let backend = Arc::new(
+        DockerBackend::new(config, storage, data_store)
+            .await
+            .unwrap(),
+    );
 
     //all expression tools pass! :)
     execute_conformance_test(backend, selected_tests).await;
@@ -85,7 +100,12 @@ async fn test_conformance_docker_wf() {
     //create docker backend
     let config = Config::default();
     let storage = Arc::new(StorageBackend::new());
-    let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
+    let data_store = StoragePath::from_local(Path::new("/tmp"));
+    let backend = Arc::new(
+        DockerBackend::new(config, storage, data_store)
+            .await
+            .unwrap(),
+    );
 
     //all workflow pass! :)
     execute_conformance_test(backend, selected_tests).await;

@@ -27,7 +27,7 @@ use crankshaft::{
     },
 };
 use cwl_core::IntegerOrExpression;
-use cwl_engine_storage::StorageBackend;
+use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::{
     sync::{Arc, Mutex},
@@ -49,6 +49,7 @@ pub struct DockerBackend {
     //wrapper to Bollard Docker client
     client: Docker,
     storage: Arc<StorageBackend>,
+    data_store: StoragePath,
     //wrapper to crankshaft backend
     backend: Arc<docker::Backend>,
 }
@@ -57,7 +58,11 @@ impl DockerBackend {
     /// Creates a new instance of `DockerBackend`
     /// # Errors
     /// Throws if the docker client is not reachable
-    pub async fn new(config: Config, storage: Arc<StorageBackend>) -> anyhow::Result<Self> {
+    pub async fn new(
+        config: Config,
+        storage: Arc<StorageBackend>,
+        data_store: StoragePath,
+    ) -> anyhow::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
@@ -71,6 +76,7 @@ impl DockerBackend {
         Ok(Self {
             client,
             storage,
+            data_store,
             backend,
         })
     }
@@ -126,7 +132,7 @@ impl TaskBackend for DockerBackend {
             .maybe_description(request.description)
             .executions(nonempty![
                 Execution::builder()
-                    .work_dir(request.staged_dir)
+                    .work_dir(request.execution_path)
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
@@ -154,7 +160,7 @@ impl TaskBackend for DockerBackend {
             let inputs = mount_workdir_item(
                 mount.clone(),
                 request.outdir,
-                request.staged_dir,
+                request.execution_path,
                 request.use_container,
                 self.storage(),
                 MountStrategy::Local,
@@ -170,7 +176,7 @@ impl TaskBackend for DockerBackend {
             Input::builder()
                 .name("outdir")
                 .contents(Contents::Path(request.outdir.to_path_buf()))
-                .path(request.staged_dir)
+                .path(request.execution_path)
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
@@ -278,6 +284,10 @@ impl TaskBackend for DockerBackend {
     fn container_tmp_dir(&self) -> String {
         CONTAINER_TMPDIR.to_string()
     }
+
+    fn data_store(&self) -> &StoragePath {
+        &self.data_store
+    }
 }
 
 impl DockerBackend {
@@ -308,7 +318,8 @@ mod tests {
     async fn test_docker_backend_creation() {
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let backend = DockerBackend::new(config, storage).await;
+        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let backend = DockerBackend::new(config, storage, data_store).await;
         assert!(backend.is_ok());
     }
 
@@ -323,7 +334,12 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
+        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let backend = Arc::new(
+            DockerBackend::new(config, storage, data_store)
+                .await
+                .unwrap(),
+        );
         let tmpdir = tempdir().unwrap();
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
@@ -347,7 +363,12 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
+        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let backend = Arc::new(
+            DockerBackend::new(config, storage, data_store)
+                .await
+                .unwrap(),
+        );
         let tmpdir = tempdir().unwrap();
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
@@ -367,7 +388,12 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let backend = Arc::new(DockerBackend::new(config, storage).await.unwrap());
+        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let backend = Arc::new(
+            DockerBackend::new(config, storage, data_store)
+                .await
+                .unwrap(),
+        );
         let tmpdir = tempdir().unwrap();
         let request =
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();

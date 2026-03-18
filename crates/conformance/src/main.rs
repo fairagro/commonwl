@@ -6,7 +6,7 @@ use commonwl::engine::{
 };
 use core::panic;
 use crankshaft::config::backend::{docker::Config, tes};
-use cwl_engine_storage::StorageBackend;
+use cwl_engine_storage::{StorageBackend, StoragePath};
 use std::{
     env,
     path::{Path, PathBuf},
@@ -46,17 +46,23 @@ async fn main() -> anyhow::Result<()> {
 
     let storage = Arc::new(StorageBackend::new());
     let backend_select = env::var("BACKEND").unwrap_or("docker".to_string());
+    let local_data_store = StoragePath::from_local(Path::new("/tmp"));
+    let remote_data_store = StoragePath::from_url(Url::parse("s3://commonwl-bucket")?);
     let backend: Arc<dyn TaskBackend> = if backend_select == "docker" {
         let config = Config::default();
-        Arc::new(DockerBackend::new(config, storage).await?)
+        Arc::new(DockerBackend::new(config, storage, local_data_store).await?)
     } else if backend_select == "local" {
-        Arc::new(LocalBackend::new(ContainerEngine::Docker, storage))
+        Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            local_data_store,
+        ))
     } else if backend_select == "tes" {
         let config = tes::Config::builder()
             .url(Url::parse("http://localhost:8000")?)
             .interval(1)
             .build();
-        Arc::new(TesBackend::new(config, storage).await?)
+        Arc::new(TesBackend::new(config, storage, remote_data_store).await?)
     } else {
         panic!()
     };

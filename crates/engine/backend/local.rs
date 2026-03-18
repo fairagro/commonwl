@@ -19,7 +19,7 @@ use crankshaft::engine::{
     },
 };
 use cwl_core::{IntegerOrExpression, files::FileOrDirectory};
-use cwl_engine_storage::StorageBackend;
+use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::{fs, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
@@ -34,19 +34,25 @@ pub struct LocalBackend {
     uuid: String,
     container_engine: ContainerEngine,
     storage: Arc<StorageBackend>,
+    data_store: StoragePath,
     //wrapper to crankshaft backend
     backend: Arc<CommandBackend>,
 }
 
 impl LocalBackend {
     #[must_use]
-    pub fn new(container_engine: ContainerEngine, storage: Arc<StorageBackend>) -> Self {
+    pub fn new(
+        container_engine: ContainerEngine,
+        storage: Arc<StorageBackend>,
+        data_store: StoragePath,
+    ) -> Self {
         let backend = Arc::new(CommandBackend {});
 
         Self {
             uuid: Uuid::new_v4().to_string()[..8].to_string(),
             container_engine,
             storage,
+            data_store,
             backend,
         }
     }
@@ -118,7 +124,7 @@ impl TaskBackend for LocalBackend {
                 .env(request.env.clone())
                 .outdir(self.container_work_dir())
                 .tmpdir(request.runtime.tmpdir.to_string_lossy())
-                .workdir(request.staged_dir)
+                .workdir(request.execution_path)
                 .maybe_docker_file(dr.docker_file)
                 .mounts(extras)
                 .build();
@@ -159,7 +165,7 @@ impl TaskBackend for LocalBackend {
             let inputs = mount_workdir_item(
                 mount.clone(),
                 request.outdir,
-                request.staged_dir,
+                request.execution_path,
                 request.use_container,
                 self.storage(),
                 MountStrategy::Local,
@@ -274,7 +280,11 @@ impl TaskBackend for LocalBackend {
     }
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend> {
-        Arc::new(LocalBackend::new(self.container_engine, self.storage())) as Arc<dyn TaskBackend>
+        Arc::new(LocalBackend::new(
+            self.container_engine,
+            self.storage(),
+            self.data_store().clone(),
+        )) as Arc<dyn TaskBackend>
     }
 
     fn storage(&self) -> Arc<StorageBackend> {
@@ -289,5 +299,9 @@ impl TaskBackend for LocalBackend {
     }
     fn container_tmp_dir(&self) -> String {
         format!("/tmp/{}/tmp", self.uuid)
+    }
+
+    fn data_store(&self) -> &StoragePath {
+        &self.data_store
     }
 }
