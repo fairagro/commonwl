@@ -61,15 +61,15 @@ impl TaskBackend for LocalBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         let stdout_file = if let Some(s) = request.stdout_file {
-            &format!("{}/{s}", self.tmp_dir())
+            &format!("{}/{s}", self.container_tmp_dir())
         } else {
-            &format!("{}/stdout", self.tmp_dir())
+            &format!("{}/stdout", self.container_tmp_dir())
         };
 
         let stderr_file = if let Some(s) = request.stderr_file {
-            &format!("{}/{s}", self.tmp_dir())
+            &format!("{}/{s}", self.container_tmp_dir())
         } else {
-            &format!("{}/stderr", self.tmp_dir())
+            &format!("{}/stderr", self.container_tmp_dir())
         };
 
         let mut inputs = request.inputs.to_vec();
@@ -116,7 +116,7 @@ impl TaskBackend for LocalBackend {
                 .network(request.network)
                 .engine(self.container_engine)
                 .env(request.env.clone())
-                .outdir(self.work_dir())
+                .outdir(self.container_work_dir())
                 .tmpdir(request.runtime.tmpdir.to_string_lossy())
                 .workdir(request.staged_dir)
                 .maybe_docker_file(dr.docker_file)
@@ -131,7 +131,7 @@ impl TaskBackend for LocalBackend {
             .maybe_description(request.description)
             .executions(nonempty![
                 Execution::builder()
-                    .work_dir(self.work_dir())
+                    .work_dir(self.container_work_dir())
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
@@ -175,7 +175,7 @@ impl TaskBackend for LocalBackend {
             Input::builder()
                 .name("outdir")
                 .contents(Contents::Path(request.outdir.to_path_buf()))
-                .path(self.work_dir())
+                .path(self.container_work_dir())
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
@@ -186,7 +186,7 @@ impl TaskBackend for LocalBackend {
             Input::builder()
                 .name("tmpdir")
                 .contents(Contents::Path(request.tmpdir.to_path_buf()))
-                .path(self.tmp_dir())
+                .path(self.container_tmp_dir())
                 .ty(input::Type::Directory)
                 .read_only(false)
                 .build(),
@@ -232,7 +232,7 @@ impl TaskBackend for LocalBackend {
         task.add_output(
             Output::builder()
                 .name("workdir")
-                .path(self.work_dir())
+                .path(self.container_work_dir())
                 .url(Url::from_file_path(request.outdir).unwrap())
                 .ty(output::Type::Directory)
                 .build(),
@@ -281,13 +281,13 @@ impl TaskBackend for LocalBackend {
         self.storage.clone()
     }
 
-    fn input_dir(&self) -> String {
+    fn container_input_dir(&self) -> String {
         format!("/tmp/{}/inputs", self.uuid)
     }
-    fn work_dir(&self) -> String {
+    fn container_work_dir(&self) -> String {
         format!("/tmp/{}/work", self.uuid)
     }
-    fn tmp_dir(&self) -> String {
+    fn container_tmp_dir(&self) -> String {
         format!("/tmp/{}/tmp", self.uuid)
     }
 }

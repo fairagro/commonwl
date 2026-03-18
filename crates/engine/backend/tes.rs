@@ -288,15 +288,15 @@ impl TaskBackend for TesBackend {
         self.storage.clone()
     }
 
-    fn input_dir(&self) -> String {
+    fn container_input_dir(&self) -> String {
         CONTAINER_INPUT_DIR.to_string()
     }
 
-    fn work_dir(&self) -> String {
+    fn container_work_dir(&self) -> String {
         CONTAINER_WORKDIR.to_string()
     }
 
-    fn tmp_dir(&self) -> String {
+    fn container_tmp_dir(&self) -> String {
         CONTAINER_TMPDIR.to_string()
     }
 }

@@ -72,9 +72,9 @@ pub trait TaskBackend: Send + Sync + 'static {
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend>;
     fn storage(&self) -> Arc<StorageBackend>;
-    fn input_dir(&self) -> String;
-    fn work_dir(&self) -> String;
-    fn tmp_dir(&self) -> String;
+    fn container_input_dir(&self) -> String;
+    fn container_work_dir(&self) -> String;
+    fn container_tmp_dir(&self) -> String;
 }
 
 #[derive(Debug, Clone, Default)]
@@ -488,7 +488,7 @@ pub async fn execute_commandline_tool(
     let outdir = tempdir()?;
     let tmpdir = tempdir()?;
 
-    let default_input_dir = backend.input_dir();
+    let default_input_dir = backend.container_input_dir();
     let stage_dir = match &request.specification {
         CWLDocument::CommandLineTool(_) => Path::new(&default_input_dir),
         CWLDocument::ExpressionTool(_) => outdir.path(),
@@ -516,13 +516,13 @@ pub async fn execute_commandline_tool(
     {
         dr_outdir
     } else {
-        &backend.work_dir()
+        &backend.container_work_dir()
     };
 
     //create runtime struct
     let mut runtime = build_runtime(rr, eval_context, &cwl_version)?;
     runtime.outdir = PathBuf::from(workdir);
-    runtime.tmpdir = PathBuf::from(backend.tmp_dir());
+    runtime.tmpdir = PathBuf::from(backend.container_tmp_dir());
 
     eval_context.runtime = Some(&runtime);
 
