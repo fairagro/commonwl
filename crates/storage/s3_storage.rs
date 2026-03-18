@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::RequestChecksumCalculation;
 use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -167,6 +168,59 @@ impl Storage for S3Storage {
                 }
             }
         }
+    }
+
+    async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
+        let (bucket, key) = S3Storage::parse_uri(uri)?;
+
+        let mut continuation_token = None;
+
+        loop {
+            let mut req = self
+                .client()
+                .await?
+                .list_objects_v2()
+                .bucket(&bucket)
+                .prefix(&key);
+
+            if let Some(token) = continuation_token {
+                req = req.continuation_token(token);
+            }
+
+            let page = req.send().await?;
+            let keys: Vec<_> = page
+                .contents()
+                .iter()
+                .filter_map(|obj| obj.key())
+                .map(|k| ObjectIdentifier::builder().key(k).build())
+                .collect::<Result<_, _>>()?;
+
+            if keys.is_empty() {
+                break;
+            }
+
+            self.client()
+                .await?
+                .delete_objects()
+                .bucket(&bucket)
+                .delete(
+                    Delete::builder()
+                        .set_objects(Some(keys))
+                        .quiet(true)
+                        .build()?,
+                )
+                .send()
+                .await?;
+
+            // Check if there are more pages
+            if page.is_truncated().unwrap_or(false) {
+                continuation_token = page.next_continuation_token().map(str::to_string);
+            } else {
+                break;
+            }
+        }
+
+        Ok(())
     }
 }
 

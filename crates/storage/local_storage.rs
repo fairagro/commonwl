@@ -60,4 +60,13 @@ impl Storage for LocalStorage {
         let uri = Path::new(uri.path());
         Ok(tokio::fs::try_exists(uri).await?)
     }
+
+    async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
+        ensure!(uri.scheme() == "file");
+        let uri = Path::new(uri.path());
+
+        tokio::fs::remove_dir_all(uri)
+            .await
+            .with_context(|| format!("Can not remove directory: {uri:?}"))
+    }
 }

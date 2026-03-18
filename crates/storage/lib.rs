@@ -3,9 +3,11 @@ use async_trait::async_trait;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tempfile::NamedTempFile;
 use url::Url;
+use uuid::Uuid;
 
 pub mod local_storage;
 pub mod s3_storage;
@@ -15,6 +17,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()>;
     async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()>;
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool>;
+    async fn delete(&self, uri: &Url) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
@@ -70,6 +73,14 @@ impl Storage for StorageBackend {
             .get(uri.scheme())
             .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
             .exists(uri)
+            .await
+    }
+
+    async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
+        self.inner
+            .get(uri.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .delete(uri)
             .await
     }
 }
@@ -147,5 +158,41 @@ impl StoragePath {
                 Ok(Self::Remote(base.join(segment)?))
             }
         }
+    }
+}
+
+pub struct RemoteTempDir {
+    pub path: StoragePath,
+    storage: Arc<StorageBackend>,
+}
+impl RemoteTempDir {
+    pub async fn new_under(
+        base: &StoragePath,
+        storage: Arc<StorageBackend>,
+    ) -> anyhow::Result<Self> {
+        let unique = Uuid::new_v4().to_string();
+        let path = base.join(&unique[..8])?;
+
+        if path.is_local() {
+            tokio::fs::create_dir_all(path.as_local_path()?).await?;
+        }
+        //remote typically does not know what a folder is
+
+        Ok(Self { path, storage })
+    }
+}
+
+impl Drop for RemoteTempDir {
+    fn drop(&mut self) {
+        let storage = self.storage.clone();
+        let path = self.path.clone().as_url().ok();
+
+        tokio::spawn(async move {
+            if let Some(path) = path
+                && let Err(e) = storage.delete(&path).await
+            {
+                tracing::warn!("Failed to clean up temp dir {path}: {e}");
+            }
+        });
     }
 }
