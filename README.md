@@ -25,7 +25,7 @@ The CWL Engine features high conformance to the specification, passing all Tests
 |---------|--------|---------------------|
 | Local   |   ✔️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-100%25-green)   |
 | Docker* |   ✔️  | ![all]( https://img.shields.io/badge/all-99%25-yellow ) ![required]( https://img.shields.io/badge/required-97%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-100%25-green )|
-| TES     |   🏗️  | ![all]( https://img.shields.io/badge/all-91%25-yellow ) ![required]( https://img.shields.io/badge/required-88%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-85%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-97%25-yellow )|
+| TES     |   🏗️  | (approx.) ![all]( https://img.shields.io/badge/all-91%25-yellow ) ![required]( https://img.shields.io/badge/required-88%25-red ) ![command_line_tool]( https://img.shields.io/badge/command_line_tool-85%25-yellow ) ![expression_tool]( https://img.shields.io/badge/expression_tool-100%25-green )![workflow]( https://img.shields.io/badge/workflow-97%25-yellow )|
 | Slurm   |   🧾  | -   |
 
 ✔️: Fully operational - 🏗️: Under Construction - 🧾: Planned

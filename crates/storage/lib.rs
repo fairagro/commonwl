@@ -122,6 +122,15 @@ impl StoragePath {
         matches!(self, Self::Local(_)) || matches!(self, Self::Remote(r) if r.scheme() == "file")
     }
 
+    pub fn file_name(&self) -> Option<String> {
+        match self {
+            Self::Local(path_buf) => path_buf
+                .file_name()
+                .map(|o| o.to_string_lossy().to_string()),
+            Self::Remote(url) => url.path_segments()?.next_back().map(|o| o.to_string()),
+        }
+    }
+
     /// Returns an owned `PathBuf`
     /// # Errors
     /// Returns an error if either `Url::to_file_path` fails or self is not local

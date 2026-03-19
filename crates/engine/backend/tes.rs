@@ -104,6 +104,8 @@ impl TaskBackend for TesBackend {
             CONTAINER_STDERR_FILE
         };
 
+        let outdir = request.outdir.as_url()?;
+
         let args = request
             .command
             .iter()
@@ -138,7 +140,7 @@ impl TaskBackend for TesBackend {
 
         //add file inputs to task
         let mut inputs = request.inputs.to_vec();
-        let mut new_destinations = self.upload_files_parallel(&inputs, request.id).await?;
+        let mut new_destinations = self.upload_files_parallel(&inputs, &outdir).await?;
         for (i, input) in inputs.iter_mut().enumerate() {
             if let Some(dest) = new_destinations.remove(&i) {
                 input.set_location(Some(dest.to_string()));
@@ -146,21 +148,21 @@ impl TaskBackend for TesBackend {
             mount_input(&mut task, input)?;
         }
 
-        let s3_workdir = Url::parse(&format!("s3://test-bucket/{}/workdir/", request.id))?;
         let mut set = tokio::task::JoinSet::new();
         let sem = Arc::new(tokio::sync::Semaphore::new(32));
+        let data_workdir = outdir.join("workdir")?;
         for mount in request.mounts.iter().cloned() {
             let outdir = request.outdir.to_owned();
             let workdir = request.execution_path.to_owned();
             let use_container = request.use_container;
             let storage = self.storage();
-            let base_url = s3_workdir.clone();
+            let base_url = data_workdir.clone();
             let permit = sem.clone().acquire_owned().await?;
             set.spawn(async move {
                 let _permit = permit;
                 mount_workdir_item(
                     mount,
-                    &outdir.as_local_path()?, //will crash
+                    &outdir.as_url()?,
                     &workdir,
                     use_container,
                     storage,
@@ -197,7 +199,7 @@ impl TaskBackend for TesBackend {
             Output::builder()
                 .name("workdir")
                 .path(CONTAINER_WORKDIR)
-                .url(s3_workdir.clone())
+                .url(data_workdir.clone())
                 .ty(output::Type::Directory)
                 .build(),
         );
@@ -284,7 +286,7 @@ impl TesBackend {
     async fn upload_files_parallel(
         &self,
         inputs: &[FileOrDirectory],
-        request_id: &str,
+        outdir: &Url,
     ) -> anyhow::Result<HashMap<usize, Url>> {
         //create a list of upload tasks (the new urls)
         let upload_tasks: Vec<(usize, String, Url)> = inputs
@@ -293,13 +295,13 @@ impl TesBackend {
             .filter_map(|(i, input)| {
                 let location = input.location()?;
                 let path = location.strip_prefix("file://")?.to_owned();
-                let dest = Url::parse(&format!(
-                    "s3://test-bucket/{}/{}{}",
-                    request_id,
-                    &Uuid::new_v4().to_string()[..8],
-                    input.basename()?
-                ))
-                .ok()?;
+                let dest = outdir
+                    .join(&format!(
+                        "inputs/{}{}",
+                        &Uuid::new_v4().to_string()[..8],
+                        input.basename()?
+                    ))
+                    .ok()?;
                 Some((i, path, dest))
             })
             .collect();

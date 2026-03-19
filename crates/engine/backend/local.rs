@@ -168,7 +168,7 @@ impl TaskBackend for LocalBackend {
         for mount in mounts {
             let inputs = mount_workdir_item(
                 mount.clone(),
-                &outdir,
+                &request.outdir.as_url()?,
                 request.execution_path,
                 request.use_container,
                 self.storage(),

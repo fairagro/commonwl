@@ -410,7 +410,7 @@ pub async fn execute_workflow(
         }
     }
     let cc = OutputCollectionContext {
-        source_dir: collection_dir.path(),
+        source_dir: &StoragePath::Local(collection_dir.path().to_path_buf()), //TODO
         dest_dir: &request.out_dir,
         workdir: Path::new(""), //not used
         eval_context,
@@ -665,7 +665,7 @@ pub async fn execute_commandline_tool(
         //update runtime
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
-        runtime.outdir = outdir.storage_path().as_local_path()?; //will crash
+        runtime.outdir = PathBuf::from(outdir.storage_path().as_url()?.path()); //is this smart?
 
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
@@ -696,16 +696,18 @@ pub async fn execute_commandline_tool(
 
         let outputs = collect_command_outputs(
             &tool.outputs,
-            &result.stdout_file.as_local_path()?, //will crash
-            &result.stderr_file.as_local_path()?, //will crash
+            &result.stdout_file,
+            &result.stderr_file,
             &OutputCollectionContext {
-                source_dir: &outdir.storage_path().as_local_path()?, //will crash
+                source_dir: outdir.storage_path(),
                 dest_dir: &request.out_dir,
                 workdir: Path::new(workdir),
                 eval_context: &eval_context,
                 validator: &fv,
             },
-        )?;
+            backend.storage(),
+        )
+        .await?;
 
         if iur.is_some_and(|i| i.inplace_update) {
             handle_inplace_update(mounts, backend.storage()).await?;
@@ -734,7 +736,7 @@ pub async fn execute_commandline_tool(
             &tool.outputs,
             &result,
             &OutputCollectionContext {
-                source_dir: &outdir.storage_path().as_local_path()?, //will crash
+                source_dir: outdir.storage_path(),
                 dest_dir: &request.out_dir,
                 workdir: Path::new(workdir),
                 eval_context,

@@ -21,18 +21,20 @@ use cwl_core::{
     requirements::MultipleInputFeatureRequirement,
     types::{CWLType, SecondaryFileSchema},
 };
+use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
 use dircpy::copy_dir;
 use glob::glob;
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 use tracing::{debug, info, warn};
 
 #[derive(Debug)]
 pub struct OutputCollectionContext<'a> {
-    pub source_dir: &'a Path,
+    pub source_dir: &'a StoragePath,
     pub dest_dir: &'a Path,
     pub workdir: &'a Path,
     pub eval_context: &'a EvaluationContext<'a>,
@@ -40,14 +42,16 @@ pub struct OutputCollectionContext<'a> {
 }
 
 /// handles collection of command outputs after execution
-pub(crate) fn collect_command_outputs(
+pub(crate) async fn collect_command_outputs(
     outputs: &[CommandOutputParameter],
-    stdout_file: &Path,
-    stderr_file: &Path,
-    context: &OutputCollectionContext,
+    stdout_file: &StoragePath,
+    stderr_file: &StoragePath,
+    context: &OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
-    if context.source_dir.join("cwl.output.json").exists() {
-        let contents = fs::read_to_string(context.source_dir.join("cwl.output.json"))?;
+    let cwl_output_json = &context.source_dir.join("cwl.output.json")?.as_url()?;
+    if storage.exists(cwl_output_json).await? {
+        let contents = storage.read_file(cwl_output_json).await?;
         let mut values: HashMap<String, DefaultValue> = serde_json::from_str(&contents)?;
         for value in values.values_mut() {
             match value {
@@ -56,13 +60,13 @@ pub(crate) fn collect_command_outputs(
                     let path = path.strip_prefix("file://").unwrap_or(&path);
                     let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
-                    *value = handle_file(&path, None, context)?;
+                    *value = handle_file(&path, None, context, storage.clone()).await?;
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     let path = d.path.clone().or(d.location.clone()).unwrap();
                     let path = path.strip_prefix("file://").unwrap_or(&path);
                     let path = correct_output_path(Path::new(&path), context);
-                    *value = handle_dir(&path, context)?;
+                    *value = handle_dir(&path, context, storage.clone()).await?;
                 }
                 _ => {}
             }
@@ -74,22 +78,34 @@ pub(crate) fn collect_command_outputs(
     let mut output_map = HashMap::new();
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
-        let value = collect_output_item(output, stdout_file, stderr_file, context)?;
+        let value =
+            collect_output_item(output, stdout_file, stderr_file, context, storage.clone()).await?;
         output_map.insert(output_id, value);
     }
 
     Ok(output_map)
 }
 
-fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> PathBuf {
-    if path.starts_with(context.source_dir) {
-        path.to_path_buf()
-    } else if let Ok(stripped) = path.strip_prefix(context.dest_dir) {
-        context.source_dir.join(stripped)
-    } else if let Ok(stripped) = path.strip_prefix(context.workdir) {
-        context.source_dir.join(stripped)
-    } else {
-        context.source_dir.join(path)
+fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> StoragePath {
+    match &context.source_dir {
+        StoragePath::Local(base) => {
+            // existing prefix-stripping logic, returns StoragePath::Local
+            if path.starts_with(base) {
+                StoragePath::Local(path.to_path_buf())
+            } else if let Ok(stripped) = path.strip_prefix(context.dest_dir) {
+                StoragePath::Local(base.join(stripped))
+            } else if let Ok(stripped) = path.strip_prefix(context.workdir) {
+                StoragePath::Local(base.join(stripped))
+            } else {
+                StoragePath::Local(base.join(path))
+            }
+        }
+        StoragePath::Remote(base_url) => {
+            // path here came from cwl.output.json which uses container paths
+            // strip container workdir prefix and rebase onto S3
+            let stripped = path.strip_prefix(context.workdir).unwrap_or(path);
+            StoragePath::from_url(base_url.join(&stripped.to_string_lossy()).unwrap())
+        }
     }
 }
 
@@ -383,16 +399,21 @@ fn get_designated_path(
 }
 
 ///collects a single output item
-fn collect_output_item(
+async fn collect_output_item(
     output: &CommandOutputParameter,
-    stdout_file: &Path,
-    stderr_file: &Path,
-    context: &OutputCollectionContext,
+    stdout_file: &StoragePath,
+    stderr_file: &StoragePath,
+    context: &OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<DefaultValue> {
     let format = output.format.as_ref().map(|f| f.as_one().clone());
     let value = match &output.r#type {
-        CommandOutputParameterType::Stdout => handle_file(stdout_file, format, context),
-        CommandOutputParameterType::Stderr => handle_file(stderr_file, format, context),
+        CommandOutputParameterType::Stdout => {
+            handle_file(stdout_file, format, context, storage).await
+        }
+        CommandOutputParameterType::Stderr => {
+            handle_file(stderr_file, format, context, storage).await
+        }
         CommandOutputParameterType::CommandOutputType(r#type) => collect_item(
             output,
             output.output_binding.as_ref(),
@@ -563,22 +584,18 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> Vec<Strin
 }
 
 //returns a file created in the output directory
-fn handle_file(
-    path: &Path,
+async fn handle_file(
+    path: &StoragePath,
     format: Option<String>,
-    context: &OutputCollectionContext,
+    context: &OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<DefaultValue> {
-    let filename = Path::new(path.file_name().unwrap_or_default());
+    let filename = path.file_name().unwrap();
+    let filename = Path::new(&filename);
 
     let dest_path = context.dest_dir.join(filename);
+    storage.download(&path.as_url()?, &dest_path).await?;
 
-    fs::copy(path, &dest_path).with_context(|| {
-        format!(
-            "Could not copy {} to {}",
-            path.display(),
-            dest_path.display()
-        )
-    })?;
     let mut file = File::new_from_path(&dest_path)?;
     file.format = format;
 
@@ -586,12 +603,20 @@ fn handle_file(
 }
 
 //returns a directory created in the output directory
-fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<DefaultValue> {
-    let relative_path = path.strip_prefix(context.source_dir)?.to_path_buf();
-    let dest_path = context.dest_dir.join(&relative_path);
+async fn handle_dir(
+    path: &StoragePath,
+    context: &OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
+) -> anyhow::Result<DefaultValue> {
+    let url = path.as_url()?.to_owned();
+    let relative_path = url
+        .path()
+        .strip_prefix(context.source_dir.as_url()?.as_str())
+        .unwrap();
+    let dest_path = context.dest_dir.join(relative_path);
     let dest_path_as_str = dest_path.to_string_lossy();
 
-    copy_dir(path, &dest_path)?;
+    storage.download(&url, &dest_path).await?;
 
     let basename = dest_path
         .file_name()
@@ -611,15 +636,25 @@ fn handle_dir(path: &Path, context: &OutputCollectionContext) -> anyhow::Result<
 }
 
 fn make_full_glob(glob_: &str, context: &OutputCollectionContext) -> anyhow::Result<String> {
-    let full_glob = if glob_.starts_with('/') {
-        if !glob_.starts_with(&context.source_dir.to_string_lossy().to_string()) {
+    let full_glob = if glob_.starts_with("/") {
+        if !glob_.starts_with(
+            &context
+                .source_dir
+                .as_local_path()?
+                .to_string_lossy()
+                .to_string(),
+        ) {
             anyhow::bail!("Can not access objects outside the working directory: {glob_}.");
         }
         glob_.to_owned()
     } else {
-        format!("{}/{}", context.source_dir.display(), glob_)
+        format!(
+            "{}/{}",
+            context.source_dir.as_local_path()?.display(),
+            glob_
+        ) //crashes in TES
     };
-
+    dbg!(&full_glob);
     Ok(full_glob)
 }
 

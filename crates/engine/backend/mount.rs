@@ -76,7 +76,7 @@ pub enum MountStrategy {
 
 pub(crate) async fn mount_workdir_item(
     mount: WorkDirMount,
-    outdir: &Path,
+    outdir: &Url,
     workdir: &str,
     use_container: bool,
     backend: Arc<StorageBackend>,
@@ -94,17 +94,21 @@ pub(crate) async fn mount_workdir_item(
 
 async fn mount_workdir_item_local(
     mount: WorkDirMount,
-    outdir: &Path,
+    outdir: &Url,
     use_container: bool,
     backend: Arc<StorageBackend>,
 ) -> anyhow::Result<Vec<Input>> {
     let mut inputs = vec![];
     //strategy is local to we can assume that target is, too
     ensure!(mount.target.scheme() == "file");
+    ensure!(outdir.scheme() == "file");
     let target = mount
         .target
         .to_file_path()
-        .map_err(|()| anyhow::anyhow!("Url not local!"))?;
+        .map_err(|()| anyhow::anyhow!("Url of mount target not local!"))?;
+    let outdir = outdir
+        .to_file_path()
+        .map_err(|()| anyhow::anyhow!("Url of outdir not local!"))?;
 
     if target.starts_with(outdir) {
         if let Some(parent) = target.parent()
@@ -161,7 +165,7 @@ async fn mount_workdir_item_local(
 
 async fn mount_workdir_item_remote(
     mount: WorkDirMount,
-    outdir: &Path,
+    outdir: &Url,
     workdir: &str,
     backend: Arc<StorageBackend>,
     base_url: &Url,
@@ -174,8 +178,8 @@ async fn mount_workdir_item_remote(
         .to_file_path()
         .map_err(|()| anyhow::anyhow!("Url not local!"))?;
 
-    let rel = target.strip_prefix(outdir).unwrap_or(&target);
-    let guest_path = if target.starts_with(outdir) {
+    let rel = target.strip_prefix(outdir.as_str()).unwrap_or(&target);
+    let guest_path = if target.starts_with(outdir.as_str()) {
         format!("{}/{}", workdir, rel.display())
     } else {
         target.to_string_lossy().to_string()
