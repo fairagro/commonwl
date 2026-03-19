@@ -1,4 +1,10 @@
 name: 📎 Conformance Runner
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
 on:
   push:
     branches:
@@ -26,10 +32,6 @@ jobs:
 
   ci-pipeline:
     needs: build
-    permissions:
-      contents: read
-      pull-requests: write
-      actions: read
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -63,7 +65,7 @@ jobs:
           AWS_ACCESS_KEY_ID: rustfsadmin
           AWS_SECRET_ACCESS_KEY: rustfsadmin
         run: |
-          aws s3 mb s3://test-bucket \
+          aws s3 mb s3://commonwl-bucket \
             --endpoint-url http://localhost:9000 \
             --region us-east-1
 
@@ -78,7 +80,7 @@ jobs:
           ./funnel server run --config ./.github/funnel-config.yaml &
           FUNNEL_PID=$!
           echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
-          
+
           until curl -sf http://localhost:8000/v1/tasks; do
             sleep 1
           done
