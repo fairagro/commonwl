@@ -194,6 +194,7 @@ impl RemoteTempDir {
         Ok(Self { path, storage })
     }
 
+    #[must_use]
     pub fn storage_path(&self) -> &StoragePath {
         &self.path
     }
