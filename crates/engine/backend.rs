@@ -37,7 +37,7 @@ use cwl_core::{
         ScatterFeatureRequirement, ToolTimeLimit,
     },
 };
-use cwl_engine_storage::{StorageBackend, StoragePath};
+use cwl_engine_storage::{RemoteTempDir, Storage, StorageBackend, StoragePath};
 use futures_util::{
     FutureExt,
     future::{BoxFuture, join_all},
@@ -116,8 +116,8 @@ pub struct TaskExecutionRequest<'a> {
     pub stdout_file: Option<&'a String>,
     pub stderr_file: Option<&'a String>,
 
-    pub outdir: &'a Path,
-    pub tmpdir: &'a Path,
+    pub outdir: &'a StoragePath,
+    pub tmpdir: &'a StoragePath,
 
     // The container side mounted workdir
     pub execution_path: &'a str,
@@ -127,8 +127,8 @@ pub struct TaskExecutionRequest<'a> {
 
 pub struct TaskExecutionResult {
     pub exit_status: NonEmpty<ExitStatus>,
-    pub stdout_file: PathBuf,
-    pub stderr_file: PathBuf,
+    pub stdout_file: StoragePath,
+    pub stderr_file: StoragePath,
 }
 
 ///Executes a `CWLDocument`
@@ -495,13 +495,13 @@ pub async fn execute_commandline_tool(
     let iur = request.get_requirement_or_hint::<InplaceUpdateRequirement>();
     let na = request.get_requirement_or_hint::<NetworkAccess>();
 
-    let outdir = tempdir()?;
-    let tmpdir = tempdir()?;
+    let outdir = RemoteTempDir::new_under(backend.data_store(), backend.storage()).await?;
+    let tmpdir = RemoteTempDir::new_under(backend.data_store(), backend.storage()).await?;
 
     let default_input_dir = backend.container_input_dir();
     let stage_dir = match &request.specification {
         CWLDocument::CommandLineTool(_) => Path::new(&default_input_dir),
-        CWLDocument::ExpressionTool(_) => outdir.path(),
+        CWLDocument::ExpressionTool(_) => Path::new("."), //outdir.path()
         _ => unreachable!(),
     };
 
@@ -565,7 +565,7 @@ pub async fn execute_commandline_tool(
         stage_work_dir(
             iwdr,
             &request.working_dir,
-            outdir.path(),
+            outdir.storage_path(),
             eval_context,
             workdir,
             &mut inputs,
@@ -652,8 +652,8 @@ pub async fn execute_commandline_tool(
                     stdout_file: tool.stdout.as_ref(),
                     stderr_file: tool.stderr.as_ref(),
 
-                    outdir: outdir.path(),
-                    tmpdir: tmpdir.path(),
+                    outdir: outdir.storage_path(),
+                    tmpdir: tmpdir.storage_path(),
                     execution_path: workdir,
                 },
                 token,
@@ -665,26 +665,24 @@ pub async fn execute_commandline_tool(
         //update runtime
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
-        runtime.outdir = outdir.path().to_path_buf();
+        runtime.outdir = outdir.storage_path().as_local_path()?; //will crash
 
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
         //evaluate stderr/stdout
-        let stdout = fs::read_to_string(&result.stdout_file).with_context(|| {
-            format!(
-                "Could not find stdout file {}",
-                result.stdout_file.display()
-            )
-        })?;
+        let stdout = backend
+            .storage()
+            .read_file(&result.stdout_file.as_url()?)
+            .await
+            .with_context(|| format!("Could not find stdout file {:?}", result.stdout_file))?;
         if !stdout.is_empty() {
             eprintln!("{stdout}");
         }
-        let stderr = fs::read_to_string(&result.stderr_file).with_context(|| {
-            format!(
-                "Could not find stderr file {}",
-                result.stderr_file.display()
-            )
-        })?;
+        let stderr = backend
+            .storage()
+            .read_file(&result.stderr_file.as_url()?)
+            .await
+            .with_context(|| format!("Could not find stderr file {:?}", result.stderr_file))?;
         if !stderr.is_empty() {
             eprintln!("{stderr}");
         }
@@ -698,10 +696,10 @@ pub async fn execute_commandline_tool(
 
         let outputs = collect_command_outputs(
             &tool.outputs,
-            &result.stdout_file,
-            &result.stderr_file,
+            &result.stdout_file.as_local_path()?, //will crash
+            &result.stderr_file.as_local_path()?, //will crash
             &OutputCollectionContext {
-                source_dir: outdir.path(),
+                source_dir: &outdir.storage_path().as_local_path()?, //will crash
                 dest_dir: &request.out_dir,
                 workdir: Path::new(workdir),
                 eval_context: &eval_context,
@@ -736,7 +734,7 @@ pub async fn execute_commandline_tool(
             &tool.outputs,
             &result,
             &OutputCollectionContext {
-                source_dir: outdir.path(),
+                source_dir: &outdir.storage_path().as_local_path()?, //will crash
                 dest_dir: &request.out_dir,
                 workdir: Path::new(workdir),
                 eval_context,

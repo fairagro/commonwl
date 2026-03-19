@@ -69,4 +69,12 @@ impl Storage for LocalStorage {
             .await
             .with_context(|| format!("Can not remove directory: {}", uri.display()))
     }
+
+    async fn read_file(&self, uri: &Url) -> anyhow::Result<String> {
+        ensure!(uri.scheme() == "file");
+        let uri = Path::new(uri.path());
+        tokio::fs::read_to_string(uri)
+            .await
+            .with_context(|| format!("Can not read file: {}", uri.display()))
+    }
 }

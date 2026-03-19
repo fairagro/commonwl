@@ -18,6 +18,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()>;
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool>;
     async fn delete(&self, uri: &Url) -> anyhow::Result<()>;
+    async fn read_file(&self, uri: &Url) -> anyhow::Result<String>;
 }
 
 #[derive(Debug)]
@@ -81,6 +82,14 @@ impl Storage for StorageBackend {
             .get(uri.scheme())
             .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
             .delete(uri)
+            .await
+    }
+
+    async fn read_file(&self, uri: &Url) -> anyhow::Result<String> {
+        self.inner
+            .get(uri.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .read_file(uri)
             .await
     }
 }
@@ -161,8 +170,9 @@ impl StoragePath {
     }
 }
 
+#[derive(Debug)]
 pub struct RemoteTempDir {
-    pub path: StoragePath,
+    path: StoragePath,
     storage: Arc<StorageBackend>,
 }
 impl RemoteTempDir {
@@ -182,6 +192,10 @@ impl RemoteTempDir {
         //remote typically does not know what a folder is
 
         Ok(Self { path, storage })
+    }
+
+    pub fn storage_path(&self) -> &StoragePath {
+        &self.path
     }
 }
 

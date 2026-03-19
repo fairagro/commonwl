@@ -9,7 +9,7 @@ use cwl_core::{
     inputs::DefaultValue,
     requirements::{InitialWorkDirRequirement, ListingItems, WorkDirItems},
 };
-use cwl_engine_storage::{Storage, StorageBackend};
+use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -33,7 +33,7 @@ pub enum Source {
 #[derive(Debug, Clone)]
 pub struct WorkDirMount {
     pub source: Source,
-    pub target: PathBuf,
+    pub target: Url,
     pub ty: MountType,
     pub readonly: bool,
 }
@@ -41,7 +41,7 @@ pub struct WorkDirMount {
 pub(crate) fn stage_work_dir(
     iwdr: &InitialWorkDirRequirement,
     workdir: &Path,
-    stagedir: &Path,
+    stagedir: &StoragePath,
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
@@ -93,7 +93,7 @@ pub(crate) fn stage_work_dir(
 fn stage_item(
     item: &ListingItems,
     workdir: &Path,
-    stagedir: &Path,
+    stagedir: &StoragePath,
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
@@ -149,7 +149,7 @@ fn stage_item(
 fn stage_dirent(
     dirent: &Dirent,
     workdir: &Path,
-    stagedir: &Path,
+    stagedir: &StoragePath,
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
@@ -199,7 +199,7 @@ fn stage_dirent(
         update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
     }
 
-    let staged_path = stagedir.join(&entryname);
+    let staged_path = stagedir.join(&entryname)?;
     let mut string_content = match dv {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) if !has_trailing_newline => {
             if let Some(contents) = file.contents {
@@ -217,7 +217,7 @@ fn stage_dirent(
                 };
                 return Ok(vec![WorkDirMount {
                     source: Source::Url(Url::from_file_path(absolute_path).unwrap()),
-                    target: staged_path.clone(),
+                    target: staged_path.as_url()?,
                     ty: MountType::File,
                     readonly: !dirent.writable.unwrap_or(false),
                 }]);
@@ -245,7 +245,7 @@ fn stage_dirent(
 
     Ok(vec![WorkDirMount {
         source: Source::Contents(string_content.into_bytes()),
-        target: staged_path.clone(),
+        target: staged_path.as_url()?,
         ty: MountType::File,
         readonly: !dirent.writable.unwrap_or(false),
     }])
@@ -254,22 +254,22 @@ fn stage_dirent(
 fn stage_files(
     item: &FileOrDirectory,
     workdir: &Path,
-    stagedir: &Path,
+    stagedir: &StoragePath,
     entryname: Option<&String>,
     readonly: bool,
 ) -> anyhow::Result<Vec<WorkDirMount>> {
     let mut mounts = vec![];
     let staged_path = if let Some(entryname) = &entryname {
-        stagedir.join(entryname)
+        stagedir.join(entryname)?
     } else if let Some(basename) = item.basename() {
-        stagedir.join(basename)
+        stagedir.join(basename)?
     } else {
         let path = item
             .location()
             .or(item.path())
             .expect("Can not guess staged_path");
         let path = PathBuf::from(path);
-        stagedir.join(path.file_name().unwrap())
+        stagedir.join(&path.file_name().unwrap().to_string_lossy())?
     };
 
     if let Some(path) = item.location() {
@@ -281,14 +281,14 @@ fn stage_files(
         if item.is_file() {
             mounts.push(WorkDirMount {
                 source: Source::Url(Url::from_file_path(&path).unwrap()),
-                target: staged_path.clone(),
+                target: staged_path.as_url()?,
                 ty: MountType::File,
                 readonly,
             });
         } else if item.is_dir() {
             mounts.push(WorkDirMount {
                 source: Source::Url(Url::from_file_path(&path).unwrap()),
-                target: staged_path.clone(),
+                target: staged_path.as_url()?,
                 ty: MountType::Directory,
                 readonly,
             });
@@ -298,7 +298,7 @@ fn stage_files(
     {
         mounts.push(WorkDirMount {
             source: Source::Contents(vec![]),
-            target: staged_path.clone(),
+            target: staged_path.as_url()?,
             ty: MountType::Directory,
             readonly,
         });
@@ -350,8 +350,13 @@ pub(crate) async fn handle_inplace_update(
     for mount in mounts {
         if !mount.readonly
             && let Source::Url(src_path) = &mount.source
+            && mount.target.scheme() == "file"
         {
-            backend.upload(&mount.target, src_path).await?;
+            let path = mount
+                .target
+                .to_file_path()
+                .map_err(|()| anyhow::anyhow!("Not a path"))?;
+            backend.upload(&path, src_path).await?;
         }
     }
     Ok(())

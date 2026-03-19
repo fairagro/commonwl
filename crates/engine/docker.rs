@@ -1,3 +1,4 @@
+use anyhow::ensure;
 use bollard::{Docker, body_full, query_parameters::BuildImageOptions};
 use bon::Builder;
 use cwl_core::files::FileOrDirectory;
@@ -142,10 +143,15 @@ pub fn build_container_command(
         let workdir::Source::Url(loc) = mount.source else {
             continue;
         };
+        ensure!(mount.target.scheme() == "file");
+        let target = mount
+            .target
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Not a local path!"))?;
         let mount = format!(
             "--mount=type=bind,source={},target={}",
             loc.path(), //dangerous
-            mount.target.to_string_lossy()
+            target.to_string_lossy()
         );
         args.push(mount);
     }

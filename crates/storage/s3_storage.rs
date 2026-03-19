@@ -222,6 +222,21 @@ impl Storage for S3Storage {
 
         Ok(())
     }
+
+    async fn read_file(&self, uri: &Url) -> anyhow::Result<String> {
+        let (bucket, key) = S3Storage::parse_uri(uri)?;
+        let object = self
+            .client()
+            .await?
+            .get_object()
+            .bucket(bucket)
+            .key(key)
+            .send()
+            .await?;
+
+        let bytes = object.body.collect().await?.into_bytes();
+        Ok(String::from_utf8_lossy(&bytes).to_string())
+    }
 }
 
 impl S3Storage {

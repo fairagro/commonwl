@@ -6,6 +6,7 @@ use crate::{
     docker::build_container,
     expression::{do_eval, do_eval_to_string},
 };
+use anyhow::ensure;
 use async_trait::async_trait;
 use crankshaft::{
     config::backend::docker::Config,
@@ -115,6 +116,12 @@ impl TaskBackend for DockerBackend {
             CONTAINER_STDERR_FILE
         };
 
+        //this is a local only backend so we assume outdir is local
+        ensure!(request.outdir.is_local());
+        let outdir = request.outdir.as_local_path()?;
+        ensure!(request.tmpdir.is_local());
+        let tmpdir = request.tmpdir.as_local_path()?;
+
         let mut args = request
             .command
             .iter()
@@ -159,7 +166,7 @@ impl TaskBackend for DockerBackend {
         for mount in request.mounts {
             let inputs = mount_workdir_item(
                 mount.clone(),
-                request.outdir,
+                &outdir,
                 request.execution_path,
                 request.use_container,
                 self.storage(),
@@ -175,7 +182,7 @@ impl TaskBackend for DockerBackend {
         task.add_input(
             Input::builder()
                 .name("outdir")
-                .contents(Contents::Path(request.outdir.to_path_buf()))
+                .contents(Contents::Path(outdir.clone()))
                 .path(request.execution_path)
                 .ty(input::Type::Directory)
                 .read_only(false)
@@ -186,7 +193,7 @@ impl TaskBackend for DockerBackend {
         task.add_input(
             Input::builder()
                 .name("tmpdir")
-                .contents(Contents::Path(request.tmpdir.to_path_buf()))
+                .contents(Contents::Path(tmpdir.clone()))
                 .path(CONTAINER_TMPDIR)
                 .ty(input::Type::Directory)
                 .read_only(false)
@@ -196,11 +203,9 @@ impl TaskBackend for DockerBackend {
         //handle stderr output
         let stderr_out_file = if let Some(stderr) = request.stderr_file {
             let stderr = do_eval_to_string(stderr, request.eval_context);
-            request.outdir.join(stderr)
+            outdir.join(stderr)
         } else {
-            request
-                .tmpdir
-                .join(format!("stderr_{}", &Uuid::new_v4().to_string()[..8]))
+            tmpdir.join(format!("stderr_{}", &Uuid::new_v4().to_string()[..8]))
         };
         task.add_output(
             Output::builder()
@@ -214,11 +219,9 @@ impl TaskBackend for DockerBackend {
         //handle stdout output
         let stdout_out_file = if let Some(stdout) = request.stdout_file {
             let stdout = do_eval_to_string(stdout, request.eval_context);
-            request.outdir.join(stdout)
+            outdir.join(stdout)
         } else {
-            request
-                .tmpdir
-                .join(format!("stdout_{}", &Uuid::new_v4().to_string()[..8]))
+            tmpdir.join(format!("stdout_{}", &Uuid::new_v4().to_string()[..8]))
         };
         task.add_output(
             Output::builder()
@@ -260,8 +263,8 @@ impl TaskBackend for DockerBackend {
 
         Ok(TaskExecutionResult {
             exit_status,
-            stdout_file: stdout_out_file,
-            stderr_file: stderr_out_file,
+            stdout_file: StoragePath::Local(stdout_out_file),
+            stderr_file: StoragePath::Local(stderr_out_file),
         })
     }
 

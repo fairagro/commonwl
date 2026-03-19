@@ -160,7 +160,7 @@ impl TaskBackend for TesBackend {
                 let _permit = permit;
                 mount_workdir_item(
                     mount,
-                    &outdir,
+                    &outdir.as_local_path()?, //will crash
                     &workdir,
                     use_container,
                     storage,
@@ -176,42 +176,19 @@ impl TaskBackend for TesBackend {
             }
         }
 
-        //add outdir mount
-        //task.add_input(
-        //Input::builder()
-        //        .name("outdir")
-        //        .contents(Contents::Path(request.outdir.to_path_buf()))
-        //        .path(request.staged_dir)
-        //        .ty(input::Type::Directory)
-        //        .read_only(false)
-        //        .build(),
-        //);
-        //
-        //add tmpdir input
-        //task.add_input(
-        //    Input::builder()
-        //        .name("tmpdir")
-        //        .contents(Contents::Path(request.tmpdir.to_path_buf()))
-        //        .path(CONTAINER_TMPDIR)
-        //        .ty(input::Type::Directory)
-        //        .read_only(false)
-        //        .build(),
-        //);
-
         //handle stderr output
-        let bucket_url = Url::parse(&format!("s3://test-bucket/{}/", request.id))?;
-        let (stderr_local, stderr_remote) = if let Some(stderr) = request.stderr_file {
+        let stderr_path = if let Some(stderr) = request.stderr_file {
             let filename = do_eval_to_string(stderr, request.eval_context);
-            (request.outdir.join(&filename), bucket_url.join(&filename)?)
+            request.outdir.join(&filename)?
         } else {
             let filename = format!("stderr_{}", &Uuid::new_v4().to_string()[..8]);
-            (request.tmpdir.join(&filename), bucket_url.join(&filename)?)
+            request.tmpdir.join(&filename)?
         };
         task.add_output(
             Output::builder()
                 .name("stderr")
                 .path(stderr_file)
-                .url(stderr_remote.clone())
+                .url(stderr_path.as_url()?)
                 .ty(output::Type::File)
                 .build(),
         );
@@ -226,18 +203,18 @@ impl TaskBackend for TesBackend {
         );
 
         //handle stdout output
-        let (stdout_local, stdout_remote) = if let Some(stdout) = request.stdout_file {
+        let stdout_path = if let Some(stdout) = request.stdout_file {
             let filename = do_eval_to_string(stdout, request.eval_context);
-            (request.outdir.join(&filename), bucket_url.join(&filename)?)
+            request.outdir.join(&filename)?
         } else {
             let filename = format!("stdout_{}", &Uuid::new_v4().to_string()[..8]);
-            (request.tmpdir.join(&filename), bucket_url.join(&filename)?)
+            request.tmpdir.join(&filename)?
         };
         task.add_output(
             Output::builder()
                 .name("stdout")
                 .path(stdout_file)
-                .url(stdout_remote.clone())
+                .url(stdout_path.as_url()?)
                 .ty(output::Type::File)
                 .build(),
         );
@@ -271,21 +248,10 @@ impl TaskBackend for TesBackend {
             self.backend.run(task, token)?.await?
         };
 
-        //download results
-        tokio::try_join!(
-            self.storage.download(&stdout_remote, &stdout_local),
-            self.storage.download(&stderr_remote, &stderr_local),
-        )?;
-
-        self.storage
-            .download(&s3_workdir, request.outdir)
-            .await
-            .ok(); //errors if workdir is empty as such thing as empty does not exist in s3
-
         Ok(TaskExecutionResult {
             exit_status,
-            stdout_file: stdout_local,
-            stderr_file: stderr_local,
+            stdout_file: stdout_path,
+            stderr_file: stderr_path,
         })
     }
 

@@ -2,7 +2,7 @@ use crate::{
     environment::workdir::{MountType, Source, WorkDirMount},
     io::normalize_url,
 };
-use anyhow::Context;
+use anyhow::{Context, ensure};
 use crankshaft::engine::{
     Task,
     task::{
@@ -99,31 +99,38 @@ async fn mount_workdir_item_local(
     backend: Arc<StorageBackend>,
 ) -> anyhow::Result<Vec<Input>> {
     let mut inputs = vec![];
-    if mount.target.starts_with(outdir) {
-        if let Some(parent) = mount.target.parent()
+    //strategy is local to we can assume that target is, too
+    ensure!(mount.target.scheme() == "file");
+    let target = mount
+        .target
+        .to_file_path()
+        .map_err(|()| anyhow::anyhow!("Url not local!"))?;
+
+    if target.starts_with(outdir) {
+        if let Some(parent) = target.parent()
             && !parent.exists()
         {
             fs::create_dir_all(parent).with_context(|| {
                 format!(
                     "Could not create parent directories for {}",
-                    mount.target.display()
+                    target.display()
                 )
             })?;
         }
         match (mount.ty, mount.source) {
-            (MountType::File, Source::Url(path)) => backend.download(&path, &mount.target).await?,
+            (MountType::File, Source::Url(path)) => backend.download(&path, &target).await?,
             (MountType::File, Source::Contents(items)) => {
-                fs::write(&mount.target, &items)
-                    .with_context(|| format!("Could not write to {}", mount.target.display()))?;
+                fs::write(&target, &items)
+                    .with_context(|| format!("Could not write to {}", target.display()))?;
             }
             (MountType::Directory, Source::Url(path)) => {
-                backend.download(&path, &mount.target).await?;
+                backend.download(&path, &target).await?;
             }
             (MountType::Directory, Source::Contents(_)) => {
-                fs::create_dir_all(&mount.target).with_context(|| {
+                fs::create_dir_all(&target).with_context(|| {
                     format!(
                         "Could not create parent directories for {}",
-                        mount.target.display()
+                        target.display()
                     )
                 })?;
             }
@@ -131,7 +138,7 @@ async fn mount_workdir_item_local(
     } else if use_container {
         inputs.push(
             Input::builder()
-                .path(mount.target.to_string_lossy())
+                .path(target.to_string_lossy())
                 .contents(match mount.source {
                     Source::Url(path) => Contents::Url(path),
                     Source::Contents(data) => Contents::Literal(data),
@@ -146,7 +153,7 @@ async fn mount_workdir_item_local(
     } else {
         anyhow::bail!(
             "Workdir item target {} is outside of working directory and container is not used, can not stage",
-            mount.target.display()
+            target.display()
         );
     }
     Ok(inputs)
@@ -160,11 +167,18 @@ async fn mount_workdir_item_remote(
     base_url: &Url,
 ) -> anyhow::Result<Vec<Input>> {
     let mut inputs = vec![];
-    let rel = mount.target.strip_prefix(outdir).unwrap_or(&mount.target);
-    let guest_path = if mount.target.starts_with(outdir) {
+    //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
+    ensure!(mount.target.scheme() == "file");
+    let target = mount
+        .target
+        .to_file_path()
+        .map_err(|()| anyhow::anyhow!("Url not local!"))?;
+
+    let rel = target.strip_prefix(outdir).unwrap_or(&target);
+    let guest_path = if target.starts_with(outdir) {
         format!("{}/{}", workdir, rel.display())
     } else {
-        mount.target.to_string_lossy().to_string()
+        target.to_string_lossy().to_string()
     };
 
     match (mount.ty, mount.source) {
