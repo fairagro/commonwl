@@ -1,7 +1,8 @@
-use crate::Storage;
+use crate::{Storage, StoragePath};
 use anyhow::{Context, ensure};
 use async_trait::async_trait;
 use dircpy::copy_dir;
+use glob::glob;
 use std::path::Path;
 use url::Url;
 
@@ -76,5 +77,29 @@ impl Storage for LocalStorage {
         tokio::fs::read_to_string(uri)
             .await
             .with_context(|| format!("Can not read file: {}", uri.display()))
+    }
+
+    async fn glob(
+        &self,
+        base: &Url,
+        pattern: &str,
+    ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
+        ensure!(base.scheme() == "file");
+        let base = Path::new(base.path());
+
+        let full_glob = if pattern.starts_with("/") {
+            if !pattern.starts_with(&base.to_string_lossy().into_owned()) {
+                anyhow::bail!("Can not access objects outside the working directory: {pattern}.");
+            }
+            pattern.to_string()
+        } else {
+            format!("{}/{}", base.display(), pattern)
+        };
+
+        Ok(Box::new(
+            glob(&full_glob)?
+                .filter_map(Result::ok)
+                .map(StoragePath::Local),
+        ))
     }
 }

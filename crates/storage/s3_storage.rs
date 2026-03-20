@@ -1,10 +1,11 @@
-use crate::Storage;
+use crate::{Storage, StoragePath};
 use anyhow::Context;
 use async_trait::async_trait;
 use aws_sdk_s3 as s3;
 use aws_sdk_s3::config::RequestChecksumCalculation;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{Delete, ObjectIdentifier};
+use glob::Pattern;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -236,6 +237,38 @@ impl Storage for S3Storage {
 
         let bytes = object.body.collect().await?.into_bytes();
         Ok(String::from_utf8_lossy(&bytes).to_string())
+    }
+
+    async fn glob(
+        &self,
+        base: &Url,
+        pattern: &str,
+    ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
+        let (bucket, key_prefix) = S3Storage::parse_uri(base)?;
+        let pattern = Pattern::new(pattern)?;
+
+        let res = self
+            .client()
+            .await?
+            .list_objects_v2()
+            .bucket(&bucket)
+            .prefix(&key_prefix)
+            .send()
+            .await?;
+
+        let urls = res
+            .contents()
+            .iter()
+            .filter_map(|obj| obj.key())
+            .filter(|key| {
+                let relative = key.strip_prefix(&format!("{}/", &*key_prefix)).unwrap_or(key);
+                pattern.matches(relative)
+            })
+            .flat_map(|key| Url::parse(&format!("s3://{}/{}", bucket, key)))
+            .map(StoragePath::Remote)
+            .collect::<Vec<_>>();
+
+        Ok(Box::new(urls.into_iter()))
     }
 }
 

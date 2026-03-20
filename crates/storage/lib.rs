@@ -19,6 +19,11 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool>;
     async fn delete(&self, uri: &Url) -> anyhow::Result<()>;
     async fn read_file(&self, uri: &Url) -> anyhow::Result<String>;
+    async fn glob(
+        &self,
+        base: &Url,
+        pattern: &str,
+    ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>>;
 }
 
 #[derive(Debug)]
@@ -92,6 +97,18 @@ impl Storage for StorageBackend {
             .read_file(uri)
             .await
     }
+
+    async fn glob(
+        &self,
+        base: &Url,
+        pattern: &str,
+    ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
+        self.inner
+            .get(base.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .glob(base, pattern)
+            .await
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -128,6 +145,26 @@ impl StoragePath {
                 .file_name()
                 .map(|o| o.to_string_lossy().to_string()),
             Self::Remote(url) => url.path_segments()?.next_back().map(|o| o.to_string()),
+        }
+    }
+
+    #[must_use]
+    pub fn is_dir(&self) -> bool {
+        match self {
+            Self::Local(path) => path.is_dir(),
+            Self::Remote(url) => url.path().ends_with('/'),
+        }
+    }
+
+    /// returns the path of an URL or the local path itself as a string
+    /// # Examples
+    /// `/mnt/my_dir/file.tx`t returns itself
+    ///
+    /// `https://domain.com/my_dir/index.pgp` returns `/my_dir/index.pgp`
+    pub fn path(&self) -> String {
+        match self {
+            Self::Local(path) => path.to_string_lossy().to_string(),
+            Self::Remote(url) => url.path().to_string(),
         }
     }
 

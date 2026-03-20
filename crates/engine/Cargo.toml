@@ -30,7 +30,6 @@ pathdiff = "0.2.3"
 tempfile.workspace = true
 tar = "0.4.44"
 dircpy.workspace = true
-glob = "0.3.3"
 url.workspace = true
 cwl_engine_storage = { path = "../storage" }
 

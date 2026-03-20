@@ -9,9 +9,9 @@ use crate::{
 };
 use anyhow::Context;
 use cwl_core::{
-    FileMetaData, Integer, OneOrMany,
+    FileMetaData, FilePathMetaData, Integer, OneOrMany,
     files::{Directory, File, FileOrDirectory, LoadListingEnum},
-    get_file_metadata,
+    get_file_metadata, get_path_metadata,
     inputs::DefaultValue,
     outputs::{
         CommandOutputBinding, CommandOutputParameter, CommandOutputParameterType,
@@ -23,14 +23,14 @@ use cwl_core::{
 };
 use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
 use dircpy::copy_dir;
-use glob::glob;
+use futures_util::{FutureExt, future::BoxFuture};
 use std::{
     collections::HashMap,
     fs,
     path::{Path, PathBuf},
     sync::Arc,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 #[derive(Debug)]
 pub struct OutputCollectionContext<'a> {
@@ -109,28 +109,24 @@ fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> Storag
     }
 }
 
-fn evaluate_command_binding(
+async fn evaluate_command_binding(
     binding: &CommandOutputBinding,
-    context: &OutputCollectionContext,
+    context: &OutputCollectionContext<'_>,
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     output_id: &String,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<Vec<DefaultValue>> {
     let mut results = vec![];
 
     //collect items via globs
     if let Some(globs) = &binding.glob {
         for glob_ in get_globs(globs, context.eval_context) {
-            let full_glob = make_full_glob(&glob_, context)?;
-            for entry in glob(&full_glob)? {
-                let Ok(item) = entry else {
-                    info!("Output glob {full_glob} did not match any files for {output_id}");
-                    continue;
-                };
+            for item in storage.glob(&context.source_dir.as_url()?, &glob_).await? {
                 let fod = if item.is_dir() {
-                    let basename = item.file_name().map(|i| i.to_string_lossy().into_owned());
+                    let basename = item.file_name();
                     let mut dir = Directory::builder()
-                        .path(item.to_string_lossy())
-                        .location(format!("file://{}", item.display()))
+                        .path(item.path())
+                        .location(item.as_url()?)
                         .maybe_basename(basename)
                         .build();
                     //handle load_listing
@@ -141,12 +137,27 @@ fn evaluate_command_binding(
                     }
                     FileOrDirectory::Directory(dir)
                 } else {
-                    let mut file = File::new_from_path(&item)?;
+                    let mut file = File::builder()
+                        .maybe_basename(item.file_name())
+                        .location(item.as_url()?)
+                        .path(item.path())
+                        .build();
+                    let FilePathMetaData {
+                        basename,
+                        nameroot,
+                        nameext,
+                        dirname,
+                    } = get_path_metadata(Path::new(&item.path()));
+                    file.basename = basename;
+                    file.nameext = nameext;
+                    file.nameroot = nameroot;
+                    file.dirname = dirname;
+
                     //handle load_contents
                     if let Some(load_contents) = &binding.load_contents
                         && *load_contents
                     {
-                        file.contents = fs::read_to_string(item).ok();
+                        file.contents = storage.read_file(&item.as_url()?).await.ok();
                     }
                     FileOrDirectory::File(file)
                 };
@@ -414,14 +425,18 @@ async fn collect_output_item(
         CommandOutputParameterType::Stderr => {
             handle_file(stderr_file, format, context, storage).await
         }
-        CommandOutputParameterType::CommandOutputType(r#type) => collect_item(
-            output,
-            output.output_binding.as_ref(),
-            r#type,
-            format.as_ref(),
-            output.secondary_files.as_ref(),
-            context,
-        ),
+        CommandOutputParameterType::CommandOutputType(r#type) => {
+            collect_item(
+                output,
+                output.output_binding.as_ref(),
+                r#type,
+                format.as_ref(),
+                output.secondary_files.as_ref(),
+                context,
+                storage,
+            )
+            .await
+        }
     }?;
 
     //validate output to schema
@@ -436,14 +451,16 @@ async fn collect_output_item(
 }
 
 // recursive implementention of item collection
-fn collect_item(
-    output: &CommandOutputParameter,
-    output_binding: Option<&CommandOutputBinding>,
-    item: &OneOrMany<CommandOutputType>,
-    format: Option<&String>,
-    secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
-    context: &OutputCollectionContext,
-) -> anyhow::Result<DefaultValue> {
+fn collect_item<'a>(
+    output: &'a CommandOutputParameter,
+    output_binding: Option<&'a CommandOutputBinding>,
+    item: &'a OneOrMany<CommandOutputType>,
+    format: Option<&'a String>,
+    secondary_files: Option<&'a OneOrMany<SecondaryFileSchema>>,
+    context: &'a OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
+) -> BoxFuture<'a, anyhow::Result<DefaultValue>> {
+    async move {
     let output_id = output.id.clone().unwrap_or_default();
 
     let is_optional = matches!(item, OneOrMany::Many(i) if i.contains(&CommandOutputType::CWLType(CWLType::Null)));
@@ -495,7 +512,9 @@ fn collect_item(
                             field.format.as_ref().map(OneOrMany::as_one),
                             field.secondary_files.as_ref(),
                             context,
-                        )?,
+                            storage.clone(),
+                        )
+                        .await?,
                     );
                 }
             }
@@ -503,8 +522,14 @@ fn collect_item(
         }
         _ => {
             if let Some(binding) = output_binding {
-                let mut values =
-                    evaluate_command_binding(binding, context, secondary_files, &output_id)?;
+                let mut values = evaluate_command_binding(
+                    binding,
+                    context,
+                    secondary_files,
+                    &output_id,
+                    storage,
+                )
+                .await?;
                 for item in &mut values {
                     validate_output_item_recurse(item, format, context)?;
                 }
@@ -523,6 +548,7 @@ fn collect_item(
         }
     };
     Ok(value)
+}.boxed()
 }
 
 fn validate_output_item_recurse(
@@ -633,29 +659,6 @@ async fn handle_dir(
     Ok(DefaultValue::FileOrDirectory(FileOrDirectory::Directory(
         dir,
     )))
-}
-
-fn make_full_glob(glob_: &str, context: &OutputCollectionContext) -> anyhow::Result<String> {
-    let full_glob = if glob_.starts_with("/") {
-        if !glob_.starts_with(
-            &context
-                .source_dir
-                .as_local_path()?
-                .to_string_lossy()
-                .to_string(),
-        ) {
-            anyhow::bail!("Can not access objects outside the working directory: {glob_}.");
-        }
-        glob_.to_owned()
-    } else {
-        format!(
-            "{}/{}",
-            context.source_dir.as_local_path()?.display(),
-            glob_
-        ) //crashes in TES
-    };
-    dbg!(&full_glob);
-    Ok(full_glob)
 }
 
 pub(crate) fn collect_expression_outputs(

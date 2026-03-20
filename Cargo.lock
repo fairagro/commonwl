@@ -1324,7 +1324,6 @@ dependencies = [
  "cwl_engine_storage",
  "dircpy",
  "futures-util",
- "glob",
  "horned-owl",
  "indexmap 2.13.0",
  "nix 0.31.2",
@@ -1359,6 +1358,7 @@ dependencies = [
  "aws-sdk-s3",
  "dircpy",
  "dotenvy",
+ "glob",
  "tempfile",
  "tokio",
  "tracing",
@@ -2865,7 +2865,7 @@ dependencies = [
  "json-event-parser",
  "oxiri",
  "oxrdf",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2877,7 +2877,7 @@ dependencies = [
  "oxilangtag",
  "oxiri",
  "rand",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2890,7 +2890,7 @@ dependencies = [
  "oxrdf",
  "oxrdfxml",
  "oxttl",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2903,7 +2903,7 @@ dependencies = [
  "oxiri",
  "oxrdf",
  "quick-xml 0.37.5",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2916,7 +2916,7 @@ dependencies = [
  "oxilangtag",
  "oxiri",
  "oxrdf",
- "thiserror 1.0.69",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
