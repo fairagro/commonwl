@@ -28,7 +28,7 @@ futures-util = "0.3.31"
 sha1.workspace = true
 pathdiff = "0.2.3"
 tempfile.workspace = true
-tar = "0.4.44"
+tar = "0.4.45"
 dircpy.workspace = true
 url.workspace = true
 cwl_engine_storage = { path = "../storage" }
