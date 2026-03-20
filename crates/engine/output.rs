@@ -634,7 +634,7 @@ async fn handle_dir(
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
 ) -> anyhow::Result<DefaultValue> {
-    let url = path.as_url()?.to_owned();
+    let url = path.as_url()?.clone();
     let relative_path = url
         .path()
         .strip_prefix(context.source_dir.as_url()?.as_str())

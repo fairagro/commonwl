@@ -261,10 +261,12 @@ impl Storage for S3Storage {
             .iter()
             .filter_map(|obj| obj.key())
             .filter(|key| {
-                let relative = key.strip_prefix(&format!("{}/", &*key_prefix)).unwrap_or(key);
+                let relative = key
+                    .strip_prefix(&format!("{}/", &*key_prefix))
+                    .unwrap_or(key);
                 pattern.matches(relative)
             })
-            .flat_map(|key| Url::parse(&format!("s3://{}/{}", bucket, key)))
+            .flat_map(|key| Url::parse(&format!("s3://{bucket}/{key}")))
             .map(StoragePath::Remote)
             .collect::<Vec<_>>();
 

@@ -139,12 +139,13 @@ impl StoragePath {
         matches!(self, Self::Local(_)) || matches!(self, Self::Remote(r) if r.scheme() == "file")
     }
 
+    #[must_use]
     pub fn file_name(&self) -> Option<String> {
         match self {
             Self::Local(path_buf) => path_buf
                 .file_name()
                 .map(|o| o.to_string_lossy().to_string()),
-            Self::Remote(url) => url.path_segments()?.next_back().map(|o| o.to_string()),
+            Self::Remote(url) => url.path_segments()?.next_back().map(ToString::to_string),
         }
     }
 
@@ -161,6 +162,7 @@ impl StoragePath {
     /// `/mnt/my_dir/file.tx`t returns itself
     ///
     /// `https://domain.com/my_dir/index.pgp` returns `/my_dir/index.pgp`
+    #[must_use]
     pub fn path(&self) -> String {
         match self {
             Self::Local(path) => path.to_string_lossy().to_string(),

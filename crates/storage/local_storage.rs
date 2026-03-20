@@ -87,7 +87,7 @@ impl Storage for LocalStorage {
         ensure!(base.scheme() == "file");
         let base = Path::new(base.path());
 
-        let full_glob = if pattern.starts_with("/") {
+        let full_glob = if pattern.starts_with('/') {
             if !pattern.starts_with(&base.to_string_lossy().into_owned()) {
                 anyhow::bail!("Can not access objects outside the working directory: {pattern}.");
             }
