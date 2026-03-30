@@ -150,13 +150,12 @@ impl TaskBackend for TesBackend {
 
         let mut set = tokio::task::JoinSet::new();
         let sem = Arc::new(tokio::sync::Semaphore::new(32));
-        let data_workdir = outdir.join("workdir")?;
+
         for mount in request.mounts.iter().cloned() {
             let outdir = request.outdir.to_owned();
             let workdir = request.execution_path.to_owned();
             let use_container = request.use_container;
             let storage = self.storage();
-            let base_url = data_workdir.clone();
             let permit = sem.clone().acquire_owned().await?;
             set.spawn(async move {
                 let _permit = permit;
@@ -166,7 +165,7 @@ impl TaskBackend for TesBackend {
                     &workdir,
                     use_container,
                     storage,
-                    MountStrategy::Remote { base_url },
+                    MountStrategy::Remote { base_url: outdir.as_url()? },
                 )
                 .await
             });
@@ -199,7 +198,7 @@ impl TaskBackend for TesBackend {
             Output::builder()
                 .name("workdir")
                 .path(CONTAINER_WORKDIR)
-                .url(data_workdir.clone())
+                .url(outdir.clone())
                 .ty(output::Type::Directory)
                 .build(),
         );
