@@ -244,10 +244,10 @@ fn validate_output_item<'a>(
     async move {
         match item {
             FileOrDirectory::File(file) => {
-                validate_file(file, format, context, base_path, copy, storage).await?
+                validate_file(file, format, context, base_path, copy, storage).await?;
             }
             FileOrDirectory::Directory(dir) => {
-                validate_dir(dir, context, base_path, copy, storage).await?
+                validate_dir(dir, context, base_path, copy, storage).await?;
             }
         }
 
@@ -281,7 +281,7 @@ async fn validate_file(
     {
         let u_source_location = Url::parse(source_location)
             .or_else(|_| Url::from_file_path(source_location))
-            .map_err(|_| anyhow::anyhow!("invalid source location: {source_location}"))?;
+            .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))?;
         if storage.exists(&u_source_location).await? {
             if copy {
                 let parent = dest_path.parent().unwrap();
@@ -297,7 +297,7 @@ async fn validate_file(
                 file.size = Some(Integer::Long(size.cast_signed()));
             }
         } else {
-            anyhow::bail!("Source location {} does not exist for output file", source_location);
+            anyhow::bail!("Source location {source_location} does not exist for output file");
         }
     } else if let Some(dest_path) = &path
         && let Some(contents) = &file.contents
