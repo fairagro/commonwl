@@ -291,6 +291,7 @@ impl S3Storage {
             .await
             .with_context(|| format!("Could not create file {}", local.display()))?;
         file.write_all(&bytes).await?;
+        file.flush().await?;
 
         Ok(())
     }
