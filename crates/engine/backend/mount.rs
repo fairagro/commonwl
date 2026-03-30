@@ -176,7 +176,7 @@ async fn mount_workdir_item_remote(
 
     let rel = target.strip_prefix(outdir.as_str()).unwrap_or(target);
     let guest_path = if target.starts_with(outdir.as_str()) {
-        format!("{}/{}", workdir, rel)
+        format!("{workdir}/{rel}")
     } else {
         target.to_string()
     };
