@@ -157,6 +157,7 @@ impl TaskBackend for TesBackend {
             let use_container = request.use_container;
             let storage = self.storage();
             let permit = sem.clone().acquire_owned().await?;
+            
             set.spawn(async move {
                 let _permit = permit;
                 mount_workdir_item(

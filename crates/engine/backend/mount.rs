@@ -172,24 +172,20 @@ async fn mount_workdir_item_remote(
 ) -> anyhow::Result<Vec<Input>> {
     let mut inputs = vec![];
     //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
-    ensure!(mount.target.scheme() == "file");
-    let target = mount
-        .target
-        .to_file_path()
-        .map_err(|()| anyhow::anyhow!("Url not local!"))?;
+    let target = mount.target.as_str();
 
-    let rel = target.strip_prefix(outdir.as_str()).unwrap_or(&target);
+    let rel = target.strip_prefix(outdir.as_str()).unwrap_or(target);
     let guest_path = if target.starts_with(outdir.as_str()) {
-        format!("{}/{}", workdir, rel.display())
+        format!("{}/{}", workdir, rel)
     } else {
-        target.to_string_lossy().to_string()
+        target.to_string()
     };
 
     match (mount.ty, mount.source) {
         (MountType::File, Source::Url(url)) => {
             let dest = if url.scheme() == "file" {
                 let local = Path::new(url.path());
-                let dest = base_url.join(&rel.to_string_lossy())?;
+                let dest = base_url.join(rel)?;
                 backend.upload(local, &dest).await?;
                 dest
             } else {
@@ -205,7 +201,7 @@ async fn mount_workdir_item_remote(
             );
         }
         (MountType::File, Source::Contents(data)) => {
-            let dest = base_url.join(&rel.to_string_lossy())?;
+            let dest = base_url.join(rel)?;
             backend.upload_bytes(&data, &dest).await?;
             inputs.push(
                 Input::builder()
@@ -219,7 +215,7 @@ async fn mount_workdir_item_remote(
         (MountType::Directory, Source::Url(url)) => {
             let dest = if url.scheme() == "file" {
                 let local = Path::new(url.path());
-                let dest = base_url.join(&format!("{}/", rel.display()))?;
+                let dest = base_url.join(&format!("{rel}/"))?;
                 backend.upload(local, &dest).await?;
                 dest
             } else {
