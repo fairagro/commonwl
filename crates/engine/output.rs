@@ -31,6 +31,7 @@ use std::{
     sync::Arc,
 };
 use tracing::{debug, warn};
+use url::Url;
 
 #[derive(Debug)]
 pub struct OutputCollectionContext<'a> {
@@ -232,28 +233,37 @@ fn handle_secondary_files(
 }
 
 /// validates new paths for files and directories
-fn validate_output_item(
-    item: &mut FileOrDirectory,
-    format: Option<&String>,
-    context: &OutputCollectionContext,
-    base_path: &Path,
+fn validate_output_item<'a>(
+    item: &'a mut FileOrDirectory,
+    format: Option<&'a String>,
+    context: &'a OutputCollectionContext<'_>,
+    base_path: &'a Path,
     copy: bool, // indicates whether we need to copy file and dir
-) -> anyhow::Result<()> {
-    match item {
-        FileOrDirectory::File(file) => validate_file(file, format, context, base_path, copy)?,
-        FileOrDirectory::Directory(dir) => validate_dir(dir, context, base_path, copy)?,
-    }
+    storage: Arc<StorageBackend>,
+) -> BoxFuture<'a, anyhow::Result<()>> {
+    async move {
+        match item {
+            FileOrDirectory::File(file) => {
+                validate_file(file, format, context, base_path, copy, storage).await?
+            }
+            FileOrDirectory::Directory(dir) => {
+                validate_dir(dir, context, base_path, copy, storage).await?
+            }
+        }
 
-    Ok(())
+        Ok(())
+    }
+    .boxed()
 }
 
 /// sets the designated path to the file and copies it and its `secondary_files` recursively to the output folder
-fn validate_file(
+async fn validate_file(
     file: &mut File,
     format: Option<&String>,
-    context: &OutputCollectionContext,
+    context: &OutputCollectionContext<'_>,
     base_path: &Path,
     copy: bool,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<()> {
     let path =
         get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref()).map(|p| {
@@ -264,36 +274,30 @@ fn validate_file(
             }
         });
     let dirname = path.as_ref().and_then(|p| p.parent());
+    let location = file.location.as_ref().or(file.path.as_ref());
 
-    if let Some(source_path) = &file.path
+    if let Some(source_location) = &location
         && let Some(dest_path) = &path
     {
-        let mut source_path = source_path.to_owned();
-        if !Path::new(&source_path).exists() {
-            debug!("Path field contains container path. Trying to use location: {file:?}");
-            source_path = file
-                .location
-                .as_ref()
-                .unwrap()
-                .strip_prefix("file://")
-                .unwrap()
-                .to_string();
-        }
+        let u_source_location = Url::parse(source_location)
+            .or_else(|_| Url::from_file_path(source_location))
+            .map_err(|_| anyhow::anyhow!("invalid source location: {source_location}"))?;
+        if storage.exists(&u_source_location).await? {
+            if copy {
+                let parent = dest_path.parent().unwrap();
+                if !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
 
-        let parent = dest_path.parent().unwrap();
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-
-        if copy {
-            fs::copy(&source_path, dest_path).with_context(|| {
-                format!("Could not copy {source_path:?} to {}", dest_path.display())
-            })?;
-        }
-        if file.size.is_none() || file.checksum.is_none() {
-            let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
-            file.checksum = checksum;
-            file.size = Some(Integer::Long(size.cast_signed()));
+                storage.download(&u_source_location, dest_path).await?;
+            }
+            if file.size.is_none() || file.checksum.is_none() {
+                let FileMetaData { size, checksum } = get_file_metadata(dest_path)?;
+                file.checksum = checksum;
+                file.size = Some(Integer::Long(size.cast_signed()));
+            }
+        } else {
+            anyhow::bail!("Source location {} does not exist for output file", source_location);
         }
     } else if let Some(dest_path) = &path
         && let Some(contents) = &file.contents
@@ -332,7 +336,7 @@ fn validate_file(
 
     if let Some(secondary_files) = &mut file.secondary_files {
         for item in secondary_files {
-            validate_output_item(item, None, context, base_path, true)?;
+            validate_output_item(item, None, context, base_path, true, storage.clone()).await?;
         }
     }
 
@@ -340,11 +344,12 @@ fn validate_file(
 }
 
 /// sets the designated path to the directory and copies it and its contents recursively to the output folder
-fn validate_dir(
+async fn validate_dir(
     dir: &mut Directory,
-    context: &OutputCollectionContext,
+    context: &OutputCollectionContext<'_>,
     base_path: &Path,
     copy: bool,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<()> {
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
         .map(|p| if copy { unique_path(&p, None) } else { p });
@@ -385,7 +390,7 @@ fn validate_dir(
     let base_path = path.unwrap();
     if let Some(listing) = &mut dir.listing {
         for item in listing {
-            validate_output_item(item, None, context, &base_path, copy)?;
+            validate_output_item(item, None, context, &base_path, copy, storage.clone()).await?;
         }
     }
 
@@ -527,11 +532,11 @@ fn collect_item<'a>(
                     context,
                     secondary_files,
                     &output_id,
-                    storage,
+                    storage.clone(),
                 )
                 .await?;
                 for item in &mut values {
-                    validate_output_item_recurse(item, format, context)?;
+                    validate_output_item_recurse(item, format, context, storage.clone()).await?;
                 }
 
                 if single && !values.is_empty() || is_any && values.len() == 1 {
@@ -551,33 +556,37 @@ fn collect_item<'a>(
 }.boxed()
 }
 
-fn validate_output_item_recurse(
-    item: &mut DefaultValue,
-    format: Option<&String>,
-    context: &OutputCollectionContext,
-) -> anyhow::Result<()> {
-    match item {
-        DefaultValue::FileOrDirectory(fod) => {
-            validate_output_item(fod, format, context, context.dest_dir, true)?;
-        }
-        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
-            for item in map.values_mut() {
-                let mut dv = serde_yaml::from_value(item.clone())?;
-                validate_output_item_recurse(&mut dv, format, context)?;
-                *item = serde_yaml::to_value(dv)?;
+fn validate_output_item_recurse<'a>(
+    item: &'a mut DefaultValue,
+    format: Option<&'a String>,
+    context: &'a OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
+) -> BoxFuture<'a, anyhow::Result<()>> {
+    async move {
+        match item {
+            DefaultValue::FileOrDirectory(fod) => {
+                validate_output_item(fod, format, context, context.dest_dir, true, storage).await?;
             }
-        }
-        DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
-            for item in arr {
-                let mut dv = serde_yaml::from_value(item.clone())?;
-                validate_output_item_recurse(&mut dv, format, context)?;
-                *item = serde_yaml::to_value(dv)?;
+            DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+                for item in map.values_mut() {
+                    let mut dv = serde_yaml::from_value(item.clone())?;
+                    validate_output_item_recurse(&mut dv, format, context, storage.clone()).await?;
+                    *item = serde_yaml::to_value(dv)?;
+                }
             }
+            DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+                for item in arr {
+                    let mut dv = serde_yaml::from_value(item.clone())?;
+                    validate_output_item_recurse(&mut dv, format, context, storage.clone()).await?;
+                    *item = serde_yaml::to_value(dv)?;
+                }
+            }
+            DefaultValue::Any(_) => {}
         }
-        DefaultValue::Any(_) => {}
-    }
 
-    Ok(())
+        Ok(())
+    }
+    .boxed()
 }
 
 fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> Vec<String> {
@@ -661,10 +670,11 @@ async fn handle_dir(
     )))
 }
 
-pub(crate) fn collect_expression_outputs(
+pub(crate) async fn collect_expression_outputs(
     outputs: &[ExpressionToolOutputParameter],
     value: &serde_yaml::Value,
-    context: &OutputCollectionContext,
+    context: &OutputCollectionContext<'_>,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map = HashMap::new();
     for output in outputs {
@@ -682,18 +692,20 @@ pub(crate) fn collect_expression_outputs(
                 );
             }
             let format = output.format.as_ref().map(|f| f.as_one().clone());
-            validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+            validate_output_item_recurse(&mut value, format.as_ref(), context, storage.clone())
+                .await?;
             output_map.insert(output_id, value);
         }
     }
     Ok(output_map)
 }
 
-pub(crate) fn collect_workflow_outputs(
+pub(crate) async fn collect_workflow_outputs(
     outputs: &[WorkflowOutputParameter],
     values: &HashMap<String, DefaultValue>,
-    context: &OutputCollectionContext,
+    context: &OutputCollectionContext<'_>,
     mir: Option<&MultipleInputFeatureRequirement>,
+    storage: Arc<StorageBackend>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut output_map = HashMap::new();
 
@@ -722,7 +734,13 @@ pub(crate) fn collect_workflow_outputs(
                         };
 
                         let format = output.format.as_ref().map(|f| f.as_one().clone());
-                        validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+                        validate_output_item_recurse(
+                            &mut value,
+                            format.as_ref(),
+                            context,
+                            storage.clone(),
+                        )
+                        .await?;
                         if let CommandOutputParameterType::CommandOutputType(r#type) =
                             &output.r#type
                         {
@@ -761,7 +779,13 @@ pub(crate) fn collect_workflow_outputs(
                     };
 
                     let format = output.format.as_ref().map(|f| f.as_one().clone());
-                    validate_output_item_recurse(&mut value, format.as_ref(), context)?;
+                    validate_output_item_recurse(
+                        &mut value,
+                        format.as_ref(),
+                        context,
+                        storage.clone(),
+                    )
+                    .await?;
                     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
                         let valid = validate_output_type(&r#type.clone().into(), &value);
                         if !valid {

@@ -416,7 +416,9 @@ pub async fn execute_workflow(
         eval_context,
         validator: &fv,
     };
-    let outputs = collect_workflow_outputs(&wf.outputs, &completed_outputs, &cc, mir)?;
+    let outputs =
+        collect_workflow_outputs(&wf.outputs, &completed_outputs, &cc, mir, backend.storage())
+            .await?;
 
     Ok(ExecutionResult {
         exit_status: NonEmpty::new(ExitStatus::default()),
@@ -742,7 +744,9 @@ pub async fn execute_commandline_tool(
                 eval_context,
                 validator: &fv,
             },
-        )?;
+            backend.storage(),
+        )
+        .await?;
 
         Ok(ExecutionResult {
             exit_status: NonEmpty::new(ExitStatus::default()),
