@@ -130,7 +130,7 @@ pub struct InlineJavascriptRequirement {
 #[serde(untagged)]
 pub enum StringOrInclude {
     Include(Include),
-    Expression(String),
+    String(String),
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash)]
@@ -162,7 +162,7 @@ pub struct DockerRequirement {
     pub docker_load: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    pub docker_file: Option<String>,
+    pub docker_file: Option<StringOrInclude>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_import: Option<String>,

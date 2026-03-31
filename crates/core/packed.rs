@@ -1,4 +1,5 @@
 use crate::{
+    OneOrMany,
     documents::{
         CWLDocument, CommandLineTool, ExpressionTool, Operation, StringOrDocument, Workflow,
         WorkflowStep,
@@ -7,11 +8,15 @@ use crate::{
     inputs::{CommandInputParameter, DefaultValue, WorkflowInputParameter},
     normalize_path,
     outputs::StringOrWorkflowStepOutput,
+    requirements::{
+        DockerRequirement, InitialWorkDirRequirement, InlineJavascriptRequirement, ListingItems,
+        StringOrInclude, ToolRequirements, WorkDirItems, WorkflowRequirements,
+    },
 };
 use anyhow::ensure;
 use commonwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{fs, path::Path};
 use url::Url;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -198,7 +203,7 @@ pub fn pack_cwl(
             graph: vec![pack_tool(spec.clone(), filename, id)?],
             cwl_version: spec.cwl_version().cloned(),
         },
-        CWLDocument::Workflow(wf) => todo!(),
+        CWLDocument::Workflow(_wf) => todo!(),
         CWLDocument::Operation(_) => unimplemented!(),
     })
 }
@@ -233,6 +238,22 @@ fn pack_tool(
             for output in &mut clt.outputs {
                 output.id = Some(format!("{id}/{}", output.id.as_ref().unwrap()));
             }
+            if let Some(reqs) = &mut clt.requirements {
+                for req in reqs {
+                    match req {
+                        ToolRequirements::InitialWorkDirRequirement(iwdr) => {
+                            pack_iwdr(iwdr, tool_dir)?;
+                        }
+                        ToolRequirements::DockerRequirement(dr) => {
+                            pack_docker_requirement(dr, tool_dir)?;
+                        }
+                        ToolRequirements::InlineJavascriptRequirement(ijs) => {
+                            pack_js_requirement(ijs, tool_dir)?;
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
         CWLDocument::ExpressionTool(et) => {
             for input in &mut et.inputs {
@@ -240,6 +261,22 @@ fn pack_tool(
             }
             for output in &mut et.outputs {
                 output.id = Some(format!("{id}/{}", output.id.as_ref().unwrap()));
+            }
+            if let Some(reqs) = &mut et.requirements {
+                for req in reqs {
+                    match req {
+                        WorkflowRequirements::InitialWorkDirRequirement(iwdr) => {
+                            pack_iwdr(iwdr, tool_dir)?;
+                        }
+                        WorkflowRequirements::DockerRequirement(dr) => {
+                            pack_docker_requirement(dr, tool_dir)?;
+                        }
+                        WorkflowRequirements::InlineJavascriptRequirement(ijs) => {
+                            pack_js_requirement(ijs, tool_dir)?;
+                        }
+                        _ => {}
+                    }
+                }
             }
         }
         _ => {}
@@ -325,7 +362,7 @@ fn pack_workflow_input(
         match default {
             DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                 if let Some(loc) = &mut f.location
-                    && Url::parse(&loc).is_err()
+                    && Url::parse(loc).is_err()
                 {
                     let p = Path::new(&loc);
                     if p.is_absolute() {
@@ -350,7 +387,7 @@ fn pack_workflow_input(
             }
             DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                 if let Some(loc) = &mut d.location
-                    && Url::parse(&loc).is_err()
+                    && Url::parse(loc).is_err()
                 {
                     let p = Path::new(&loc);
                     if p.is_absolute() {
@@ -375,6 +412,68 @@ fn pack_workflow_input(
             }
             DefaultValue::Any(_) => {}
         }
+    }
+
+    Ok(())
+}
+
+fn pack_iwdr(
+    iwdr: &mut InitialWorkDirRequirement,
+    doc_dir: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    match &mut iwdr.listing {
+        WorkDirItems::Expression(_) => {}
+        WorkDirItems::ListingItems(items) => match &mut **items {
+            OneOrMany::One(item) => pack_iwdr_item(item, doc_dir)?,
+            OneOrMany::Many(items) => {
+                for item in items {
+                    pack_iwdr_item(item, &doc_dir)?;
+                }
+            }
+        },
+    }
+
+    Ok(())
+}
+
+fn pack_iwdr_item(item: &mut ListingItems, doc_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    if let ListingItems::Dirent(dirent) = item {
+        pack_entry(&mut dirent.entry, &doc_dir)?;
+    }
+
+    Ok(())
+}
+
+fn pack_docker_requirement(
+    dr: &mut DockerRequirement,
+    doc_dir: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    if let Some(df) = &mut dr.docker_file {
+        pack_entry(df, doc_dir)?;
+    }
+
+    Ok(())
+}
+
+fn pack_js_requirement(
+    ijs: &mut InlineJavascriptRequirement,
+    doc_dir: impl AsRef<Path>,
+) -> anyhow::Result<()> {
+    if let Some(lib) = &mut ijs.expression_lib {
+        for item in lib {
+            pack_entry(item, &doc_dir)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn pack_entry(entry: &mut StringOrInclude, doc_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    if let StringOrInclude::Include(include) = &entry {
+        let path = &include.include;
+        let contents = fs::read_to_string(doc_dir.as_ref().join(path))?;
+
+        *entry = StringOrInclude::String(contents);
     }
 
     Ok(())

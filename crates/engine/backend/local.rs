@@ -18,7 +18,7 @@ use crankshaft::engine::{
         output::{self},
     },
 };
-use cwl_core::{IntegerOrExpression, files::FileOrDirectory};
+use cwl_core::{IntegerOrExpression, files::FileOrDirectory, requirements::StringOrInclude};
 use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::{fs, sync::Arc, time::Duration};
@@ -121,6 +121,22 @@ impl TaskBackend for LocalBackend {
         if let Some(dr) = &request.docker {
             let dr = (*dr).clone();
             let image_id = dr.docker_pull.or(dr.docker_image_id).unwrap();
+
+            let df = if let Some(df) = dr.docker_file {
+                Some(match df {
+                    StringOrInclude::Include(include) => include.include.clone(),
+                    StringOrInclude::String(s) => {
+                        let tmp = request.tmpdir.join("Dockerfile")?;
+                        self.storage
+                            .upload_bytes(s.as_bytes(), &tmp.as_url()?)
+                            .await?;
+                        tmp.as_local_path()?.to_string_lossy().into_owned()
+                    }
+                })
+            } else {
+                None
+            };
+
             let options = ContainerBuildOptions::builder()
                 .docker_image_id(image_id)
                 .network(request.network)
@@ -129,7 +145,7 @@ impl TaskBackend for LocalBackend {
                 .outdir(self.container_work_dir())
                 .tmpdir(request.runtime.tmpdir.to_string_lossy())
                 .workdir(request.execution_path)
-                .maybe_docker_file(dr.docker_file)
+                .maybe_docker_file(df)
                 .mounts(extras)
                 .build();
             args = build_container_command(args, &inputs, options)?;

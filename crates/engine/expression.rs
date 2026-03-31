@@ -173,7 +173,7 @@ fn js_eval(
                         .eval(Source::from_bytes(&contents))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
                 }
-                StringOrInclude::Expression(expr) => {
+                StringOrInclude::String(expr) => {
                     context
                         .eval(Source::from_bytes(expr))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;

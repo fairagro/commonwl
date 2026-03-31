@@ -7,7 +7,7 @@ use cwl_core::{
     OneOrMany,
     files::{Dirent, FileOrDirectory},
     inputs::DefaultValue,
-    requirements::{InitialWorkDirRequirement, ListingItems, WorkDirItems},
+    requirements::{InitialWorkDirRequirement, ListingItems, StringOrInclude, WorkDirItems},
 };
 use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
 use std::{
@@ -154,13 +154,43 @@ fn stage_dirent(
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
 ) -> anyhow::Result<Vec<WorkDirMount>> {
+    //get entryname
+    let entryname = dirent.clone().entryname.unwrap();
+    let entryname = do_eval_to_string(&entryname, context);
+    if entryname.starts_with("../") {
+        //illegal
+        anyhow::bail!("dirent.entryname must not start with ../")
+    }
+
+    if let StringOrInclude::Include(include) = &dirent.entry {
+        let mut path = PathBuf::from(&include.include);
+        if !path.is_absolute() {
+            path = workdir.join(path);
+        }
+        let url = Url::from_file_path(path)
+            .map_err(|()| anyhow::anyhow!("Could not create URL from path"))?;
+
+        let staged_path = stagedir.join(&entryname)?;
+        return Ok(vec![WorkDirMount {
+            source: Source::Url(url),
+            target: staged_path.as_url()?,
+            ty: MountType::File,
+            readonly: !dirent.writable.unwrap_or(false),
+        }]);
+    }
+
+    let StringOrInclude::String(entry) = &dirent.entry else {
+        unreachable!()
+    };
+
     //evaluate expression if so
     let evaluated_content =
-        do_eval(&dirent.entry, context).unwrap_or(serde_yaml::Value::String(dirent.entry.clone()));
+        do_eval(entry, context).unwrap_or(serde_yaml::Value::String(entry.clone()));
     if evaluated_content.is_null() {
         debug!("Workdir Entry evaluated to null: {dirent:?}");
         return Ok(vec![]);
     }
+
     //probably array of files is given here, why is dirent used in the first place?
     if dirent.entryname.is_none()
         && let Ok(items) =
@@ -184,19 +214,12 @@ fn stage_dirent(
     //parse to DefaultValue
     let dv: DefaultValue = serde_yaml::from_value(evaluated_content)?;
 
-    //get entryname
-    let entryname = dirent.clone().entryname.unwrap();
-    let entryname = do_eval_to_string(&entryname, context);
-    if entryname.starts_with("../") {
-        //illegal
-        anyhow::bail!("dirent.entryname must not start with ../")
-    }
     //if dirent ends with newline and has expression we use string interpolation which means we do json serialization
-    let has_trailing_newline = dirent.entry.ends_with('\n');
+    let has_trailing_newline = entry.ends_with('\n');
 
     //relocate used inputs
     if !has_trailing_newline && matches!(dv, DefaultValue::FileOrDirectory(_)) {
-        update_inputs(&dirent.entry, inputs, container_workdir, Some(&entryname));
+        update_inputs(entry, inputs, container_workdir, Some(&entryname));
     }
 
     let staged_path = stagedir.join(&entryname)?;

@@ -27,7 +27,7 @@ use crankshaft::{
         },
     },
 };
-use cwl_core::IntegerOrExpression;
+use cwl_core::{IntegerOrExpression, requirements::StringOrInclude};
 use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::{
@@ -97,6 +97,16 @@ impl TaskBackend for DockerBackend {
             if let Some(df) = &dr.docker_file
                 && let Some(dt) = &dr.docker_image_id
             {
+                let df = match df {
+                    StringOrInclude::Include(include) => include.include.clone(),
+                    StringOrInclude::String(s) => {
+                        let tmp = request.tmpdir.join("Dockerfile")?;
+                        self.storage
+                            .upload_bytes(s.as_bytes(), &tmp.as_url()?)
+                            .await?;
+                        tmp.as_local_path()?.to_string_lossy().into_owned()
+                    }
+                };
                 build_container(self.client.inner(), df, dt).await?;
                 container = dt.clone();
             } else if let Some(dp) = &dr.docker_pull {
