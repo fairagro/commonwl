@@ -6,7 +6,7 @@ use crate::{
     },
     files::FileOrDirectory,
     inputs::{CommandInputParameter, DefaultValue, WorkflowInputParameter},
-    normalize_path,
+    load_cwl_file, normalize_path,
     outputs::StringOrWorkflowStepOutput,
     requirements::{
         DockerRequirement, InitialWorkDirRequirement, InlineJavascriptRequirement, ListingItems,
@@ -189,22 +189,93 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
     unpack_identifiable(step, base_id);
 }
 
-/// Generates a packed cwl file from a given Document
+/// Generates a document graph from a given Document
 /// # Errors
 /// Can return error if packing of workflow
 pub fn pack_cwl(
     spec: &CWLDocument,
     filename: impl AsRef<Path>,
     id: Option<&str>,
-) -> anyhow::Result<PackedCWL> {
+) -> anyhow::Result<Vec<CWLDocument>> {
     Ok(match spec {
-        CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => PackedCWL {
-            graph: vec![pack_tool(spec.clone(), filename, id)?],
-            cwl_version: spec.cwl_version().cloned(),
-        },
-        CWLDocument::Workflow(_wf) => todo!(),
+        CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => {
+            vec![pack_tool(spec.clone(), filename, id)?]
+        }
+        CWLDocument::Workflow(wf) => pack_workflow(wf, filename, id)?.graph,
         CWLDocument::Operation(_) => unimplemented!(),
     })
+}
+
+/// Generates a packed cwl file for a given Document
+/// # Errors
+/// Can return error if packing of workflow
+pub fn pack_workflow(
+    wf: &Workflow,
+    filename: impl AsRef<Path>,
+    id: Option<&str>,
+) -> anyhow::Result<PackedCWL> {
+    let mut wf = wf.clone();
+    if let Some(id) = id {
+        wf.id = Some(id.to_string())
+    } else {
+        wf.id = Some("#main".to_string())
+    };
+
+    let wf_dir = filename.as_ref().parent().unwrap_or(filename.as_ref());
+    let wf_id = wf.id.clone().unwrap();
+
+    let mut graph = vec![];
+
+    for input in &mut wf.inputs {
+        pack_workflow_input(input, &wf_id, wf_dir)?;
+    }
+
+    for output in &mut wf.outputs {
+        output.id = Some(format!("{wf_id}/{}", output.id.as_ref().unwrap()));
+        if let Some(output_source) = &mut output.output_source {
+            match output_source {
+                OneOrMany::One(item) => *item = format!("{wf_id}/{item}"),
+                OneOrMany::Many(items) => {
+                    for item in items {
+                        *item = format!("{wf_id}/{item}")
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(reqs) = &mut wf.requirements {
+        for req in reqs {
+            match req {
+                WorkflowRequirements::InitialWorkDirRequirement(iwdr) => {
+                    pack_iwdr(iwdr, wf_dir)?;
+                }
+                WorkflowRequirements::DockerRequirement(dr) => {
+                    pack_docker_requirement(dr, wf_dir)?;
+                }
+                WorkflowRequirements::InlineJavascriptRequirement(ijs) => {
+                    pack_js_requirement(ijs, wf_dir)?;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    for step in &mut wf.steps {
+        graph.extend(pack_step(step, wf_dir, &wf_id)?);
+    }
+
+    let cwl_version = Some(
+        wf.cwl_version
+            .as_ref()
+            .map_or("v1.2".to_string(), |v| v.clone()),
+    );
+    wf.cwl_version = None;
+
+    graph.push(CWLDocument::Workflow(wf.clone()));
+    graph.sort_by(|a, b| a.get_id().unwrap().cmp(b.get_id().unwrap()));
+
+    Ok(PackedCWL { graph, cwl_version })
 }
 
 fn pack_tool(
@@ -282,6 +353,85 @@ fn pack_tool(
     }
 
     Ok(tool)
+}
+
+fn pack_step(
+    step: &mut WorkflowStep,
+    wf_dir: impl AsRef<Path>,
+    wf_id: &str,
+) -> anyhow::Result<Vec<CWLDocument>> {
+    let step_id = format!("{wf_id}/{}", step.id.as_ref().unwrap());
+    step.id = Some(step_id.to_string());
+
+    let mut packed_graph = match &mut step.run {
+        StringOrDocument::String(filename) => {
+            let path = Path::new(filename);
+            let path = if path.is_absolute() {
+                path
+            } else {
+                &wf_dir.as_ref().join(path)
+            };
+            let filename = if let Some(filename) = path.file_name() {
+                filename.to_string_lossy().into_owned()
+            } else {
+                format!("{step_id}.cwl")
+            };
+            let step_hash = format!("#{filename}");
+            let cwl = load_cwl_file(path, true)?;
+            let graph = pack_cwl(&cwl, path, Some(&step_hash))?;
+
+            step.run = StringOrDocument::String(step_hash);
+            graph
+        }
+        StringOrDocument::Document(doc) => {
+            let step_hash = format!("#{step_id}.cwl");
+            let graph = pack_cwl(
+                doc,
+                wf_dir.as_ref().join(step.id.as_ref().unwrap()),
+                Some(&step_hash),
+            )?;
+
+            step.run = StringOrDocument::String(step_hash);
+            graph
+        }
+    };
+
+    //clear versions from child docs
+    for item in &mut packed_graph {
+        match item {
+            CWLDocument::CommandLineTool(clt) => clt.cwl_version = None,
+            CWLDocument::ExpressionTool(et) => et.cwl_version = None,
+            CWLDocument::Operation(op) => op.cwl_version = None,
+            CWLDocument::Workflow(wf) => wf.cwl_version = None,
+        }
+    }
+
+    for input in &mut step.r#in {
+        input.id = Some(format!("{step_id}/{}", input.id.as_ref().unwrap()));
+        if let Some(src) = &mut input.source {
+            match src {
+                OneOrMany::One(item) => *item = format!("{wf_id}/{item}"),
+                OneOrMany::Many(items) => {
+                    for item in items {
+                        *item = format!("{wf_id}/{item}");
+                    }
+                }
+            }
+        }
+    }
+
+    for output in &mut step.out {
+        match output {
+            StringOrWorkflowStepOutput::String(o_string) => {
+                *o_string = format!("{step_id}/{o_string}");
+            }
+            StringOrWorkflowStepOutput::WorkflowStepOutput(wf_out) => {
+                wf_out.set_id(&format!("{step_id}/{}", wf_out.get_id().unwrap()))
+            }
+        }
+    }
+
+    Ok(packed_graph.to_owned())
 }
 
 fn pack_command_input(
@@ -558,7 +708,7 @@ mod tests {
     fn test_pack_commandlinetool() {
         let path = Path::new("../../testdata/packed/workflows/calculation/calculation.cwl");
         let tool = load_cwl_file(path, true).unwrap();
-        let packed = &pack_cwl(&tool, path, Some("#main")).unwrap().graph[0];
+        let packed = &pack_cwl(&tool, path, Some("#main")).unwrap()[0];
 
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
@@ -567,6 +717,34 @@ mod tests {
 
         let mut json = serde_json::json!(packed);
         let reference_json = include_str!("../../testdata/packed/calculation_packed.cwl")
+            .replace(
+                "/mnt/commonwl",
+                &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
+            )
+            .replace("//?", "");
+
+        let mut reference: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
+        normalize_json_newlines(&mut json);
+        normalize_json_newlines(&mut reference);
+        assert_eq!(json, reference);
+    }
+
+    #[test]
+    fn test_pack_workflow() {
+        let path = "../../testdata/packed/workflows/main/main.cwl";
+        let CWLDocument::Workflow(wf) = load_cwl_file(path, true).unwrap() else {
+            panic!()
+        };
+
+        let packed = pack_workflow(&wf, path, None).unwrap();
+        let mut json = serde_json::json!(&packed);
+
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .canonicalize()
+            .unwrap();
+
+        let reference_json = include_str!("../../testdata/packed/main_packed.cwl")
             .replace(
                 "/mnt/commonwl",
                 &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
