@@ -209,6 +209,8 @@ pub fn pack_cwl(
 /// Generates a packed cwl file for a given Document
 /// # Errors
 /// Can return error if packing of workflow
+/// # Panics
+/// unwrap used on wf.id after definitvely setting it -> no panic
 pub fn pack_workflow(
     wf: &Workflow,
     filename: impl AsRef<Path>,
@@ -216,10 +218,10 @@ pub fn pack_workflow(
 ) -> anyhow::Result<PackedCWL> {
     let mut wf = wf.clone();
     if let Some(id) = id {
-        wf.id = Some(id.to_string())
+        wf.id = Some(id.to_string());
     } else {
-        wf.id = Some("#main".to_string())
-    };
+        wf.id = Some("#main".to_string());
+    }
 
     let wf_dir = filename.as_ref().parent().unwrap_or(filename.as_ref());
     let wf_id = wf.id.clone().unwrap();
@@ -237,7 +239,7 @@ pub fn pack_workflow(
                 OneOrMany::One(item) => *item = format!("{wf_id}/{item}"),
                 OneOrMany::Many(items) => {
                     for item in items {
-                        *item = format!("{wf_id}/{item}")
+                        *item = format!("{wf_id}/{item}");
                     }
                 }
             }
@@ -268,7 +270,7 @@ pub fn pack_workflow(
     let cwl_version = Some(
         wf.cwl_version
             .as_ref()
-            .map_or("v1.2".to_string(), |v| v.clone()),
+            .map_or("v1.2".to_string(), Clone::clone),
     );
     wf.cwl_version = None;
 
@@ -361,7 +363,7 @@ fn pack_step(
     wf_id: &str,
 ) -> anyhow::Result<Vec<CWLDocument>> {
     let step_id = format!("{wf_id}/{}", step.id.as_ref().unwrap());
-    step.id = Some(step_id.to_string());
+    step.id = Some(step_id.clone());
 
     let mut packed_graph = match &mut step.run {
         StringOrDocument::String(filename) => {
@@ -426,12 +428,12 @@ fn pack_step(
                 *o_string = format!("{step_id}/{o_string}");
             }
             StringOrWorkflowStepOutput::WorkflowStepOutput(wf_out) => {
-                wf_out.set_id(&format!("{step_id}/{}", wf_out.get_id().unwrap()))
+                wf_out.set_id(&format!("{step_id}/{}", wf_out.get_id().unwrap()));
             }
         }
     }
 
-    Ok(packed_graph.to_owned())
+    Ok(packed_graph.clone())
 }
 
 fn pack_command_input(
