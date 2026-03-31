@@ -146,6 +146,17 @@ fn stage_item(
     }
 }
 
+fn get_entryname(dirent: &Dirent, context: &EvaluationContext) -> anyhow::Result<String> {
+    //get entryname
+    let entryname = dirent.clone().entryname.unwrap();
+    let entryname = do_eval_to_string(&entryname, context);
+    if entryname.starts_with("../") {
+        //illegal
+        anyhow::bail!("dirent.entryname must not start with ../")
+    }
+    Ok(entryname)
+}
+
 fn stage_dirent(
     dirent: &Dirent,
     workdir: &Path,
@@ -154,14 +165,6 @@ fn stage_dirent(
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
 ) -> anyhow::Result<Vec<WorkDirMount>> {
-    //get entryname
-    let entryname = dirent.clone().entryname.unwrap();
-    let entryname = do_eval_to_string(&entryname, context);
-    if entryname.starts_with("../") {
-        //illegal
-        anyhow::bail!("dirent.entryname must not start with ../")
-    }
-
     if let StringOrInclude::Include(include) = &dirent.entry {
         let mut path = PathBuf::from(&include.include);
         if !path.is_absolute() {
@@ -170,6 +173,7 @@ fn stage_dirent(
         let url = Url::from_file_path(path)
             .map_err(|()| anyhow::anyhow!("Could not create URL from path"))?;
 
+        let entryname = get_entryname(dirent, context)?;
         let staged_path = stagedir.join(&entryname)?;
         return Ok(vec![WorkDirMount {
             source: Source::Url(url),
@@ -211,6 +215,7 @@ fn stage_dirent(
         return Ok(mounts);
     }
 
+    let entryname = get_entryname(dirent, context)?;
     //parse to DefaultValue
     let dv: DefaultValue = serde_yaml::from_value(evaluated_content)?;
 
