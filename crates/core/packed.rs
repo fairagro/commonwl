@@ -189,17 +189,16 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
     unpack_identifiable(step, base_id);
 }
 
+/// Generates a packed cwl file from a given Document
+/// # Errors
+/// Can return error if packing of workflow
 pub fn pack_cwl(
     spec: &CWLDocument,
     filename: impl AsRef<Path>,
     id: Option<&str>,
 ) -> anyhow::Result<PackedCWL> {
     Ok(match spec {
-        CWLDocument::CommandLineTool(_) => PackedCWL {
-            graph: vec![pack_tool(spec.clone(), filename, id)?],
-            cwl_version: spec.cwl_version().cloned(),
-        },
-        CWLDocument::ExpressionTool(_) => PackedCWL {
+        CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => PackedCWL {
             graph: vec![pack_tool(spec.clone(), filename, id)?],
             cwl_version: spec.cwl_version().cloned(),
         },

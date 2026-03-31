@@ -5,6 +5,7 @@ use sha1::Digest;
 use sha1::Sha1;
 use std::env;
 use std::fs;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -274,15 +275,14 @@ pub(crate) fn normalize_path<P: AsRef<Path>>(input: P) -> std::io::Result<PathBu
     Ok(full_path
         .components()
         .fold(PathBuf::new(), |mut acc, comp| {
-            use std::path::Component::*;
             match comp {
-                RootDir => acc.push(comp),
-                Prefix(prefix) => acc.push(prefix.as_os_str()),
-                CurDir => {}
-                ParentDir => {
+                Component::RootDir => acc.push(comp),
+                Component::Prefix(prefix) => acc.push(prefix.as_os_str()),
+                Component::CurDir => {}
+                Component::ParentDir => {
                     acc.pop();
                 }
-                Normal(c) => acc.push(c),
+                Component::Normal(c) => acc.push(c),
             }
             acc
         }))
