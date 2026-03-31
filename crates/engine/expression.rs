@@ -3,7 +3,7 @@ use anyhow::Context as _;
 use boa_engine::{Context, JsString, JsValue, Source, property::PropertyKey};
 use cwl_core::{
     inputs::DefaultValue,
-    requirements::{ExpressionLibItem, InlineJavascriptRequirement},
+    requirements::{StringOrInclude, InlineJavascriptRequirement},
 };
 use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
 
@@ -165,7 +165,7 @@ fn js_eval(
     if let Some(lib) = &ijsr.expression_lib {
         for item in lib {
             match item {
-                ExpressionLibItem::Include(include) => {
+                StringOrInclude::Include(include) => {
                     let include = &include.include;
                     let contents = fs::read_to_string(workdir.join(include))
                         .with_context(|| format!("Could not read expression_lib {include}"))?;
@@ -173,7 +173,7 @@ fn js_eval(
                         .eval(Source::from_bytes(&contents))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
                 }
-                ExpressionLibItem::Expression(expr) => {
+                StringOrInclude::Expression(expr) => {
                     context
                         .eval(Source::from_bytes(expr))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;

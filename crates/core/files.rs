@@ -1,4 +1,7 @@
-use crate::{FileMetaData, FilePathMetaData, Integer, get_file_metadata, get_path_metadata};
+use crate::{
+    FileMetaData, FilePathMetaData, Integer, get_file_metadata, get_path_metadata,
+    requirements::StringOrInclude,
+};
 use anyhow::Context;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -230,11 +233,11 @@ impl Directory {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct Dirent {
     #[builder(into)]
-    pub entry: String,
+    pub entry: StringOrInclude,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub entryname: Option<String>,

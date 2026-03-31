@@ -2,7 +2,7 @@
 .venv
 .env
 # some local testing stuff
-data
+/data
 logs
 funnel-work-dir
 ./funnel-config.yaml

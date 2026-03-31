@@ -123,12 +123,12 @@ impl FromShortHand for WorkflowHints {}
 #[serde(rename_all = "camelCase")]
 pub struct InlineJavascriptRequirement {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expression_lib: Option<Vec<ExpressionLibItem>>,
+    pub expression_lib: Option<Vec<StringOrInclude>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(untagged)]
-pub enum ExpressionLibItem {
+pub enum StringOrInclude {
     Include(Include),
     Expression(String),
 }
@@ -382,6 +382,20 @@ mod tests {
           - "var t = function(s) { return _.template(s, {variable: 'data'})({'inputs': inputs}); };"
         "#;
         let res = serde_yaml::from_str::<InlineJavascriptRequirement>(contents);
+        assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_iwdr_include_entry() {
+        let contents = r#"
+        requirements:
+          - class: InitialWorkDirRequirement
+            listing:
+              - entryname: foo.txt
+                entry: 
+                    $include: calculation.py
+    "#;
+        let res = serde_yaml::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
     }
 }

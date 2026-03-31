@@ -3,8 +3,10 @@ use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use sha1::Digest;
 use sha1::Sha1;
+use std::env;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 pub mod documents;
 pub mod files;
@@ -264,4 +266,24 @@ pub fn get_file_metadata(path: &Path) -> anyhow::Result<FileMetaData> {
         size,
         checksum: hash,
     })
+}
+
+pub(crate) fn normalize_path<P: AsRef<Path>>(input: P) -> std::io::Result<PathBuf> {
+    let current_dir = env::current_dir()?;
+    let full_path = current_dir.join(input);
+    Ok(full_path
+        .components()
+        .fold(PathBuf::new(), |mut acc, comp| {
+            use std::path::Component::*;
+            match comp {
+                RootDir => acc.push(comp),
+                Prefix(prefix) => acc.push(prefix.as_os_str()),
+                CurDir => {}
+                ParentDir => {
+                    acc.pop();
+                }
+                Normal(c) => acc.push(c),
+            }
+            acc
+        }))
 }

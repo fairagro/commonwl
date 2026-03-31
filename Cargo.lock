@@ -1305,6 +1305,7 @@ dependencies = [
  "bon",
  "commonwl_salad",
  "serde",
+ "serde_json",
  "serde_yaml",
  "sha1",
  "url",
