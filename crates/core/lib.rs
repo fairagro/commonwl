@@ -196,6 +196,10 @@ pub trait ExtractFromEnum<E> {
     fn get(e: &E) -> Option<&Self>
     where
         Self: Sized;
+
+    fn get_mut(e: &mut E) -> Option<&mut Self>
+    where
+        Self: Sized;
 }
 
 /// Returns `String`, `Number` or `Bool` as String

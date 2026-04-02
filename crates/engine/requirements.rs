@@ -29,6 +29,14 @@ macro_rules! impl_conversion_methods {
                     None
                 }
             }
+
+            fn get_mut(e: &mut $enum) -> Option<&mut Self> {
+                if let $enum::$variant(v) = e {
+                    Some(v)
+                } else {
+                    None
+                }
+            }
         }
     };
 }

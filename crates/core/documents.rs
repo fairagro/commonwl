@@ -52,6 +52,19 @@ impl CWLDocument {
     }
 
     #[must_use]
+    pub fn get_requirement_mut<T>(&mut self) -> Option<&mut T>
+    where
+        T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,
+    {
+        match self {
+            Self::Operation(o) => o.get_requirement_mut::<T>(),
+            Self::CommandLineTool(clt) => clt.get_requirement_mut::<T>(),
+            Self::ExpressionTool(et) => et.get_requirement_mut::<T>(),
+            Self::Workflow(wf) => wf.get_requirement_mut::<T>(),
+        }
+    }
+
+    #[must_use]
     pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
     where
         T: ExtractFromEnum<ToolRequirements> + ExtractFromEnum<WorkflowRequirements>,
@@ -136,6 +149,15 @@ macro_rules! impl_document_defaults {
                 self.requirements
                     .as_ref()
                     .and_then(|reqs| reqs.iter().find_map(|req| T::get(req)))
+            }
+
+            pub fn get_requirement_mut<T>(&mut self) -> Option<&mut T>
+            where
+                T: ExtractFromEnum<$req_enum>,
+            {
+                self.requirements
+                    .as_mut()
+                    .and_then(|reqs| reqs.iter_mut().find_map(|req| T::get_mut(req)))
             }
 
             pub fn get_requirement_or_hint<T>(&self) -> Option<&T>
