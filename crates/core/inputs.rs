@@ -16,7 +16,7 @@ use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-#[derive(Serialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandInputParameterType {
     #[serde(rename = "stdin")]
@@ -95,7 +95,7 @@ impl CommandInputParameterType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum DefaultValue {
     FileOrDirectory(FileOrDirectory),
@@ -196,7 +196,7 @@ pub struct CommandInputParameter {
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -245,7 +245,7 @@ impl Default for OneOrMany<InputType> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -324,7 +324,7 @@ impl From<CommandInputParameter> for OperationInputParameter {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum CommandInputSchema {
@@ -345,7 +345,7 @@ impl CommandInputSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum InputSchema {
@@ -364,7 +364,7 @@ impl From<CommandInputSchema> for InputSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandInputType {
     CWLType(CWLType),
@@ -409,7 +409,7 @@ impl From<CommandInputSchema> for CommandInputType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum InputType {
     CWLType(CWLType),
@@ -435,7 +435,7 @@ impl From<CommandInputType> for InputType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputRecordSchema {
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
@@ -457,7 +457,7 @@ pub struct CommandInputRecordSchema {
     pub input_binding: Option<CommandLineBinding>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct InputRecordSchema {
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
@@ -489,7 +489,7 @@ impl From<CommandInputRecordSchema> for InputRecordSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputRecordField {
     #[builder(into)]
@@ -527,7 +527,7 @@ pub struct CommandInputRecordField {
 
 make_shorthand_impl!(CommandInputRecordField, "name", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct InputRecordField {
     #[builder(into)]
@@ -578,7 +578,7 @@ impl From<CommandInputRecordField> for InputRecordField {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputEnumSchema {
     #[builder(into)]
@@ -597,7 +597,7 @@ pub struct CommandInputEnumSchema {
     pub input_binding: Option<CommandLineBinding>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct InputEnumSchema {
     #[builder(into)]
@@ -624,7 +624,7 @@ impl From<CommandInputEnumSchema> for InputEnumSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputArraySchema {
     #[builder(into)]
@@ -643,7 +643,7 @@ pub struct CommandInputArraySchema {
     pub input_binding: Option<CommandLineBinding>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct InputArraySchema {
     #[builder(into)]
@@ -670,7 +670,7 @@ impl From<CommandInputArraySchema> for InputArraySchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineBinding {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -696,7 +696,7 @@ pub struct CommandLineBinding {
     pub shell_quote: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStepInput {
     #[serde(skip_serializing_if = "Option::is_none")]

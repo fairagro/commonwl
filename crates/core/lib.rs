@@ -48,7 +48,7 @@ impl From<f32> for NumberOrExpression {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum IntegerOrExpression {
     Int(i32),
@@ -68,7 +68,7 @@ impl From<i64> for IntegerOrExpression {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum BoolOrExpression {
     Bool(bool),
@@ -81,7 +81,7 @@ impl From<bool> for BoolOrExpression {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, Copy, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum Integer {
     Int(i32),
@@ -122,7 +122,7 @@ impl Integer {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum OneOrMany<T> {
     One(T),

@@ -1,7 +1,7 @@
 use crate::BoolOrExpression;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CWLType {
     Null,
@@ -19,7 +19,7 @@ pub enum CWLType {
     Any,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SecondaryFileSchema {
     pub pattern: String,

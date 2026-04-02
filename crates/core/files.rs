@@ -7,7 +7,7 @@ use bon::Builder;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LoadListingEnum {
     NoListing,
@@ -15,7 +15,7 @@ pub enum LoadListingEnum {
     DeepListing,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(tag = "class")]
 pub enum FileOrDirectory {
     File(File),
@@ -79,7 +79,7 @@ impl FileOrDirectory {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct File {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -146,7 +146,7 @@ impl File {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Directory {
     #[serde(skip_serializing_if = "Option::is_none")]

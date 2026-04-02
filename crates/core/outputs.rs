@@ -9,7 +9,7 @@ use commonwl_salad::deserialize::{
 use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandOutputParameterType {
     #[serde(rename = "stdout")]
@@ -60,7 +60,7 @@ impl From<CommandOutputType> for CommandOutputParameterType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -93,7 +93,7 @@ pub struct CommandOutputParameter {
 
 make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -132,7 +132,7 @@ pub struct WorkflowOutputParameter {
 
 make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -162,7 +162,7 @@ pub struct OperationOutputParameter {
 
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionToolOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -192,14 +192,14 @@ pub struct ExpressionToolOutputParameter {
 
 make_shorthand_impl!(ExpressionToolOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum LinkMergeMethod {
     MergeNested,
     MergeFlattened,
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum PickValueMethod {
     FirstNonNull,
@@ -207,7 +207,7 @@ pub enum PickValueMethod {
     AllNonNull,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum CommandOutputSchema {
@@ -216,7 +216,7 @@ pub enum CommandOutputSchema {
     Array(CommandOutputArraySchema),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
 pub enum OutputSchema {
@@ -235,7 +235,7 @@ impl From<CommandOutputSchema> for OutputSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandOutputType {
     CWLType(CWLType),
@@ -249,7 +249,7 @@ impl Default for CommandOutputType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum OutputType {
     CWLType(CWLType),
@@ -290,7 +290,7 @@ impl From<OneOrMany<CommandOutputType>> for OneOrMany<OutputType> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputRecordSchema {
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
@@ -305,7 +305,7 @@ pub struct CommandOutputRecordSchema {
     pub name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputRecordSchema {
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
@@ -333,7 +333,7 @@ impl From<CommandOutputRecordSchema> for OutputRecordSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputRecordField {
     pub name: String,
@@ -356,7 +356,7 @@ pub struct CommandOutputRecordField {
 
 make_shorthand_impl!(CommandOutputRecordField, "name", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputRecordField {
     pub name: String,
@@ -391,7 +391,7 @@ impl From<CommandOutputRecordField> for OutputRecordField {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputEnumSchema {
     pub symbols: Vec<String>,
@@ -403,7 +403,7 @@ pub struct CommandOutputEnumSchema {
     pub doc: Option<OneOrMany<String>>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputEnumSchema {
     pub symbols: Vec<String>,
@@ -426,7 +426,7 @@ impl From<CommandOutputEnumSchema> for OutputEnumSchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputArraySchema {
     pub items: OneOrMany<CommandOutputType>,
@@ -438,7 +438,7 @@ pub struct CommandOutputArraySchema {
     pub name: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputArraySchema {
     pub items: OneOrMany<OutputType>,
@@ -461,7 +461,7 @@ impl From<CommandOutputArraySchema> for OutputArraySchema {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputBinding {
     #[serde(skip_serializing_if = "Option::is_none")]
