@@ -29,7 +29,7 @@ macro_rules! impl_conversion_methods {
     };
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "class")]
 pub enum ToolRequirements {
     InlineJavascriptRequirement(InlineJavascriptRequirement),
@@ -62,7 +62,7 @@ impl_conversion_methods!(ToolRequirements, NetworkAccess);
 impl_conversion_methods!(ToolRequirements, InplaceUpdateRequirement);
 impl_conversion_methods!(ToolRequirements, ToolTimeLimit);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "class")]
 pub enum WorkflowRequirements {
     InlineJavascriptRequirement(InlineJavascriptRequirement),
@@ -103,7 +103,7 @@ impl_conversion_methods!(WorkflowRequirements, MultipleInputFeatureRequirement);
 impl_conversion_methods!(WorkflowRequirements, StepInputExpressionRequirement);
 impl_conversion_methods!(WorkflowRequirements, WorkReuse);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum ToolHints {
     Requirement(ToolRequirements),
@@ -111,7 +111,7 @@ pub enum ToolHints {
 }
 impl FromShortHand for ToolHints {}
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum WorkflowHints {
     Requirement(WorkflowRequirements),

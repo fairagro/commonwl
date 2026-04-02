@@ -18,7 +18,7 @@ use commonwl_salad::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "class")]
 pub enum CWLDocument {
     CommandLineTool(CommandLineTool),
@@ -112,14 +112,14 @@ impl From<Workflow> for CWLDocument {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum StringOrDocument {
     String(String),
     Document(Box<CWLDocument>),
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum Argument {
     String(String),
@@ -177,7 +177,7 @@ impl_document_defaults!(ExpressionTool, WorkflowRequirements, WorkflowHints);
 impl_document_defaults!(Operation, WorkflowRequirements, WorkflowHints);
 impl_document_defaults!(Workflow, WorkflowRequirements, WorkflowHints);
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, Builder, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, Builder, Identifiable, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -241,7 +241,7 @@ pub struct CommandLineTool {
     pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -283,7 +283,7 @@ pub struct ExpressionTool {
     pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -323,7 +323,7 @@ pub struct Operation {
     pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -366,7 +366,7 @@ pub struct Workflow {
     pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStep {
     #[serde(deserialize_with = "deserialize_map_list_id")]
