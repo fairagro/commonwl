@@ -11,6 +11,7 @@ use std::path::PathBuf;
 
 pub mod documents;
 pub mod files;
+pub mod format;
 pub mod inputs;
 pub mod outputs;
 pub mod packed;
