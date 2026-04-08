@@ -60,7 +60,18 @@ impl From<CommandOutputType> for CommandOutputParameterType {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
+impl From<OneOrMany<OutputType>> for CommandOutputParameterType {
+    fn from(value: OneOrMany<OutputType>) -> Self {
+        CommandOutputParameterType::CommandOutputType(match value {
+            OneOrMany::One(item) => OneOrMany::One(item.into()),
+            OneOrMany::Many(items) => OneOrMany::Many(items.into_iter().map(Into::into).collect()),
+        })
+    }
+}
+
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -93,7 +104,9 @@ pub struct CommandOutputParameter {
 
 make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -132,7 +145,9 @@ pub struct WorkflowOutputParameter {
 
 make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -162,7 +177,9 @@ pub struct OperationOutputParameter {
 
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionToolOutputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -216,6 +233,16 @@ pub enum CommandOutputSchema {
     Array(CommandOutputArraySchema),
 }
 
+impl From<OutputSchema> for CommandOutputSchema {
+    fn from(value: OutputSchema) -> Self {
+        match value {
+            OutputSchema::Record(rec) => CommandOutputSchema::Record(rec.into()),
+            OutputSchema::Enum(enu) => CommandOutputSchema::Enum(enu.into()),
+            OutputSchema::Array(arr) => CommandOutputSchema::Array(arr.into()),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(tag = "type")]
 #[serde(rename_all = "snake_case")]
@@ -246,6 +273,18 @@ pub enum CommandOutputType {
 impl Default for CommandOutputType {
     fn default() -> Self {
         CommandOutputType::CWLType(CWLType::Null)
+    }
+}
+
+impl From<OutputType> for CommandOutputType {
+    fn from(value: OutputType) -> Self {
+        match value {
+            OutputType::CWLType(cwltype) => CommandOutputType::CWLType(cwltype),
+            OutputType::OutputSchema(schema) => {
+                CommandOutputType::CommandOutputSchema(Box::new((*schema).into()))
+            }
+            OutputType::String(s) => CommandOutputType::String(s),
+        }
     }
 }
 
@@ -305,6 +344,19 @@ pub struct CommandOutputRecordSchema {
     pub name: Option<String>,
 }
 
+impl From<OutputRecordSchema> for CommandOutputRecordSchema {
+    fn from(value: OutputRecordSchema) -> Self {
+        Self {
+            fields: value
+                .fields
+                .map(|fields| fields.into_iter().map(Into::into).collect()),
+            label: value.label,
+            doc: value.doc,
+            name: value.name,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputRecordSchema {
@@ -352,6 +404,21 @@ pub struct CommandOutputRecordField {
     pub format: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_binding: Option<CommandOutputBinding>,
+}
+
+impl From<OutputRecordField> for CommandOutputRecordField {
+    fn from(value: OutputRecordField) -> Self {
+        Self {
+            name: value.name,
+            r#type: value.r#type.map(Into::into),
+            doc: value.doc,
+            label: value.label,
+            secondary_files: value.secondary_files,
+            streamable: value.streamable,
+            format: value.format,
+            output_binding: None,
+        }
+    }
 }
 
 make_shorthand_impl!(CommandOutputRecordField, "name", "type");
@@ -403,6 +470,17 @@ pub struct CommandOutputEnumSchema {
     pub doc: Option<OneOrMany<String>>,
 }
 
+impl From<OutputEnumSchema> for CommandOutputEnumSchema {
+    fn from(value: OutputEnumSchema) -> Self {
+        Self {
+            symbols: value.symbols,
+            name: value.name,
+            label: value.label,
+            doc: value.doc,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct OutputEnumSchema {
@@ -436,6 +514,17 @@ pub struct CommandOutputArraySchema {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+}
+
+impl From<OutputArraySchema> for CommandOutputArraySchema {
+    fn from(value: OutputArraySchema) -> Self {
+        Self {
+            items: value.items.map(Into::into),
+            name: value.name,
+            label: value.label,
+            doc: value.doc,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
