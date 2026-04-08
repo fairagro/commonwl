@@ -141,7 +141,7 @@ pub enum StringOrInclude {
     String(String),
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Hash, Builder)]
 pub struct Include {
     #[serde(rename = "$include")]
     pub include: String,
