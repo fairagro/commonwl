@@ -40,6 +40,8 @@ impl CWLDocument {
     }
 
     /// Gets the documents output ids
+    /// # Panics
+    /// Panics if id of an output is null
     #[must_use]
     pub fn get_output_ids(&self) -> Vec<String> {
         match self {
@@ -407,7 +409,7 @@ impl Workflow {
     pub fn has_step(&self, id: &str) -> bool {
         self.steps.iter().any(|s| s.id == Some(id.to_owned()))
     }
-    
+
     #[must_use]
     pub fn has_input(&self, id: &str) -> bool {
         self.inputs.iter().any(|s| s.id == Some(id.to_owned()))
