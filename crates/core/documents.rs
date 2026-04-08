@@ -388,7 +388,7 @@ pub struct Workflow {
     pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStep {
     #[serde(deserialize_with = "deserialize_map_list_id")]

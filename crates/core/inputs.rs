@@ -696,7 +696,7 @@ pub struct CommandLineBinding {
     pub shell_quote: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Eq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Eq, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStepInput {
     #[serde(skip_serializing_if = "Option::is_none")]
