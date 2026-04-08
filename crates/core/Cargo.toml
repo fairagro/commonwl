@@ -9,6 +9,7 @@ license.workspace = true
 [dependencies]
 anyhow.workspace = true
 bon.workspace = true
+base16ct.workspace = true
 sha1.workspace = true
 serde.workspace = true
 serde_yaml.workspace = true

@@ -26,6 +26,7 @@ futures-util = "0.3.31"
 
 # io
 sha1.workspace = true
+base16ct.workspace = true
 pathdiff = "0.2.3"
 tempfile.workspace = true
 tar = "0.4.45"

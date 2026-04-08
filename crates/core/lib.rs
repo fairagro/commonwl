@@ -1,10 +1,12 @@
 use anyhow::Context;
+use base16ct::HexDisplay;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 use sha1::Digest;
 use sha1::Sha1;
 use std::env;
 use std::fs;
+use std::hash::Hash;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -261,12 +263,10 @@ pub fn get_file_metadata(path: &Path) -> anyhow::Result<FileMetaData> {
     let metadata = fs::metadata(path)
         .with_context(|| format!("Can not retrieve File metadata for {}", path.display()))?;
     let size = metadata.len();
-
-    let mut hasher = Sha1::new();
     let hash = fs::read(path).ok().map(|f| {
-        hasher.update(&f);
-        let hash = hasher.finalize();
-        format!("sha1${hash:x}")
+        let hash = Sha1::digest(&f);
+        let dp = HexDisplay(hash.as_slice());
+        format!("sha1${dp:x}")
     });
     Ok(FileMetaData {
         size,

@@ -20,17 +20,18 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 anyhow = "1.0.102"
 async-trait = "0.1.89"
-bon = "3.8.1"
+base16ct = "1.0.0"
+bon = "3.9.1"
 cwl_core = { version = "0", path = "crates/core" }
-dircpy = "0.3.19"
+dircpy = "0.3.20"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.143"
 serde_yaml = "0.9.34"
-sha1 = "0.10.6"
+sha1 = "0.11.0"
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-tempfile = "3.24.0"
-tokio = { version = "1.49.0", features = ["full"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+tempfile = "3.27.0"
+tokio = { version = "1.51.0", features = ["full"] }
 tokio-util = "0.7.18"
 url = "2.5.8"
-uuid = { version = "1.21.0", features = ["v4"] }
+uuid = { version = "1.23.0", features = ["v4"] }

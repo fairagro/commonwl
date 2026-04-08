@@ -1,3 +1,4 @@
+use base16ct::HexDisplay;
 use cwl_core::{files::FileOrDirectory, inputs::DefaultValue};
 use sha1::{Digest, Sha1};
 use std::{
@@ -128,7 +129,8 @@ pub fn checksum(str: &str) -> String {
 
     hasher.update(str);
     let hash = hasher.finalize();
-    format!("sha1${hash:x}")
+    let dp = HexDisplay(hash.as_slice());
+    format!("sha1${dp:x}")
 }
 
 fn file_checksum(path: &Path) -> std::io::Result<[u8; 20]> {
