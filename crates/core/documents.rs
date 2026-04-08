@@ -28,6 +28,7 @@ pub enum CWLDocument {
 }
 
 impl CWLDocument {
+    /// Gets the documents inputs as generic `OperationInputParameter`s
     #[must_use]
     pub fn get_inputs(&self) -> Vec<OperationInputParameter> {
         match self {
@@ -35,6 +36,19 @@ impl CWLDocument {
             Self::CommandLineTool(clt) => clt.inputs.iter().map(|i| i.clone().into()).collect(),
             Self::ExpressionTool(et) => et.inputs.iter().map(|i| i.clone().into()).collect(),
             Self::Workflow(wf) => wf.inputs.iter().map(|i| i.clone().into()).collect(),
+        }
+    }
+
+    /// Gets the documents outputs as generic `OperationOutputParameter`s
+    #[must_use]
+    pub fn get_output_ids(&self) -> Vec<String> {
+        match self {
+            Self::Operation(o) => o.outputs.iter().map(|i| i.id.clone().unwrap()).collect(),
+            Self::CommandLineTool(clt) => {
+                clt.outputs.iter().map(|i| i.id.clone().unwrap()).collect()
+            }
+            Self::ExpressionTool(et) => et.outputs.iter().map(|i| i.id.clone().unwrap()).collect(),
+            Self::Workflow(wf) => wf.outputs.iter().map(|i| i.id.clone().unwrap()).collect(),
         }
     }
 
