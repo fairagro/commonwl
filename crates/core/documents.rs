@@ -39,7 +39,7 @@ impl CWLDocument {
         }
     }
 
-    /// Gets the documents outputs as generic `OperationOutputParameter`s
+    /// Gets the documents output ids
     #[must_use]
     pub fn get_output_ids(&self) -> Vec<String> {
         match self {
@@ -403,14 +403,17 @@ pub struct Workflow {
 }
 
 impl Workflow {
+    #[must_use]
     pub fn has_step(&self, id: &str) -> bool {
         self.steps.iter().any(|s| s.id == Some(id.to_owned()))
     }
-
+    
+    #[must_use]
     pub fn has_input(&self, id: &str) -> bool {
         self.inputs.iter().any(|s| s.id == Some(id.to_owned()))
     }
 
+    #[must_use]
     pub fn has_output(&self, id: &str) -> bool {
         self.outputs.iter().any(|s| s.id == Some(id.to_owned()))
     }
