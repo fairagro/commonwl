@@ -388,6 +388,20 @@ pub struct Workflow {
     pub extension_fields: HashMap<String, serde_yaml::Value>,
 }
 
+impl Workflow {
+    pub fn has_step(&self, id: &str) -> bool {
+        self.steps.iter().any(|s| s.id == Some(id.to_owned()))
+    }
+
+    pub fn has_input(&self, id: &str) -> bool {
+        self.inputs.iter().any(|s| s.id == Some(id.to_owned()))
+    }
+
+    pub fn has_output(&self, id: &str) -> bool {
+        self.outputs.iter().any(|s| s.id == Some(id.to_owned()))
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq, Builder)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStep {
