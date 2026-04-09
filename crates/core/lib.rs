@@ -200,7 +200,7 @@ impl<T: Clone> OneOrMany<T> {
 impl Display for OneOrMany<String> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OneOrMany::One(s) => write!(f, "{}", s),
+            OneOrMany::One(s) => write!(f, "{s}"),
             OneOrMany::Many(vec) => write!(f, "{}", vec.join(" ")),
         }
     }

@@ -1,5 +1,6 @@
 use crate::BoolOrExpression;
 use serde::{Deserialize, Serialize};
+use std::fmt::Display;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -17,6 +18,24 @@ pub enum CWLType {
     Directory,
     #[serde(rename = "Any")]
     Any,
+}
+
+impl Display for CWLType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            CWLType::Null => "null",
+            CWLType::Boolean => "boolean",
+            CWLType::Int => "int",
+            CWLType::Long => "long",
+            CWLType::Float => "float",
+            CWLType::Double => "double",
+            CWLType::String => "string",
+            CWLType::File => "File",
+            CWLType::Directory => "Directory",
+            CWLType::Any => "Any",
+        };
+        write!(f, "{s}")
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
