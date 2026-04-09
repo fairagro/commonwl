@@ -5,6 +5,7 @@ use serde_yaml::Value;
 use sha1::Digest;
 use sha1::Sha1;
 use std::env;
+use std::fmt::Display;
 use std::fs;
 use std::hash::Hash;
 use std::path::Component;
@@ -21,9 +22,9 @@ pub mod requirements;
 pub mod types;
 
 mod load;
+pub use commonwl_salad::Identifiable;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
-pub use commonwl_salad::Identifiable;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
@@ -192,6 +193,15 @@ impl<T: Clone> OneOrMany<T> {
         match self {
             OneOrMany::One(t) => vec![t.clone()],
             OneOrMany::Many(v) => v.clone(),
+        }
+    }
+}
+
+impl Display for OneOrMany<String> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OneOrMany::One(s) => write!(f, "{}", s),
+            OneOrMany::Many(vec) => write!(f, "{}", vec.join(" ")),
         }
     }
 }
