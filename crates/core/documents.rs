@@ -101,6 +101,16 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.cwl_version.as_ref(),
         }
     }
+    
+    #[must_use]
+    pub fn get_label(&self) -> Option<&String> {
+        match self {
+            Self::CommandLineTool(clt) => clt.label.as_ref(),
+            Self::ExpressionTool(et) => et.label.as_ref(),
+            Self::Operation(op) => op.label.as_ref(),
+            Self::Workflow(wf) => wf.label.as_ref(),
+        }
+    }
 }
 
 impl Identifiable for CWLDocument {

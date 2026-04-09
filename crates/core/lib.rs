@@ -23,6 +23,7 @@ pub mod types;
 mod load;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
+pub use commonwl_salad::Identifiable;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
