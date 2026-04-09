@@ -121,6 +121,16 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.doc.as_ref(),
         }
     }
+
+    #[must_use]
+    pub fn get_class(&self) -> &str {
+        match self {
+            Self::CommandLineTool(_) => "CommandLineTool",
+            Self::ExpressionTool(_) => "ExpressionTool",
+            Self::Operation(_) => "Operation",
+            Self::Workflow(_) => "Workflow",
+        }
+    }
 }
 
 impl Identifiable for CWLDocument {
