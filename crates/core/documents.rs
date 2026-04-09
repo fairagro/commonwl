@@ -101,7 +101,7 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.cwl_version.as_ref(),
         }
     }
-    
+
     #[must_use]
     pub fn get_label(&self) -> Option<&String> {
         match self {
@@ -109,6 +109,16 @@ impl CWLDocument {
             Self::ExpressionTool(et) => et.label.as_ref(),
             Self::Operation(op) => op.label.as_ref(),
             Self::Workflow(wf) => wf.label.as_ref(),
+        }
+    }
+
+    #[must_use]
+    pub fn get_doc(&self) -> Option<&OneOrMany<String>> {
+        match self {
+            Self::CommandLineTool(clt) => clt.doc.as_ref(),
+            Self::ExpressionTool(et) => et.doc.as_ref(),
+            Self::Operation(op) => op.doc.as_ref(),
+            Self::Workflow(wf) => wf.doc.as_ref(),
         }
     }
 }
