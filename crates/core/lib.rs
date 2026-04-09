@@ -53,6 +53,17 @@ impl From<f32> for NumberOrExpression {
     }
 }
 
+impl Display for NumberOrExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NumberOrExpression::Int(i) => write!(f, "{i}"),
+            NumberOrExpression::Long(l) => write!(f, "{l}"),
+            NumberOrExpression::Float(fl) => write!(f, "{fl}"),
+            NumberOrExpression::Expression(e) => write!(f, "{e}"),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 #[serde(untagged)]
 pub enum IntegerOrExpression {
@@ -70,6 +81,16 @@ impl From<i32> for IntegerOrExpression {
 impl From<i64> for IntegerOrExpression {
     fn from(value: i64) -> Self {
         IntegerOrExpression::Long(value)
+    }
+}
+
+impl Display for IntegerOrExpression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IntegerOrExpression::Int(i) => write!(f, "{i}"),
+            IntegerOrExpression::Long(l) => write!(f, "{l}"),
+            IntegerOrExpression::Expression(e) => write!(f, "{e}"),
+        }
     }
 }
 
