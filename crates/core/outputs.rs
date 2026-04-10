@@ -519,7 +519,7 @@ pub struct CommandOutputArraySchema {
 impl From<OutputArraySchema> for CommandOutputArraySchema {
     fn from(value: OutputArraySchema) -> Self {
         Self {
-            items: value.items.map(Into::into),
+            items: value.items.into(),
             name: value.name,
             label: value.label,
             doc: value.doc,
