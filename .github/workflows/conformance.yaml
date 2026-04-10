@@ -72,9 +72,9 @@ jobs:
       - name: Start Funnel
         if: matrix.variant == 'tes'
         run: |
-          FUNNEL_VERSION=$(curl -s https://api.github.com/repos/calpyr/funnel/releases/latest \
+          FUNNEL_VERSION=$(curl -s https://api.github.com/repos/calypr/funnel/releases/latest \
             | jq -r '.tag_name')
-          curl -sL "https://github.com/calpyr/funnel/releases/download/${FUNNEL_VERSION}/funnel-linux-amd64-${FUNNEL_VERSION}.tar.gz" \
+          curl -sL "https://github.com/calypr/funnel/releases/download/${FUNNEL_VERSION}/funnel-linux-amd64-${FUNNEL_VERSION}.tar.gz" \
             | tar -xz
           chmod +x funnel
           ./funnel server run --config ./.github/funnel-config.yaml &
