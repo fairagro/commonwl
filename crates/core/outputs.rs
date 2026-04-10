@@ -448,7 +448,7 @@ impl From<CommandOutputRecordField> for OutputRecordField {
     fn from(value: CommandOutputRecordField) -> Self {
         Self {
             name: value.name,
-            r#type: value.r#type.map(Into::into),
+            r#type: value.r#type.into(),
             doc: value.doc,
             label: value.label,
             secondary_files: value.secondary_files,
