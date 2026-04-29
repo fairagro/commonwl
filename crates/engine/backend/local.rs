@@ -148,7 +148,7 @@ impl TaskBackend for LocalBackend {
                 .maybe_docker_file(df)
                 .mounts(extras)
                 .build();
-            args = build_container_command(args, &inputs, options)?;
+            args = build_container_command(args, &inputs, options, request.specificationdir)?;
         }
         //build crankshaft task object
         #[allow(clippy::cast_precision_loss)]

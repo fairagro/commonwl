@@ -119,6 +119,8 @@ pub struct TaskExecutionRequest<'a> {
     pub outdir: &'a StoragePath,
     pub tmpdir: &'a StoragePath,
 
+    pub specificationdir: &'a Path,
+
     // The container side mounted workdir
     pub execution_path: &'a str,
 }
@@ -656,6 +658,7 @@ pub async fn execute_commandline_tool(
 
                     outdir: outdir.storage_path(),
                     tmpdir: tmpdir.storage_path(),
+                    specificationdir: &request.working_dir,
                     execution_path: workdir,
                 },
                 token,
