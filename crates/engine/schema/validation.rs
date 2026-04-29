@@ -68,8 +68,8 @@ fn validate_cwl_type(
 ) -> bool {
     match value {
         DefaultValue::FileOrDirectory(fod) => match r#type {
-            CWLType::File => {
-                if fod.is_file() {
+            CWLType::File
+                if fod.is_file() => {
                     if let FileOrDirectory::File(file) = &fod
                         && let Some(file_format) = &file.format
                         && let Some(fv) = fv
@@ -87,10 +87,7 @@ fn validate_cwl_type(
                         }
                     }
                     true
-                } else {
-                    false
                 }
-            }
             CWLType::Directory => fod.is_dir(),
             CWLType::Any => true,
             _ => false,

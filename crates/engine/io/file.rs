@@ -181,11 +181,10 @@ fn handle_secondary_files_for_input(
 
 fn set_secondary_files_empty(value: &mut DefaultValue) -> anyhow::Result<()> {
     match value {
-        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
-            if file.secondary_files.is_none() {
+        DefaultValue::FileOrDirectory(FileOrDirectory::File(file))
+            if file.secondary_files.is_none() => {
                 file.secondary_files = Some(vec![]);
             }
-        }
         DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
             for item in vec {
                 let mut dv = serde_yaml::from_value(item.clone())?;
