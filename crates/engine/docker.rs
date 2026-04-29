@@ -98,61 +98,8 @@ pub fn build_container_command(
     options: ContainerBuildOptions,
     specificationdir: &Path,
 ) -> anyhow::Result<Vec<String>> {
-    if let Some(df) = options.docker_file {
-        let path = specificationdir.join(df);
-        let mut build = Command::new(options.engine.to_string());
-        let mut process = build
-            .args([
-                "build",
-                "-f",
-                &path.to_string_lossy(),
-                "-t",
-                &options.docker_image_id,
-                ".",
-            ])
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
-        let stdout = process.stdout.take().expect("Failed to capture stdout");
-        let stderr = process.stderr.take().expect("Failed to capture stderr");
-
-        // Stream stdout in a thread
-        let stdout_thread = std::thread::spawn(move || {
-            let reader = std::io::BufReader::new(stdout);
-            for line in reader.lines() {
-                match line {
-                    Ok(line) => println!("{}", line),
-                    Err(e) => eprintln!("stdout read error: {}", e),
-                }
-            }
-        });
-
-        // Stream stderr in a thread
-        let stderr_thread = std::thread::spawn(move || {
-            let reader = std::io::BufReader::new(stderr);
-            for line in reader.lines() {
-                match line {
-                    Ok(line) => eprintln!("{}", line),
-                    Err(e) => eprintln!("stderr read error: {}", e),
-                }
-            }
-        });
-
-        // Wait for both streams to finish, then get exit status
-        stdout_thread.join().expect("stdout thread panicked");
-        stderr_thread.join().expect("stderr thread panicked");
-
-        let status = process.wait()?;
-        if status.success() {
-            tracing::info!("Docker build successful");
-        } else {
-            let mut stderr = String::new();
-            if let Some(mut err) = process.stderr.take() {
-                use std::io::Read;
-                err.read_to_string(&mut stderr)?;
-            }
-            anyhow::bail!("Docker build failed: {stderr}");
-        }
+    if let Some(df) = &options.docker_file {
+        build_docker_file(df, specificationdir, &options)?;
     }
 
     let outdir = options.outdir;
@@ -241,6 +188,68 @@ pub fn build_container_command(
     args.splice(0..0, vec![options.engine.to_string()]);
 
     Ok(args)
+}
+
+fn build_docker_file(
+    df: &str,
+    specificationdir: &Path,
+    options: &ContainerBuildOptions,
+) -> anyhow::Result<()> {
+    let path = specificationdir.join(df);
+    let mut build = Command::new(options.engine.to_string());
+    let mut process = build
+        .args([
+            "build",
+            "-f",
+            &path.to_string_lossy(),
+            "-t",
+            &options.docker_image_id,
+            ".",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdout = process.stdout.take().expect("Failed to capture stdout");
+    let stderr = process.stderr.take().expect("Failed to capture stderr");
+
+    // Stream stdout in a thread
+    let stdout_thread = std::thread::spawn(move || {
+        let reader = std::io::BufReader::new(stdout);
+        for line in reader.lines() {
+            match line {
+                Ok(line) => println!("{line}"),
+                Err(e) => eprintln!("stdout read error: {e}"),
+            }
+        }
+    });
+
+    // Stream stderr in a thread
+    let stderr_thread = std::thread::spawn(move || {
+        let reader = std::io::BufReader::new(stderr);
+        for line in reader.lines() {
+            match line {
+                Ok(line) => eprintln!("{line}"),
+                Err(e) => eprintln!("stderr read error: {e}"),
+            }
+        }
+    });
+
+    // Wait for both streams to finish, then get exit status
+    stdout_thread.join().expect("stdout thread panicked");
+    stderr_thread.join().expect("stderr thread panicked");
+
+    let status = process.wait()?;
+    if status.success() {
+        tracing::info!("Docker build successful");
+        Ok(())
+    } else {
+        let mut stderr = String::new();
+        if let Some(mut err) = process.stderr.take() {
+            use std::io::Read;
+            err.read_to_string(&mut stderr)?;
+        }
+        anyhow::bail!("Docker build failed: {stderr}");
+    }
 }
 
 #[cfg(unix)]
