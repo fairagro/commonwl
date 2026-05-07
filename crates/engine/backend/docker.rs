@@ -92,7 +92,7 @@ impl TaskBackend for DockerBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let mut container = "ubuntu".to_string(); //add config "default-container"
+        let mut container = "ubuntu:noble".to_string(); //add config "default-container"
         if let Some(dr) = request.docker {
             if let Some(df) = &dr.docker_file
                 && let Some(dt) = &dr.docker_image_id
