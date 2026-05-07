@@ -70,18 +70,18 @@ pub fn load_file_contents(dv: &mut DefaultValue) -> anyhow::Result<()> {
                 )
             }
         }
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+        DefaultValue::Any(serde_json::Value::Array(vec)) => {
             for item in vec {
-                let mut dv: DefaultValue = serde_yaml::from_value(item.clone())?;
+                let mut dv: DefaultValue = serde_json::from_value(item.clone())?;
                 load_file_contents(&mut dv)?;
-                *item = serde_yaml::to_value(dv)?;
+                *item = serde_json::to_value(dv)?;
             }
         }
-        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+        DefaultValue::Any(serde_json::Value::Object(map)) => {
             for item in map.values_mut() {
-                let mut dv: DefaultValue = serde_yaml::from_value(item.clone())?;
+                let mut dv: DefaultValue = serde_json::from_value(item.clone())?;
                 load_file_contents(&mut dv)?;
-                *item = serde_yaml::to_value(dv)?;
+                *item = serde_json::to_value(dv)?;
             }
         }
         _ => {}

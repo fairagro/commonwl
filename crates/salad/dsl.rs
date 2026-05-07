@@ -1,7 +1,8 @@
-use serde_yaml::Mapping;
+use crate::Mapping;
+use serde_json::Value;
 
 #[must_use]
-pub fn type_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
+pub fn type_dsl(value: Value) -> Value {
     let mut value = value;
     while let Some(new_value) = type_dsl_impl(&value) {
         value = new_value;
@@ -9,27 +10,24 @@ pub fn type_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
     value
 }
 
-fn type_dsl_impl(value: &serde_yaml::Value) -> Option<serde_yaml::Value> {
+fn type_dsl_impl(value: &Value) -> Option<Value> {
     match value {
-        serde_yaml::Value::String(value) => {
+        Value::String(value) => {
             if value.ends_with('?') {
-                let inner = serde_yaml::Value::String(value[..value.len() - 1].to_string());
+                let inner = Value::String(value[..value.len() - 1].to_string());
 
-                return Some(serde_yaml::Value::Sequence(vec![
+                return Some(Value::Array(vec![
                     type_dsl(inner),
-                    serde_yaml::Value::String("null".to_string()),
+                    Value::String("null".to_string()),
                 ]));
             }
 
             if value.ends_with("[]") {
-                let inner = serde_yaml::Value::String(value[..value.len() - 2].to_string());
+                let inner = Value::String(value[..value.len() - 2].to_string());
 
-                return Some(serde_yaml::Value::Mapping(Mapping::from_iter([
-                    (
-                        serde_yaml::Value::String("type".into()),
-                        serde_yaml::Value::String("array".into()),
-                    ),
-                    (serde_yaml::Value::String("items".into()), type_dsl(inner)),
+                return Some(Value::Object(Mapping::from_iter([
+                    ("type".into(), Value::String("array".into())),
+                    ("items".into(), type_dsl(inner)),
                 ])));
             }
 
@@ -39,29 +37,24 @@ fn type_dsl_impl(value: &serde_yaml::Value) -> Option<serde_yaml::Value> {
     }
 }
 
-pub fn secondary_files_dsl(value: serde_yaml::Value) -> serde_yaml::Value {
+pub fn secondary_files_dsl(value: Value) -> Value {
     match value {
-        serde_yaml::Value::String(value) => {
+        Value::String(value) => {
             if value.ends_with('?') {
-                return serde_yaml::Value::Mapping(Mapping::from_iter([
+                return Value::Object(Mapping::from_iter([
                     (
-                        serde_yaml::Value::String("pattern".into()),
-                        serde_yaml::Value::String(value[..value.len() - 1].to_string()),
+                        "pattern".into(),
+                        Value::String(value[..value.len() - 1].to_string()),
                     ),
-                    (
-                        serde_yaml::Value::String("required".into()),
-                        serde_yaml::Value::Bool(false),
-                    ),
+                    ("required".into(), Value::Bool(false)),
                 ]));
             }
-            serde_yaml::Value::Mapping(Mapping::from_iter([(
-                serde_yaml::Value::String("pattern".into()),
-                serde_yaml::Value::String(value),
+            Value::Object(Mapping::from_iter([(
+                "pattern".into(),
+                Value::String(value),
             )]))
         }
-        serde_yaml::Value::Sequence(seq) => {
-            serde_yaml::Value::Sequence(seq.into_iter().map(secondary_files_dsl).collect())
-        }
+        Value::Array(seq) => Value::Array(seq.into_iter().map(secondary_files_dsl).collect()),
         _ => value,
     }
 }
@@ -73,67 +66,52 @@ mod tests {
     #[test]
     fn test_type_dsl() {
         let optional = "string?";
-        let result = type_dsl(serde_yaml::Value::String(optional.to_owned()));
+        let result = type_dsl(Value::String(optional.to_owned()));
         assert_eq!(
             result,
-            serde_yaml::Value::Sequence(vec![
-                serde_yaml::Value::String("string".to_string()),
-                serde_yaml::Value::String("null".to_string())
+            Value::Array(vec![
+                Value::String("string".to_string()),
+                Value::String("null".to_string())
             ])
         );
 
         let array = "File[]";
-        let result = type_dsl(serde_yaml::Value::String(array.to_owned()));
+        let result = type_dsl(Value::String(array.to_owned()));
 
         assert_eq!(
             result,
-            serde_yaml::Value::Mapping(Mapping::from_iter([
-                (
-                    serde_yaml::Value::String("type".into()),
-                    serde_yaml::Value::String("array".into())
-                ),
-                (
-                    serde_yaml::Value::String("items".into()),
-                    serde_yaml::Value::String("File".into())
-                ),
+            Value::Object(Mapping::from_iter([
+                ("type".into(), Value::String("array".into())),
+                ("items".into(), Value::String("File".into())),
             ]))
         );
 
         let optional_array = "File[]?";
-        let result = type_dsl(serde_yaml::Value::String(optional_array.to_owned()));
+        let result = type_dsl(Value::String(optional_array.to_owned()));
 
         assert_eq!(
             result,
-            serde_yaml::Value::Sequence(vec![
-                serde_yaml::Value::Mapping(Mapping::from_iter([
-                    (
-                        serde_yaml::Value::String("type".into()),
-                        serde_yaml::Value::String("array".into())
-                    ),
-                    (
-                        serde_yaml::Value::String("items".into()),
-                        serde_yaml::Value::String("File".into())
-                    ),
+            Value::Array(vec![
+                Value::Object(Mapping::from_iter([
+                    ("type".into(), Value::String("array".into())),
+                    ("items".into(), Value::String("File".into())),
                 ])),
-                serde_yaml::Value::String("null".to_string())
+                Value::String("null".to_string())
             ])
         );
 
         let array_optional = "File?[]";
-        let result = type_dsl(serde_yaml::Value::String(array_optional.to_owned()));
+        let result = type_dsl(Value::String(array_optional.to_owned()));
 
         assert_eq!(
             result,
-            serde_yaml::Value::Mapping(Mapping::from_iter([
+            Value::Object(Mapping::from_iter([
+                ("type".into(), Value::String("array".into())),
                 (
-                    serde_yaml::Value::String("type".into()),
-                    serde_yaml::Value::String("array".into())
-                ),
-                (
-                    serde_yaml::Value::String("items".into()),
-                    serde_yaml::Value::Sequence(vec![
-                        serde_yaml::Value::String("File".into()),
-                        serde_yaml::Value::String("null".to_string())
+                    "items".into(),
+                    Value::Array(vec![
+                        Value::String("File".into()),
+                        Value::String("null".to_string())
                     ])
                 ),
             ])),
@@ -143,24 +121,18 @@ mod tests {
     #[test]
     fn test_secondary_files_dsl() {
         assert_eq!(
-            secondary_files_dsl(serde_yaml::Value::String("wamborambo".to_string())),
-            serde_yaml::Value::Mapping(Mapping::from_iter([(
-                serde_yaml::Value::String("pattern".into()),
-                serde_yaml::Value::String("wamborambo".into()),
+            secondary_files_dsl(Value::String("wamborambo".to_string())),
+            Value::Object(Mapping::from_iter([(
+                "pattern".into(),
+                Value::String("wamborambo".into()),
             )]))
         );
 
         assert_eq!(
-            secondary_files_dsl(serde_yaml::Value::String("wamborambo?".to_string())),
-            serde_yaml::Value::Mapping(Mapping::from_iter([
-                (
-                    serde_yaml::Value::String("pattern".into()),
-                    serde_yaml::Value::String("wamborambo".into()),
-                ),
-                (
-                    serde_yaml::Value::String("required".into()),
-                    serde_yaml::Value::Bool(false),
-                )
+            secondary_files_dsl(Value::String("wamborambo?".to_string())),
+            Value::Object(Mapping::from_iter([
+                ("pattern".into(), Value::String("wamborambo".into()),),
+                ("required".into(), Value::Bool(false),)
             ]))
         );
     }

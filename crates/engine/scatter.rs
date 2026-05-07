@@ -4,10 +4,10 @@ use std::collections::HashMap;
 use crate::request::InputObject;
 
 pub(crate) fn gather_jobs(
-    scatter_inputs: &[Vec<serde_yaml::Value>],
+    scatter_inputs: &[Vec<serde_json::Value>],
     scatter_keys: &[String],
     method: ScatterMethod,
-) -> anyhow::Result<Vec<HashMap<String, serde_yaml::Value>>> {
+) -> anyhow::Result<Vec<HashMap<String, serde_json::Value>>> {
     match method {
         ScatterMethod::Dotproduct => {
             let len = scatter_inputs[0].len();
@@ -47,10 +47,10 @@ pub(crate) fn gather_jobs(
         ScatterMethod::NestedCrossproduct => {
             fn nest(
                 keys: &[String],
-                values: &[Vec<serde_yaml::Value>],
+                values: &[Vec<serde_json::Value>],
                 index: usize,
-                current: &mut HashMap<String, serde_yaml::Value>,
-                jobs: &mut Vec<HashMap<String, serde_yaml::Value>>,
+                current: &mut HashMap<String, serde_json::Value>,
+                jobs: &mut Vec<HashMap<String, serde_json::Value>>,
             ) {
                 if index == keys.len() {
                     jobs.push(current.clone());
@@ -73,7 +73,7 @@ pub(crate) fn gather_jobs(
 pub(crate) fn gather_inputs(
     scatter_keys: &[String],
     input_values: &InputObject,
-) -> anyhow::Result<Vec<Vec<serde_yaml::Value>>> {
+) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
     scatter_keys
         .iter()
         .map(|k| {
@@ -81,42 +81,42 @@ pub(crate) fn gather_inputs(
                 .inputs
                 .get(k)
                 .and_then(|v| match v {
-                    DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => Some(arr.clone()),
+                    DefaultValue::Any(serde_json::Value::Array(arr)) => Some(arr.clone()),
                     _ => None,
                 })
                 .ok_or_else(|| anyhow::anyhow!("Input {k} must be of type array to scatter!"))
         })
-        .collect::<anyhow::Result<Vec<Vec<serde_yaml::Value>>>>()
+        .collect::<anyhow::Result<Vec<Vec<serde_json::Value>>>>()
 }
 
-pub(crate) fn nest_results(flat: &[serde_yaml::Value], dims: &[usize]) -> serde_yaml::Value {
-    fn chunk(flat: &[serde_yaml::Value], dims: &[usize]) -> serde_yaml::Value {
+pub(crate) fn nest_results(flat: &[serde_json::Value], dims: &[usize]) -> serde_json::Value {
+    fn chunk(flat: &[serde_json::Value], dims: &[usize]) -> serde_json::Value {
         if dims.len() == 1 {
-            serde_yaml::Value::Sequence(flat.to_vec())
+            serde_json::Value::Array(flat.to_vec())
         } else {
             let inner_size: usize = dims[1..].iter().product();
             let chunks = flat
                 .chunks(inner_size)
                 .map(|c| chunk(c, &dims[1..]))
                 .collect();
-            serde_yaml::Value::Sequence(chunks)
+            serde_json::Value::Array(chunks)
         }
     }
     chunk(flat, dims)
 }
 
-pub(crate) fn empty(method: ScatterMethod, dims: &[usize]) -> serde_yaml::Value {
+pub(crate) fn empty(method: ScatterMethod, dims: &[usize]) -> serde_json::Value {
     match method {
         ScatterMethod::Dotproduct | ScatterMethod::FlatCrossproduct => {
-            serde_yaml::Value::Sequence(vec![])
+            serde_json::Value::Array(vec![])
         }
         ScatterMethod::NestedCrossproduct => {
-            fn build_empty(dims: &[usize]) -> serde_yaml::Value {
+            fn build_empty(dims: &[usize]) -> serde_json::Value {
                 if dims.len() == 1 {
-                    serde_yaml::Value::Sequence(vec![])
+                    serde_json::Value::Array(vec![])
                 } else {
                     let inner = (0..dims[0]).map(|_| build_empty(&dims[1..])).collect();
-                    serde_yaml::Value::Sequence(inner)
+                    serde_json::Value::Array(inner)
                 }
             }
             build_empty(dims)

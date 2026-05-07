@@ -89,24 +89,24 @@ fn load_input(
         DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
             locate_dir(dir, work_dir, stage_dir, load_listing)?;
         }
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+        DefaultValue::Any(serde_json::Value::Array(vec)) => {
             for item in vec {
-                let mut dv = serde_yaml::from_value(item.clone())?;
+                let mut dv = serde_json::from_value(item.clone())?;
                 let stage_dir =
                     stage_dir.join(format!("stg-{}", &uuid::Uuid::new_v4().to_string()[..8]));
                 load_input(&mut dv, work_dir, &stage_dir, load_listing, load_contents)?;
-                *item = serde_yaml::to_value(&dv)?;
+                *item = serde_json::to_value(&dv)?;
             }
         }
-        DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+        DefaultValue::Any(serde_json::Value::Object(map)) => {
             for item in map.values_mut() {
-                let mut dv = serde_yaml::from_value(item.clone())?;
+                let mut dv = serde_json::from_value(item.clone())?;
                 load_input(&mut dv, work_dir, stage_dir, None, false)?;
-                *item = serde_yaml::to_value(&dv)?;
+                *item = serde_json::to_value(&dv)?;
             }
         }
         #[allow(clippy::cast_possible_truncation)]
-        DefaultValue::Any(serde_yaml::Value::Number(n)) => {
+        DefaultValue::Any(serde_json::Value::Number(n)) => {
             //the spec wants floats with .0 to be represented as integer
             const MAX_I64_AS_FLOAT: f64 = 9_223_372_036_854_775_808.0;
             const MIN_I64_AS_FLOAT: f64 = -9_223_372_036_854_775_808.0;
@@ -115,7 +115,7 @@ fn load_input(
                 && f.fract() == 0.0
                 && (MIN_I64_AS_FLOAT..MAX_I64_AS_FLOAT).contains(&f)
             {
-                *value = DefaultValue::Any(serde_yaml::Value::Number(serde_yaml::Number::from(
+                *value = DefaultValue::Any(serde_json::Value::Number(serde_json::Number::from(
                     //guarded!
                     f as i64,
                 )));
@@ -139,7 +139,7 @@ pub(crate) fn get_input_value(
     } else if let Some(default) = &input.default {
         default.clone()
     } else {
-        DefaultValue::Any(serde_yaml::Value::Null)
+        DefaultValue::Any(serde_json::Value::Null)
     }
 }
 
@@ -183,16 +183,16 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
             }
         }
         DefaultValue::Any(v) => match v {
-            serde_yaml::Value::Sequence(values) => {
+            serde_json::Value::Array(values) => {
                 for v in values {
-                    if let Ok(dv) = serde_yaml::from_value(v.clone()) {
+                    if let Ok(dv) = serde_json::from_value(v.clone()) {
                         flatten_inputs_impl(&dv, flattened);
                     }
                 }
             }
-            serde_yaml::Value::Mapping(mapping) => {
+            serde_json::Value::Object(mapping) => {
                 for v in mapping.values() {
-                    if let Ok(dv) = serde_yaml::from_value(v.clone()) {
+                    if let Ok(dv) = serde_json::from_value(v.clone()) {
                         flatten_inputs_impl(&dv, flattened);
                     }
                 }
@@ -212,11 +212,11 @@ mod tests {
 
     #[test]
     fn test_collect_inputs() {
-        let tool: CommandLineTool = serde_yaml::from_str(include_str!(
+        let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
             "../../testdata/cwl/tests/anon_enum_inside_array.cwl"
         ))
         .unwrap();
-        let inputs_values: HashMap<String, DefaultValue> = serde_yaml::from_str(include_str!(
+        let inputs_values: HashMap<String, DefaultValue> = serde_saphyr::from_str(include_str!(
             "../../testdata/cwl/tests/anon_enum_inside_array.yml"
         ))
         .unwrap();

@@ -2,6 +2,7 @@ use crate::{
     FileMetaData, FilePathMetaData, Integer, get_file_metadata, get_path_metadata,
     requirements::StringOrInclude,
 };
+use crate::{Result, guard};
 use anyhow::Context;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
@@ -74,8 +75,8 @@ impl FileOrDirectory {
     /// Gets a `FileOrDirectory` from its yaml Mapping
     /// # Panics
     /// if class is not given
-    pub fn from_mapping(value: serde_yaml::Value) -> Self {
-        serde_yaml::from_value(value).expect("class not found")
+    pub fn from_mapping(value: serde_json::Value) -> Self {
+        serde_json::from_value(value).expect("class not found")
     }
 }
 
@@ -121,7 +122,7 @@ impl File {
     /// Creats a `File` from `Path`.
     /// # Errors
     /// if file does not exist
-    pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
+    pub fn new_from_path(path: &Path) -> Result<Self> {
         let path_as_str = path.to_string_lossy();
         let FilePathMetaData {
             basename,
@@ -167,7 +168,7 @@ impl Directory {
     /// Creates a directory from a given path
     /// # Errors
     /// If dir does not exist
-    pub fn new_from_path(path: &Path) -> anyhow::Result<Self> {
+    pub fn new_from_path(path: &Path) -> Result<Self> {
         let path_as_str = path.to_string_lossy();
         let FilePathMetaData {
             basename,
@@ -187,10 +188,8 @@ impl Directory {
     /// Loads listing for directory
     /// # Errors
     /// if a file or dir does not exist or path is not given
-    pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> anyhow::Result<()> {
-        let Some(path) = &self.path else {
-            anyhow::bail!("No path given!");
-        };
+    pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> Result<()> {
+        guard!(let Some(path) = &self.path, "No path given");
 
         match load_listing {
             LoadListingEnum::NoListing => self.listing = None,
@@ -200,7 +199,7 @@ impl Directory {
         Ok(())
     }
 
-    fn read_dir(path: &str, recursive: bool) -> anyhow::Result<Vec<FileOrDirectory>> {
+    fn read_dir(path: &str, recursive: bool) -> Result<Vec<FileOrDirectory>> {
         let mut entries = Vec::new();
 
         let read_dir =
@@ -258,7 +257,7 @@ mod tests {
             listing: Vec<FileOrDirectory>,
         }
         let contents = include_str!("../../testdata/listing.yaml");
-        let res = serde_yaml::from_str::<ListingBag>(contents);
+        let res = serde_saphyr::from_str::<ListingBag>(contents);
         assert!(res.is_ok());
     }
 }

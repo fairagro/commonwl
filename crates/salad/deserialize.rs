@@ -1,7 +1,7 @@
 use crate::dsl::{secondary_files_dsl, type_dsl};
 use serde::de::Error;
 use serde::{Deserialize, Deserializer, de::DeserializeOwned};
-use serde_yaml::Value;
+use serde_json::Value;
 use std::collections::HashMap;
 
 pub trait FromShortHand {
@@ -29,9 +29,9 @@ where
             let mut result = vec![];
             for (key, value) in &mut map {
                 let normalized = match value {
-                    Value::Mapping(m) => {
-                        m.insert(Value::String(tag.to_string()), Value::String(key.clone()));
-                        Value::Mapping(m.clone())
+                    Value::Object(m) => {
+                        m.insert(tag.to_string(), Value::String(key.clone()));
+                        Value::Object(m.clone())
                     }
                     _ => {
                         if let Some(sh) = T::from_shorthand(key, value.to_owned()) {
@@ -43,8 +43,7 @@ where
                 };
                 result.push(normalized);
             }
-            Ok(serde_yaml::from_value(serde_yaml::Value::Sequence(result))
-                .map_err(serde::de::Error::custom)?)
+            Ok(serde_json::from_value(Value::Array(result)).map_err(serde::de::Error::custom)?)
         }
     }
 }
@@ -94,11 +93,11 @@ make_deserialize_map_list_option!(deserialize_map_list_option_class, "class");
 macro_rules! make_shorthand_impl {
     ($class:ident, $id:expr, $type:expr) => {
         impl FromShortHand for $class {
-            fn from_shorthand(key: &str, value: serde_yaml::Value) -> Option<serde_yaml::Value> {
-                let mut map = serde_yaml::Mapping::new();
-                map.insert($id.into(), serde_yaml::Value::String(key.to_owned()));
+            fn from_shorthand(key: &str, value: serde_json::Value) -> Option<serde_json::Value> {
+                let mut map = $crate::Mapping::new();
+                map.insert($id.into(), serde_json::Value::String(key.to_owned()));
                 map.insert($type.into(), value);
-                Some(serde_yaml::Value::Mapping(map))
+                Some(serde_json::Value::Object(map))
             }
         }
     };
@@ -112,7 +111,7 @@ where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
 {
-    let value = serde_yaml::Value::deserialize(deserializer)?;
+    let value = Value::deserialize(deserializer)?;
     let normalized = type_dsl(value);
     T::deserialize(normalized).map_err(D::Error::custom)
 }
@@ -125,7 +124,7 @@ where
     D: Deserializer<'de>,
     T: Deserialize<'de>,
 {
-    let value = serde_yaml::Value::deserialize(deserializer)?;
+    let value = Value::deserialize(deserializer)?;
     let normalized = secondary_files_dsl(value);
     T::deserialize(normalized).map_err(D::Error::custom)
 }
@@ -162,7 +161,7 @@ mod tests {
         inputs:
           my_id: Music
         "#;
-        let res = serde_yaml::from_str::<DaInputBag>(shorthand);
+        let res = serde_saphyr::from_str::<DaInputBag>(shorthand);
         assert!(res.is_ok());
     }
 }

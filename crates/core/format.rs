@@ -1,20 +1,29 @@
-use serde_yaml::{Mapping, Value};
+use commonwl_salad::Mapping;
+use serde_json::Value;
 use std::{collections::HashMap, error::Error};
-
+use crate::Result;
 const HASH_BANG: &str = "#!/usr/bin/env cwl-runner\n\n";
 const HASH_BANG_PRE: &str = "#!/usr/bin/env ";
-const KEYS_WITH_NEWLINES: [&str; 7] = ["inputs", "outputs", "steps", "requirements", "hints", "baseCommand", "$schemas"];
+const KEYS_WITH_NEWLINES: [&str; 7] = [
+    "inputs",
+    "outputs",
+    "steps",
+    "requirements",
+    "hints",
+    "baseCommand",
+    "$schemas",
+];
 
 /// formats cwl document in an oppinionated way. Heavily inspired by <https://github.com/rabix/cwl-format>
 /// # Errors
 /// Returns an error if the input string is not a valid yaml document or if there is an issue during serialization.
 pub fn format_cwl(raw_cwl: &str) -> Result<String, Box<dyn Error>> {
-    let cwl = &serde_yaml::from_str(raw_cwl)?;
+    let cwl = &serde_saphyr::from_str(raw_cwl)?;
 
     let comment = add_leading_comment(raw_cwl);
 
     let formatted_node = format_node(cwl);
-    let mut formatted_cwl = serde_yaml::to_string(&formatted_node)?;
+    let mut formatted_cwl = serde_saphyr::to_string(&formatted_node)?;
     formatted_cwl = add_space_between_main_sections(&formatted_cwl);
 
     Ok(format!("{comment}{formatted_cwl}"))
@@ -22,20 +31,23 @@ pub fn format_cwl(raw_cwl: &str) -> Result<String, Box<dyn Error>> {
 
 fn format_node(cwl: &Value) -> Value {
     match cwl {
-        Value::Mapping(map) => {
+        Value::Object(map) => {
             let node_type = infer_type(map);
             let reordered_map = reorder_node(map, node_type);
 
-            let formatted_map: Mapping = reordered_map.into_iter().map(|(k, v)| (k, format_node(&v))).collect();
-            Value::Mapping(formatted_map)
+            let formatted_map: Mapping = reordered_map
+                .into_iter()
+                .map(|(k, v)| (k, format_node(&v)))
+                .collect();
+            Value::Object(formatted_map)
         }
-        Value::Sequence(seq) => Value::Sequence(seq.iter().map(format_node).collect()),
+        Value::Array(seq) => Value::Array(seq.iter().map(format_node).collect()),
         _ => cwl.clone(),
     }
 }
 
 fn infer_type(cwl: &Mapping) -> &str {
-    if let Some(Value::String(class)) = cwl.get(Value::String("class".to_string())) {
+    if let Some(Value::String(class)) = cwl.get("class") {
         class
     } else {
         "generic-ordering"
@@ -53,15 +65,14 @@ fn reorder_node(cwl: &Mapping, node_type: &str) -> Mapping {
     let mut extra_keys = vec![];
 
     for key in key_order {
-        let kv = Value::String((*key).to_string());
-        if let Some(value) = cwl.get(&kv) {
-            ordered_map.insert(kv, value.clone());
+        if let Some(value) = cwl.get(*key) {
+            ordered_map.insert(key.to_string(), value.clone());
         }
     }
 
     //extra keys to be pushed to end
     for (k, v) in cwl {
-        if !key_order.contains(&k.as_str().unwrap_or("")) {
+        if !key_order.contains(&k.as_str()) {
             extra_keys.push((k.clone(), v.clone()));
         }
     }
@@ -140,7 +151,18 @@ fn get_key_order() -> HashMap<&'static str, Vec<&'static str>> {
 
     key_order_dict.insert(
         "ExpressionTool",
-        vec!["cwlVersion", "class", "label", "doc", "requirements", "inputs", "outputs", "expression", "hints", "id"],
+        vec![
+            "cwlVersion",
+            "class",
+            "label",
+            "doc",
+            "requirements",
+            "inputs",
+            "outputs",
+            "expression",
+            "hints",
+            "id",
+        ],
     );
 
     key_order_dict.insert(
@@ -191,7 +213,10 @@ fn add_space_between_main_sections(raw_cwl: &str) -> String {
     for line in raw_cwl.lines() {
         let trimmed_line = line.trim();
 
-        if KEYS_WITH_NEWLINES.iter().any(|&key| trimmed_line.starts_with(key)) {
+        if KEYS_WITH_NEWLINES
+            .iter()
+            .any(|&key| trimmed_line.starts_with(key))
+        {
             if !was_special_key {
                 result.push('\n');
             }

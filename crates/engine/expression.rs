@@ -3,7 +3,7 @@ use anyhow::Context as _;
 use boa_engine::{Context, JsString, JsValue, Source, property::PropertyKey};
 use cwl_core::{
     inputs::DefaultValue,
-    requirements::{StringOrInclude, InlineJavascriptRequirement},
+    requirements::{InlineJavascriptRequirement, StringOrInclude},
 };
 use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
 
@@ -71,12 +71,12 @@ pub(crate) fn do_eval_to_string(expression: &str, eval_context: &EvaluationConte
 pub fn do_eval(
     expression: &str,
     eval_context: &EvaluationContext,
-) -> anyhow::Result<serde_yaml::Value> {
+) -> anyhow::Result<serde_json::Value> {
     let expressions = parse_expressions(expression);
 
     if expressions.is_empty() {
         // No CWL expressions found, just unescape and return
-        return Ok(serde_yaml::to_value(unescape_value(expression))?);
+        return Ok(serde_json::to_value(unescape_value(expression))?);
     }
 
     let context = eval_context.context.unwrap_or(&serde_json::Value::Null);
@@ -118,7 +118,7 @@ pub fn do_eval(
 fn simple_expression_eval(
     expression: &str,
     map: &HashMap<&str, serde_json::Value>,
-) -> anyhow::Result<serde_yaml::Value> {
+) -> anyhow::Result<serde_json::Value> {
     let mut context = Context::default();
 
     for (key, value) in map {
@@ -142,7 +142,7 @@ fn simple_expression_eval(
         anyhow::bail!("Expression did not evaluate to a value");
     }
 
-    Ok(serde_yaml::to_value(json)?)
+    Ok(serde_json::to_value(json)?)
 }
 
 fn js_eval(
@@ -150,7 +150,7 @@ fn js_eval(
     map: &HashMap<&str, serde_json::Value>,
     ijsr: &InlineJavascriptRequirement,
     workdir: Option<&Path>,
-) -> anyhow::Result<serde_yaml::Value> {
+) -> anyhow::Result<serde_json::Value> {
     let mut context = Context::default();
     for (key, value) in map {
         let value = JsValue::from_json(value, &mut context).map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -202,7 +202,7 @@ fn js_eval(
         anyhow::bail!("Expression did not evaluate to a value");
     }
 
-    Ok(serde_yaml::to_value(json)?)
+    Ok(serde_json::to_value(json)?)
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -239,7 +239,7 @@ fn replace_expressions(
     map: &HashMap<&str, serde_json::Value>,
     ijsr: Option<&InlineJavascriptRequirement>,
     workdir: Option<&Path>,
-) -> anyhow::Result<serde_yaml::Value> {
+) -> anyhow::Result<serde_json::Value> {
     let evaluations = expressions
         .iter()
         .map(|e| {
@@ -249,7 +249,7 @@ fn replace_expressions(
                 simple_expression_eval(&e.expression(), map)
             }
         })
-        .collect::<anyhow::Result<Vec<serde_yaml::Value>>>()?;
+        .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
 
     let mut result = String::new();
     let mut last_end = 0;
@@ -267,7 +267,7 @@ fn replace_expressions(
     // Add the remaining part (with escapes processed)
     result.push_str(&unescape_value(&expr[last_end..]));
 
-    Ok(serde_yaml::to_value(result)?)
+    Ok(serde_json::to_value(result)?)
 }
 
 fn parse_expressions(expr: &str) -> Vec<Expression> {
@@ -407,13 +407,13 @@ fn unescape_value(expr: &str) -> String {
     result
 }
 
-fn to_str(value: &serde_yaml::Value) -> String {
+fn to_str(value: &serde_json::Value) -> String {
     match value {
-        serde_yaml::Value::String(s) => s.clone(),
-        serde_yaml::Value::Number(n) => n.to_string(),
-        serde_yaml::Value::Bool(b) => b.to_string(),
-        serde_yaml::Value::Null => "null".to_string(),
-        serde_yaml::Value::Mapping(m) => serde_json::to_string_pretty(m).unwrap_or(String::new()),
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Number(n) => n.to_string(),
+        serde_json::Value::Bool(b) => b.to_string(),
+        serde_json::Value::Null => "null".to_string(),
+        serde_json::Value::Object(m) => serde_json::to_string_pretty(m).unwrap_or(String::new()),
         _ => String::new(),
     }
 }
@@ -467,8 +467,8 @@ mod tests {
             },
         )
         .unwrap();
-        let str = serde_yaml::to_string(&result).unwrap();
-        assert_eq!(str.trim(), ".");
+        let str = serde_saphyr::to_string(&result).unwrap();
+        assert_eq!(str.trim(), "'.'");
     }
 
     #[test]
@@ -477,7 +477,7 @@ mod tests {
         let mut inputs = HashMap::new();
         inputs.insert(
             "val".to_string(),
-            DefaultValue::Any(serde_yaml::Value::String("val".to_string())),
+            DefaultValue::Any(serde_json::Value::String("val".to_string())),
         );
 
         let result = do_eval(
@@ -499,7 +499,7 @@ mod tests {
         let mut inputs = HashMap::new();
         inputs.insert(
             "val".to_string(),
-            DefaultValue::Any(serde_yaml::Value::String("val".to_string())),
+            DefaultValue::Any(serde_json::Value::String("val".to_string())),
         );
 
         let result = do_eval(
@@ -521,7 +521,7 @@ mod tests {
         let mut inputs = HashMap::new();
         inputs.insert(
             "val".to_string(),
-            DefaultValue::Any(serde_yaml::Value::String("val".to_string())),
+            DefaultValue::Any(serde_json::Value::String("val".to_string())),
         );
 
         let result = do_eval(

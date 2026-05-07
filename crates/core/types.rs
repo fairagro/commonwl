@@ -68,7 +68,7 @@ mod tests {
             - rampawampa?
             - wamborambo
             - alerta"#;
-        let sec_files = serde_yaml::from_str::<SecondaryBag>(contents);
+        let sec_files = serde_saphyr::from_str::<SecondaryBag>(contents);
         dbg!(&sec_files);
         assert!(sec_files.is_ok())
     }

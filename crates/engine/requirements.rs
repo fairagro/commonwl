@@ -166,7 +166,7 @@ impl From<WorkflowRequirements> for ProcessRequirements {
 #[serde(untagged)]
 pub enum ProcessHints {
     Requirement(ProcessRequirements),
-    Any(serde_yaml::Value),
+    Any(serde_json::Value),
 }
 
 impl From<WorkflowHints> for ProcessHints {
@@ -302,7 +302,7 @@ mod tests {
     #[test]
     fn test_collect_requirements() {
         let yaml = include_str!("../../testdata/cwl/tests/env-tool4.cwl");
-        let tool: CWLDocument = serde_yaml::from_str(yaml).unwrap();
+        let tool: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
 
         let base_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests");
         let inputs = base_path.join("env-job4.yaml");

@@ -118,7 +118,7 @@ fn handle_value(
         NumberOrExpression::Expression(expression) => {
             if let Ok(result) = do_eval(expression, context) {
                 handle_value(
-                    &serde_yaml::from_value(result).unwrap(),
+                    &serde_json::from_value(result).unwrap(),
                     context,
                     cwl_version,
                 )?

@@ -68,33 +68,32 @@ fn validate_cwl_type(
 ) -> bool {
     match value {
         DefaultValue::FileOrDirectory(fod) => match r#type {
-            CWLType::File
-                if fod.is_file() => {
-                    if let FileOrDirectory::File(file) = &fod
-                        && let Some(file_format) = &file.format
-                        && let Some(fv) = fv
+            CWLType::File if fod.is_file() => {
+                if let FileOrDirectory::File(file) = &fod
+                    && let Some(file_format) = &file.format
+                    && let Some(fv) = fv
+                {
+                    let expected_resolved = fv.handle(format, None);
+                    let actual_resolved = fv.handle(Some(file_format), None);
+                    if let Some(actual_format) = actual_resolved
+                        && let Some(expected_format) = expected_resolved
+                        && !fv.validate(&actual_format, &expected_format)
                     {
-                        let expected_resolved = fv.handle(format, None);
-                        let actual_resolved = fv.handle(Some(file_format), None);
-                        if let Some(actual_format) = actual_resolved
-                            && let Some(expected_format) = expected_resolved
-                            && !fv.validate(&actual_format, &expected_format)
-                        {
-                            error!(
-                                "Format could not be validated: {actual_format} vs. {expected_format}"
-                            );
-                            return false;
-                        }
+                        error!(
+                            "Format could not be validated: {actual_format} vs. {expected_format}"
+                        );
+                        return false;
                     }
-                    true
                 }
+                true
+            }
             CWLType::Directory => fod.is_dir(),
             CWLType::Any => true,
             _ => false,
         },
         DefaultValue::Any(value) => match r#type {
             CWLType::Null => value.is_null(),
-            CWLType::Boolean => value.is_bool(),
+            CWLType::Boolean => value.is_boolean(),
             CWLType::Int | CWLType::Long => value.is_i64() || value.is_u64(),
             CWLType::Float => value.is_f64() || value.is_i64() || value.is_u64(),
             CWLType::Double => value.is_f64(),
@@ -123,18 +122,17 @@ fn validate_record_schema(
     value: &DefaultValue,
     fv: Option<&FormatValidator>,
 ) -> bool {
-    let DefaultValue::Any(serde_yaml::Value::Mapping(mapping)) = value else {
+    let DefaultValue::Any(serde_json::Value::Object(mapping)) = value else {
         return false;
     };
 
     if let Some(fields) = &schema.fields {
         return fields.iter().all(|f| {
-            let key = serde_yaml::Value::String(f.name.clone());
-            if let Some(field_value) = mapping.get(&key) {
+            if let Some(field_value) = mapping.get(&f.name) {
                 match &f.r#type {
                     OneOrMany::One(item) => validate_type(
                         item,
-                        &serde_yaml::from_value(field_value.clone())
+                        &serde_json::from_value(field_value.clone())
                             .expect("DefaultValue violates itself"),
                         f.format.as_ref().map(OneOrMany::as_one),
                         fv,
@@ -142,7 +140,7 @@ fn validate_record_schema(
                     OneOrMany::Many(items) => items.iter().any(|item| {
                         validate_type(
                             item,
-                            &serde_yaml::from_value(field_value.clone())
+                            &serde_json::from_value(field_value.clone())
                                 .expect("DefaultValue violates itself"),
                             f.format.as_ref().map(OneOrMany::as_one),
                             fv,
@@ -171,10 +169,10 @@ fn validate_array_schema(
     fv: Option<&FormatValidator>,
 ) -> bool {
     //check whether we have a sequence!
-    if let DefaultValue::Any(serde_yaml::Value::Sequence(seq)) = value {
+    if let DefaultValue::Any(serde_json::Value::Array(seq)) = value {
         seq.iter().all(|item| {
             let item_value: DefaultValue =
-                serde_yaml::from_value(item.clone()).expect("DefaultValue violates itself");
+                serde_json::from_value(item.clone()).expect("DefaultValue violates itself");
             match &schema.items {
                 OneOrMany::One(t) => validate_type(t, &item_value, format, fv),
                 OneOrMany::Many(ts) => ts.iter().any(|t| validate_type(t, &item_value, format, fv)),
@@ -206,10 +204,10 @@ mod tests {
     #[test]
     fn test_input_validation_complex() {
         let tool: CommandLineTool =
-            serde_yaml::from_str(include_str!("../../../testdata/cwl/tests/binding-test.cwl"))
+            serde_saphyr::from_str(include_str!("../../../testdata/cwl/tests/binding-test.cwl"))
                 .unwrap();
         let mut inputs_values: HashMap<String, DefaultValue> =
-            serde_yaml::from_str(include_str!("../../../testdata/cwl/tests/bwa-mem-job.json"))
+            serde_saphyr::from_str(include_str!("../../../testdata/cwl/tests/bwa-mem-job.json"))
                 .unwrap();
 
         //append the default value as we do not test that here
@@ -230,11 +228,11 @@ mod tests {
 
     #[test]
     fn test_input_validation_enum() {
-        let tool: CommandLineTool = serde_yaml::from_str(include_str!(
+        let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
             "../../../testdata/cwl/tests/anon_enum_inside_array.cwl"
         ))
         .unwrap();
-        let inputs_values: HashMap<String, DefaultValue> = serde_yaml::from_str(include_str!(
+        let inputs_values: HashMap<String, DefaultValue> = serde_saphyr::from_str(include_str!(
             "../../../testdata/cwl/tests/anon_enum_inside_array.yml"
         ))
         .unwrap();

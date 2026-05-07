@@ -306,7 +306,7 @@ pub struct CommandLineTool {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(flatten)]
     #[builder(default, into)]
-    pub extension_fields: HashMap<String, serde_yaml::Value>,
+    pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
@@ -348,7 +348,7 @@ pub struct ExpressionTool {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(flatten)]
     #[builder(default, into)]
-    pub extension_fields: HashMap<String, serde_yaml::Value>,
+    pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
@@ -388,7 +388,7 @@ pub struct Operation {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(flatten)]
     #[builder(default, into)]
-    pub extension_fields: HashMap<String, serde_yaml::Value>,
+    pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
@@ -431,7 +431,7 @@ pub struct Workflow {
     #[serde(skip_serializing_if = "HashMap::is_empty")]
     #[serde(flatten)]
     #[builder(default, into)]
-    pub extension_fields: HashMap<String, serde_yaml::Value>,
+    pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
 impl Workflow {
@@ -507,7 +507,7 @@ mod tests {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_file() && entry.path().extension().unwrap() == "cwl" {
                 let contents = fs::read_to_string(entry.path()).unwrap();
-                let result_doc = serde_yaml::from_str::<CWLDocument>(&contents);
+                let result_doc = serde_saphyr::from_str::<CWLDocument>(&contents);
                 dbg!(&result_doc);
                 assert!(result_doc.is_ok());
                 assert!(matches!(
@@ -533,7 +533,7 @@ mod tests {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_file() && entry.path().extension().unwrap() == "cwl" {
                 let contents = fs::read_to_string(entry.path()).unwrap();
-                let result_doc = serde_yaml::from_str::<CWLDocument>(&contents);
+                let result_doc = serde_saphyr::from_str::<CWLDocument>(&contents);
                 dbg!(&result_doc);
                 assert!(result_doc.is_ok());
                 assert!(matches!(
@@ -559,7 +559,7 @@ mod tests {
             let entry = entry.unwrap();
             if entry.file_type().unwrap().is_file() && entry.path().extension().unwrap() == "cwl" {
                 let contents = fs::read_to_string(entry.path()).unwrap();
-                let result_doc = serde_yaml::from_str::<CWLDocument>(&contents);
+                let result_doc = serde_saphyr::from_str::<CWLDocument>(&contents);
                 dbg!(&result_doc);
                 assert!(result_doc.is_ok());
                 assert!(matches!(result_doc.unwrap(), CWLDocument::Workflow(_)));

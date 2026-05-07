@@ -1,10 +1,11 @@
 use crate::{
-    OneOrMany,
+    OneOrMany, Result,
     documents::{
         CWLDocument, CommandLineTool, ExpressionTool, Operation, StringOrDocument, Workflow,
         WorkflowStep,
     },
     files::FileOrDirectory,
+    guard,
     inputs::{CommandInputParameter, DefaultValue, WorkflowInputParameter},
     load_cwl_file, normalize_path,
     outputs::StringOrWorkflowStepOutput,
@@ -31,7 +32,7 @@ impl PackedCWL {
     /// Tries to unpack `PackedCWL` to `CWLDocument`
     /// # Errors
     /// - If root entity is invalid (e.g. #main)
-    pub fn unpack(self, root_entity: Option<&str>) -> anyhow::Result<CWLDocument> {
+    pub fn unpack(self, root_entity: Option<&str>) -> Result<CWLDocument> {
         let needle = root_entity.unwrap_or_else(|| {
             if self.graph.len() == 1 {
                 self.graph[0].get_id().map_or("main", |v| v)
@@ -50,9 +51,7 @@ impl PackedCWL {
             })
             .cloned();
 
-        let Some(mut main) = main else {
-            anyhow::bail!("Could not find root entity")
-        };
+        guard!(let Some(mut main) = main ,"Could not find root entity");
 
         //unpack main entity
         match &mut main {
@@ -196,7 +195,7 @@ pub fn pack_cwl(
     spec: &CWLDocument,
     filename: impl AsRef<Path>,
     id: Option<&str>,
-) -> anyhow::Result<Vec<CWLDocument>> {
+) -> Result<Vec<CWLDocument>> {
     Ok(match spec {
         CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => {
             vec![pack_tool(spec.clone(), filename, id)?]
@@ -215,7 +214,7 @@ pub fn pack_workflow(
     wf: &Workflow,
     filename: impl AsRef<Path>,
     id: Option<&str>,
-) -> anyhow::Result<PackedCWL> {
+) -> Result<PackedCWL> {
     let mut wf = wf.clone();
     if let Some(id) = id {
         wf.id = Some(id.to_string());
@@ -361,7 +360,7 @@ fn pack_step(
     step: &mut WorkflowStep,
     wf_dir: impl AsRef<Path>,
     wf_id: &str,
-) -> anyhow::Result<Vec<CWLDocument>> {
+) -> Result<Vec<CWLDocument>> {
     let step_id = format!("{wf_id}/{}", step.id.as_ref().unwrap());
     step.id = Some(step_id.clone());
 
@@ -440,7 +439,7 @@ fn pack_command_input(
     input: &mut CommandInputParameter,
     root_id: &str,
     doc_dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     input.id = Some(format!("{root_id}/{}", input.id.as_ref().unwrap()));
 
     if let Some(default) = &mut input.default {
@@ -506,7 +505,7 @@ fn pack_workflow_input(
     input: &mut WorkflowInputParameter,
     root_id: &str,
     doc_dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     input.id = Some(format!("{root_id}/{}", input.id.as_ref().unwrap()));
 
     if let Some(default) = &mut input.default {
@@ -568,10 +567,7 @@ fn pack_workflow_input(
     Ok(())
 }
 
-fn pack_iwdr(
-    iwdr: &mut InitialWorkDirRequirement,
-    doc_dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+fn pack_iwdr(iwdr: &mut InitialWorkDirRequirement, doc_dir: impl AsRef<Path>) -> Result<()> {
     match &mut iwdr.listing {
         WorkDirItems::Expression(_) => {}
         WorkDirItems::ListingItems(items) => match &mut **items {
@@ -587,7 +583,7 @@ fn pack_iwdr(
     Ok(())
 }
 
-fn pack_iwdr_item(item: &mut ListingItems, doc_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+fn pack_iwdr_item(item: &mut ListingItems, doc_dir: impl AsRef<Path>) -> Result<()> {
     if let ListingItems::Dirent(dirent) = item {
         pack_entry(&mut dirent.entry, &doc_dir)?;
     }
@@ -595,10 +591,7 @@ fn pack_iwdr_item(item: &mut ListingItems, doc_dir: impl AsRef<Path>) -> anyhow:
     Ok(())
 }
 
-fn pack_docker_requirement(
-    dr: &mut DockerRequirement,
-    doc_dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+fn pack_docker_requirement(dr: &mut DockerRequirement, doc_dir: impl AsRef<Path>) -> Result<()> {
     if let Some(df) = &mut dr.docker_file {
         pack_entry(df, doc_dir)?;
     }
@@ -609,7 +602,7 @@ fn pack_docker_requirement(
 fn pack_js_requirement(
     ijs: &mut InlineJavascriptRequirement,
     doc_dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     if let Some(lib) = &mut ijs.expression_lib {
         for item in lib {
             pack_entry(item, &doc_dir)?;
@@ -619,7 +612,7 @@ fn pack_js_requirement(
     Ok(())
 }
 
-fn pack_entry(entry: &mut StringOrInclude, doc_dir: impl AsRef<Path>) -> anyhow::Result<()> {
+fn pack_entry(entry: &mut StringOrInclude, doc_dir: impl AsRef<Path>) -> Result<()> {
     if let StringOrInclude::Include(include) = &entry {
         let path = &include.include;
         let contents = fs::read_to_string(doc_dir.as_ref().join(path))?;

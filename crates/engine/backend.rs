@@ -268,7 +268,7 @@ pub async fn execute_workflow(
                     let mut sub_inputs = inputs.clone();
                     for (k, v) in job {
                         //convert to default value (inner values we extracted before as vec!)
-                        sub_inputs.inputs.insert(k, serde_yaml::from_value(v)?);
+                        sub_inputs.inputs.insert(k, serde_json::from_value(v)?);
                     }
 
                     let step_inputs = eval_inputs(step, sub_inputs, eval_context)?;
@@ -279,7 +279,7 @@ pub async fn execute_workflow(
                                 "Conditional execution with when is not supported for CWL version {cwl_version}",
                             );
                         }
-                        let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
+                        let serde_json::Value::Bool(result) = do_eval(when, &eval_context)? else {
                             anyhow::bail!("Condition {when} did not evaluate to boolean");
                         };
                         if !result {
@@ -287,7 +287,7 @@ pub async fn execute_workflow(
                                 .out
                                 .iter()
                                 .map(|o| {
-                                    (o.id().clone(), DefaultValue::Any(serde_yaml::Value::Null))
+                                    (o.id().clone(), DefaultValue::Any(serde_json::Value::Null))
                                 })
                                 .collect::<HashMap<_, _>>();
                             //spawn the "Null-Job"
@@ -332,7 +332,7 @@ pub async fn execute_workflow(
                             "Conditional execution with when is not supported for CWL version {cwl_version}",
                         );
                     }
-                    let serde_yaml::Value::Bool(result) = do_eval(when, &eval_context)? else {
+                    let serde_json::Value::Bool(result) = do_eval(when, &eval_context)? else {
                         anyhow::bail!("Condition {when} did not evaluate to boolean");
                     };
                     if !result {
@@ -340,7 +340,7 @@ pub async fn execute_workflow(
                         let null_outputs = step
                             .out
                             .iter()
-                            .map(|o| (o.id().clone(), DefaultValue::Any(serde_yaml::Value::Null)))
+                            .map(|o| (o.id().clone(), DefaultValue::Any(serde_json::Value::Null)))
                             .collect::<HashMap<_, _>>();
                         //spawn the "Null-Job"
                         let step_id = step_id_clone.clone();
@@ -394,17 +394,17 @@ pub async fn execute_workflow(
                 let aggregated = if let Some((method, dims)) = scatter_meta.get(&step_id) {
                     match method {
                         ScatterMethod::NestedCrossproduct => {
-                            let raw: Vec<serde_yaml::Value> = values
+                            let raw: Vec<serde_json::Value> = values
                                 .into_iter()
-                                .map(serde_yaml::to_value)
+                                .map(serde_json::to_value)
                                 .collect::<Result<_, _>>()?;
                             scatter::nest_results(&raw, dims)
                         }
                         // flat and dotproduct both produce a flat array
-                        _ => serde_yaml::to_value(values)?,
+                        _ => serde_json::to_value(values)?,
                     }
                 } else {
-                    serde_yaml::to_value(values)?
+                    serde_json::to_value(values)?
                 };
 
                 completed_outputs.insert(key, DefaultValue::Any(aggregated));
@@ -599,7 +599,7 @@ pub async fn execute_commandline_tool(
         if let Some(stdin) = &mut stdin {
             //evaluate expression
             *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
-                serde_yaml::to_string(&value)?.trim().to_owned()
+                serde_saphyr::to_string(&value)?.trim().to_owned()
             } else {
                 stdin.clone()
             };
@@ -614,7 +614,7 @@ pub async fn execute_commandline_tool(
                 BoolOrExpression::Bool(b) => *b,
                 BoolOrExpression::Expression(ex) => {
                     let val = do_eval(ex, eval_context)?;
-                    if let serde_yaml::Value::Bool(b) = val {
+                    if let serde_json::Value::Bool(b) = val {
                         b
                     } else {
                         false

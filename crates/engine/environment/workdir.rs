@@ -49,7 +49,7 @@ pub(crate) fn stage_work_dir(
     match &iwdr.listing {
         WorkDirItems::Expression(expression) => {
             let evaluated = do_eval(expression, context)?;
-            let items = &serde_yaml::from_value(evaluated)?;
+            let items = &serde_json::from_value(evaluated)?;
             update_inputs(expression, inputs, container_workdir, None);
             stage_item(
                 items,
@@ -107,7 +107,7 @@ fn stage_item(
                 debug!("expression returned null: {expression}");
                 return Ok(vec![]);
             }
-            let items = &serde_yaml::from_value(evaluated)?;
+            let items = &serde_json::from_value(evaluated)?;
             update_inputs(expression, inputs, container_workdir, None);
             stage_item(
                 items,
@@ -189,7 +189,7 @@ fn stage_dirent(
 
     //evaluate expression if so
     let evaluated_content =
-        do_eval(entry, context).unwrap_or(serde_yaml::Value::String(entry.clone()));
+        do_eval(entry, context).unwrap_or(serde_json::Value::String(entry.clone()));
     if evaluated_content.is_null() {
         debug!("Workdir Entry evaluated to null: {dirent:?}");
         return Ok(vec![]);
@@ -198,7 +198,7 @@ fn stage_dirent(
     //probably array of files is given here, why is dirent used in the first place?
     if dirent.entryname.is_none()
         && let Ok(items) =
-            serde_yaml::from_value::<OneOrMany<ListingItems>>(evaluated_content.clone())
+            serde_json::from_value::<OneOrMany<ListingItems>>(evaluated_content.clone())
     {
         let mut mounts = vec![];
         for item in &items.as_many() {
@@ -217,7 +217,7 @@ fn stage_dirent(
 
     let entryname = get_entryname(dirent, context)?;
     //parse to DefaultValue
-    let dv: DefaultValue = serde_yaml::from_value(evaluated_content)?;
+    let dv: DefaultValue = serde_json::from_value(evaluated_content)?;
 
     //if dirent ends with newline and has expression we use string interpolation which means we do json serialization
     let has_trailing_newline = entry.ends_with('\n');
@@ -261,7 +261,7 @@ fn stage_dirent(
             );
         }
         DefaultValue::Any(value) => match value {
-            serde_yaml::Value::String(s) => s,
+            serde_json::Value::String(s) => s,
             _ => to_string_dump(&value)?,
         },
         DefaultValue::FileOrDirectory(_) => to_string_dump(&dv)?,

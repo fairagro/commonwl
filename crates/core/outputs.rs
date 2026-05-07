@@ -8,6 +8,7 @@ use commonwl_salad::deserialize::{
 };
 use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
@@ -24,13 +25,13 @@ impl<'de> Deserialize<'de> for CommandOutputParameterType {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = serde_yaml::Value::deserialize(deserializer)?;
+        let value = Value::deserialize(deserializer)?;
 
-        if value == serde_yaml::Value::String("stderr".to_string()) {
+        if value == Value::String("stderr".to_string()) {
             return Ok(Self::Stderr);
         }
 
-        if value == serde_yaml::Value::String("stdout".to_string()) {
+        if value == Value::String("stdout".to_string()) {
             return Ok(Self::Stdout);
         }
 
@@ -606,7 +607,7 @@ mod tests {
         }
 
         let contents = include_str!("../../testdata/command_outputs.yaml");
-        let res = serde_yaml::from_str::<OutputHolder>(contents);
+        let res = serde_saphyr::from_str::<OutputHolder>(contents);
         dbg!(&res);
         assert!(res.is_ok());
         assert_eq!(res.unwrap().outputs.len(), 11);
@@ -626,7 +627,7 @@ mod tests {
         }
 
         let contents = include_str!("../../testdata/command_out_schemas.yaml");
-        let res = serde_yaml::from_str::<Bag>(contents);
+        let res = serde_saphyr::from_str::<Bag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
     }

@@ -129,7 +129,7 @@ pub(crate) fn collect_secondary_files_for_inputs(
                     if let DefaultValue::Any(yaml_value) = value
                         && let Some(field_value) = yaml_value.get_mut(&field.name)
                     {
-                        let mut dv = serde_yaml::from_value(field_value.clone())?;
+                        let mut dv = serde_json::from_value(field_value.clone())?;
                         if let Some(sec_files) = &field.secondary_files {
                             handle_secondary_files_for_input(
                                 &mut dv, sec_files, context, work_dir,
@@ -137,7 +137,7 @@ pub(crate) fn collect_secondary_files_for_inputs(
                         } else {
                             set_secondary_files_empty(&mut dv)?;
                         }
-                        *field_value = serde_yaml::to_value(dv)?;
+                        *field_value = serde_json::to_value(dv)?;
                     }
                 }
             }
@@ -160,18 +160,18 @@ fn handle_secondary_files_for_input(
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
             handle_secondary_files(file, secondary_files, work_dir, context)?;
         }
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+        DefaultValue::Any(serde_json::Value::Array(vec)) => {
             for item in vec {
-                let mut dv = serde_yaml::from_value(item.clone())?;
+                let mut dv = serde_json::from_value(item.clone())?;
                 handle_secondary_files_for_input(&mut dv, secondary_files, context, work_dir)?;
-                *item = serde_yaml::to_value(dv)?;
+                *item = serde_json::to_value(dv)?;
             }
         }
-        DefaultValue::Any(serde_yaml::Value::Mapping(rec)) => {
+        DefaultValue::Any(serde_json::Value::Object(rec)) => {
             for item in rec.values_mut() {
-                let mut dv = serde_yaml::from_value(item.clone())?;
+                let mut dv = serde_json::from_value(item.clone())?;
                 handle_secondary_files_for_input(&mut dv, secondary_files, context, work_dir)?;
-                *item = serde_yaml::to_value(dv)?;
+                *item = serde_json::to_value(dv)?;
             }
         }
         _ => {}
@@ -182,21 +182,22 @@ fn handle_secondary_files_for_input(
 fn set_secondary_files_empty(value: &mut DefaultValue) -> anyhow::Result<()> {
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file))
-            if file.secondary_files.is_none() => {
-                file.secondary_files = Some(vec![]);
-            }
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+            if file.secondary_files.is_none() =>
+        {
+            file.secondary_files = Some(vec![]);
+        }
+        DefaultValue::Any(serde_json::Value::Array(vec)) => {
             for item in vec {
-                let mut dv = serde_yaml::from_value(item.clone())?;
+                let mut dv = serde_json::from_value(item.clone())?;
                 set_secondary_files_empty(&mut dv)?;
-                *item = serde_yaml::to_value(dv)?;
+                *item = serde_json::to_value(dv)?;
             }
         }
-        DefaultValue::Any(serde_yaml::Value::Mapping(rec)) => {
+        DefaultValue::Any(serde_json::Value::Object(rec)) => {
             for item in rec.values_mut() {
-                let mut dv = serde_yaml::from_value(item.clone())?;
+                let mut dv = serde_json::from_value(item.clone())?;
                 set_secondary_files_empty(&mut dv)?;
-                *item = serde_yaml::to_value(dv)?;
+                *item = serde_json::to_value(dv)?;
             }
         }
         _ => {}
@@ -314,7 +315,7 @@ pub(crate) fn handle_secondary_file_schema(
         && pattern_value != item.pattern
     {
         //we got a filename, list of filenames, fod or list of fod
-        let dv: DefaultValue = serde_yaml::from_value(pattern_value)?;
+        let dv: DefaultValue = serde_json::from_value(pattern_value)?;
         return handle_secondary_file_from_expression(dv, path);
     }
 
@@ -368,14 +369,14 @@ fn handle_secondary_file_from_expression(
 ) -> anyhow::Result<Option<Vec<PathOrFile>>> {
     match dv {
         DefaultValue::FileOrDirectory(fod) => Ok(Some(vec![PathOrFile::File(Box::new(fod))])),
-        DefaultValue::Any(serde_yaml::Value::String(filename)) => {
+        DefaultValue::Any(serde_json::Value::String(filename)) => {
             let parent = path.as_ref().parent().unwrap();
             Ok(Some(vec![PathOrFile::Path(parent.join(filename))]))
         }
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => {
+        DefaultValue::Any(serde_json::Value::Array(vec)) => {
             let mut values = vec![];
             for item in vec {
-                let dv: DefaultValue = serde_yaml::from_value(item)?;
+                let dv: DefaultValue = serde_json::from_value(item)?;
                 let res = handle_secondary_file_from_expression(dv, path.as_ref())?;
                 if let Some(res) = res {
                     values.extend(res);

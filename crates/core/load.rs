@@ -1,16 +1,20 @@
+use crate::{Result, documents::CWLDocument, packed::PackedCWL};
 use anyhow::Context;
+use serde_json::Value;
+use serde_saphyr::Options;
+use std::{env, fs, path::Path};
 use url::Url;
 
-use crate::{documents::CWLDocument, packed::PackedCWL};
-use std::{env, fs, path::Path};
-
+pub fn saphyr_options() -> Options {
+    serde_saphyr::options! { strict_booleans: true, with_snippet: false }
+}
 /// Loads and may preprocesses a `CWLDocument` from Disk
 /// # Errors
 /// If file does not exist
 pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
     path: P,
     preprocess: bool,
-) -> anyhow::Result<CWLDocument> {
+) -> Result<CWLDocument> {
     if path.as_ref().to_string_lossy().contains('#') {
         return load_cwl_from_url(path.as_ref(), preprocess);
     }
@@ -22,15 +26,16 @@ pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
     };
 
     if contents.contains("$graph") {
-        let packed = serde_yaml::from_str::<PackedCWL>(&contents)
+        let packed = serde_saphyr::from_str_with_options::<PackedCWL>(&contents, saphyr_options())
             .context("Could not parse to packed CWL")?;
         packed.unpack(None)
     } else {
-        serde_yaml::from_str::<CWLDocument>(&contents).map_err(Into::into)
+        serde_saphyr::from_str_with_options::<CWLDocument>(&contents, saphyr_options())
+            .map_err(Into::into)
     }
 }
 
-fn load_cwl_from_url(path: &Path, preprocess: bool) -> anyhow::Result<CWLDocument> {
+fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
     let working_dir = env::current_dir()?;
     let absolute_path = if path.is_absolute() {
         path
@@ -39,7 +44,7 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> anyhow::Result<CWLDocumen
     };
     let path_url = format!("file://{}", absolute_path.to_string_lossy());
 
-    let url = Url::parse(&path_url).map_err(|_| anyhow::anyhow!("Could not parse url"))?;
+    let url = Url::parse(&path_url)?;
 
     if let Some(fragment) = url.fragment() {
         let path = Path::new(url.path());
@@ -48,38 +53,38 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> anyhow::Result<CWLDocumen
         } else {
             fs::read_to_string(path).with_context(|| format!("CWL File {}", path.display()))?
         };
-        let pack = serde_yaml::from_str::<PackedCWL>(&contents).map_err(|e| anyhow::anyhow!(e))?;
+        let pack = serde_saphyr::from_str_with_options::<PackedCWL>(&contents, saphyr_options())?;
         return pack.unpack(Some(fragment));
     }
-    anyhow::bail!("Packed CWL could not be loaded. Can not guess fragment")
+    Err(anyhow::anyhow!("Packed CWL could not be loaded. Can not guess fragment").into())
 }
 
 /// Preprocesses the $import sections of CWL Files
 /// # Errors
 /// Throws if CWL File or some of the imports do not exist
-pub fn preprocess_cwl_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> anyhow::Result<String> {
+pub fn preprocess_cwl_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<String> {
     let contents =
         fs::read_to_string(&path).with_context(|| format!("Could not read CWL File {path:?}"))?;
-    let mut yaml: serde_yaml::Value = serde_yaml::from_str(&contents)?;
+    let mut yaml: Value = serde_saphyr::from_str_with_options(&contents, saphyr_options())?;
     let path = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
 
     resolve_imports(&mut yaml, path)?;
 
-    Ok(serde_yaml::to_string(&yaml)?)
+    Ok(serde_saphyr::to_string(&yaml)?)
 }
 
-fn resolve_imports(value: &mut serde_yaml::Value, base_path: &Path) -> anyhow::Result<()> {
+fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
     match value {
-        serde_yaml::Value::Mapping(map) => {
+        Value::Object(map) => {
             if map.len() == 1
-                && let Some(serde_yaml::Value::String(file)) =
-                    map.get(serde_yaml::Value::String("$import".to_string()))
+                && let Some(Value::String(file)) = map.get("$import")
             {
                 let path = base_path.join(file);
                 let contents = fs::read_to_string(&path).with_context(|| {
                     format!("Could not read imported fragment {}", path.display())
                 })?;
-                let mut imported_value: serde_yaml::Value = serde_yaml::from_str(&contents)?;
+                let mut imported_value: Value =
+                    serde_saphyr::from_str_with_options(&contents, saphyr_options())?;
                 resolve_imports(&mut imported_value, path.parent().unwrap_or(base_path))?;
                 *value = imported_value;
                 return Ok(());
@@ -88,7 +93,7 @@ fn resolve_imports(value: &mut serde_yaml::Value, base_path: &Path) -> anyhow::R
                 resolve_imports(val, base_path)?;
             }
         }
-        serde_yaml::Value::Sequence(seq) => {
+        Value::Array(seq) => {
             for val in seq.iter_mut() {
                 resolve_imports(val, base_path)?;
             }
@@ -101,6 +106,7 @@ fn resolve_imports(value: &mut serde_yaml::Value, base_path: &Path) -> anyhow::R
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::error::Error;
     use std::path::PathBuf;
 
     #[test]
@@ -113,10 +119,10 @@ mod tests {
         let parsed = load_instruction_file(&instruction_file);
         evaluate_cwl_files(parsed, &base_dir);
 
-        fn evaluate_cwl_files(values: Vec<serde_yaml::Value>, base_dir: &Path) {
+        fn evaluate_cwl_files(values: Vec<Value>, base_dir: &Path) {
             for item in values {
-                if let serde_yaml::Value::Mapping(map) = &item {
-                    if let Some(file) = map.get(serde_yaml::Value::String("$import".to_string())) {
+                if let Value::Object(map) = &item {
+                    if let Some(file) = map.get("$import") {
                         //recurse the import
                         let instruction_file = base_dir.join(file.as_str().unwrap());
                         let base_dir = instruction_file.parent().unwrap();
@@ -132,8 +138,11 @@ mod tests {
 
                         let cwl_file = base_dir.join(file);
                         eprintln!("Loading {cwl_file:?}");
-                        let result = load_cwl_file(cwl_file, true);
-                        if result.is_err() {
+                        let result = load_cwl_file(&cwl_file, true);
+                        if let Err(e) = &result {
+                            if let Error::ParsingFailed(ex) = e {
+                                eprintln!("{ex}");
+                            }
                             eprintln!("Error: {result:?}");
                         }
                         assert!(result.is_ok());
@@ -142,9 +151,9 @@ mod tests {
             }
         }
 
-        fn load_instruction_file(instruction_file: &Path) -> Vec<serde_yaml::Value> {
+        fn load_instruction_file(instruction_file: &Path) -> Vec<Value> {
             let contents = fs::read_to_string(instruction_file).unwrap();
-            serde_yaml::from_str(&contents).unwrap()
+            serde_saphyr::from_str(&contents).unwrap()
         }
     }
 }

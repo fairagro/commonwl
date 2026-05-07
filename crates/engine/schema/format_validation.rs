@@ -221,12 +221,12 @@ pub(crate) fn get_format_validator(
 
     let namespaces = extension_fields
         .get("$namespaces")
-        .and_then(|v| v.as_mapping())
+        .and_then(|v| v.as_object())
         .map(|mapping| {
             mapping
                 .iter()
                 .filter_map(|(k, v)| {
-                    let key = k.as_str()?.to_string();
+                    let key = k.to_string();
                     let value = v.as_str()?.to_string();
                     Some((key, value))
                 })
@@ -236,7 +236,7 @@ pub(crate) fn get_format_validator(
 
     let schemas = extension_fields
         .get("$schemas")
-        .and_then(|v| v.as_sequence())
+        .and_then(|v| v.as_array())
         .map(|vec| {
             vec.iter()
                 .filter_map(|v| Some(working_dir.join(v.as_str()?)))

@@ -7,6 +7,7 @@ use commonwl_salad::deserialize::{
 };
 use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 macro_rules! impl_conversion_methods {
@@ -115,7 +116,7 @@ impl_conversion_methods!(WorkflowRequirements, WorkReuse);
 #[serde(untagged)]
 pub enum ToolHints {
     Requirement(ToolRequirements),
-    Any(serde_yaml::Value),
+    Any(Value),
 }
 impl FromShortHand for ToolHints {}
 
@@ -123,7 +124,7 @@ impl FromShortHand for ToolHints {}
 #[serde(untagged)]
 pub enum WorkflowHints {
     Requirement(WorkflowRequirements),
-    Any(serde_yaml::Value),
+    Any(Value),
 }
 impl FromShortHand for WorkflowHints {}
 
@@ -150,7 +151,7 @@ pub struct Include {
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SchemaDefRequirement {
-    pub types: serde_yaml::Value,
+    pub types: Value,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
@@ -335,21 +336,21 @@ mod tests {
         requirements:
           - class: InlineJavascriptRequirement
         "#;
-        let res = serde_yaml::from_str::<RequirementsBag>(bare_by_class);
+        let res = serde_saphyr::from_str::<RequirementsBag>(bare_by_class);
         assert!(res.is_ok());
 
         let bare_by_map = r#"
         requirements:
           InlineJavascriptRequirement: {}
         "#;
-        let res = serde_yaml::from_str::<RequirementsBag>(bare_by_map);
+        let res = serde_saphyr::from_str::<RequirementsBag>(bare_by_map);
         assert!(res.is_ok());
     }
 
     #[test]
     fn test_iwdr() {
         let contents = include_str!("../../testdata/iwdr.yaml");
-        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        let res = serde_saphyr::from_str::<RequirementsBag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
     }
@@ -357,11 +358,11 @@ mod tests {
     #[test]
     fn test_mapping_requirements() {
         let contents = include_str!("../../testdata/tool_requirements.yaml");
-        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        let res = serde_saphyr::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
 
         let contents = include_str!("../../testdata/tool_requirements_list.yaml");
-        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        let res = serde_saphyr::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
     }
 
@@ -378,7 +379,7 @@ mod tests {
               - { $include: underscore.js }
               - "var t = function(s) { return _.template(s, {variable: 'data'})({'inputs': inputs}); };"
         "#;
-        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        let res = serde_saphyr::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
     }
 
@@ -389,7 +390,7 @@ mod tests {
           - { $include: underscore.js }
           - "var t = function(s) { return _.template(s, {variable: 'data'})({'inputs': inputs}); };"
         "#;
-        let res = serde_yaml::from_str::<InlineJavascriptRequirement>(contents);
+        let res = serde_saphyr::from_str::<InlineJavascriptRequirement>(contents);
         assert!(res.is_ok());
     }
 
@@ -403,7 +404,7 @@ mod tests {
                 entry: 
                     $include: calculation.py
     "#;
-        let res = serde_yaml::from_str::<RequirementsBag>(contents);
+        let res = serde_saphyr::from_str::<RequirementsBag>(contents);
         assert!(res.is_ok());
     }
 }

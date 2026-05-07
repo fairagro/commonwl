@@ -115,7 +115,7 @@ async fn test_conformance_docker_wf() {
 struct ConformanceTest {
     job: Option<PathBuf>,
     tool: PathBuf,
-    output: Option<serde_yaml::Value>,
+    output: Option<serde_json::Value>,
     id: String,
     #[serde(default)]
     tags: Vec<String>,
@@ -134,39 +134,39 @@ fn load_test_file(file: &Path, root: &Path) -> anyhow::Result<Vec<ConformanceTes
     let contents = fs::read_to_string(file)?;
     let parent = file.parent().unwrap();
 
-    let raw: serde_yaml::Value = serde_yaml::from_str(&contents)?;
+    let raw: serde_json::Value = serde_saphyr::from_str(&contents)?;
     let resolved = resolve_imports(raw, parent, root)?;
     let resolved = rewrite_paths(resolved, parent, root);
 
     let items = match resolved {
-        serde_yaml::Value::Sequence(seq) => flatten_sequences(seq),
+        serde_json::Value::Array(seq) => flatten_sequences(seq),
         other => vec![other],
     };
 
     items
         .into_iter()
-        .map(|v| serde_yaml::from_value::<ConformanceTest>(v).map_err(Into::into))
+        .map(|v| serde_json::from_value::<ConformanceTest>(v).map_err(Into::into))
         .collect()
 }
 
 fn resolve_imports(
-    value: serde_yaml::Value,
+    value: serde_json::Value,
     parent: &Path,
     root: &Path,
-) -> anyhow::Result<serde_yaml::Value> {
+) -> anyhow::Result<serde_json::Value> {
     match value {
-        serde_yaml::Value::Mapping(map) => {
+        serde_json::Value::Object(map) => {
             if let Some(import_val) = map.get("$import") {
                 let import_path = import_val
                     .as_str()
                     .ok_or_else(|| anyhow::anyhow!("$import value is not a string"))?;
                 let full_path = parent.join(import_path);
                 let contents = fs::read_to_string(&full_path)?;
-                let imported: serde_yaml::Value =
+                let imported: serde_json::Value =
                     if full_path.extension().is_some_and(|e| e == "json") {
                         serde_json::from_str(&contents)?
                     } else {
-                        serde_yaml::from_str(&contents)?
+                        serde_saphyr::from_str(&contents)?
                     };
                 let import_parent = full_path.parent().unwrap();
                 // Resolve imports within the imported file relative to its own location
@@ -178,53 +178,52 @@ fn resolve_imports(
             let resolved = map
                 .into_iter()
                 .map(|(k, v)| resolve_imports(v, parent, root).map(|r| (k, r)))
-                .collect::<anyhow::Result<serde_yaml::Mapping>>()?;
-            Ok(serde_yaml::Value::Mapping(resolved))
+                .collect::<anyhow::Result<serde_json::Map<String, serde_json::Value>>>()?;
+            Ok(serde_json::Value::Object(resolved))
         }
 
-        serde_yaml::Value::Sequence(seq) => {
+        serde_json::Value::Array(seq) => {
             let resolved = seq
                 .into_iter()
                 .map(|v| resolve_imports(v, parent, root))
                 .collect::<anyhow::Result<Vec<_>>>()?;
-            Ok(serde_yaml::Value::Sequence(resolved))
+            Ok(serde_json::Value::Array(resolved))
         }
 
         other => Ok(other),
     }
 }
 
-fn rewrite_paths(value: serde_yaml::Value, dir: &Path, root: &Path) -> serde_yaml::Value {
+fn rewrite_paths(value: serde_json::Value, dir: &Path, root: &Path) -> serde_json::Value {
     let relative_dir = dir.strip_prefix(root).unwrap_or(Path::new(""));
     if relative_dir.as_os_str().is_empty() {
         return value;
     }
 
     match value {
-        serde_yaml::Value::Sequence(seq) => serde_yaml::Value::Sequence(
+        serde_json::Value::Array(seq) => serde_json::Value::Array(
             seq.into_iter()
                 .map(|v| rewrite_paths(v, dir, root))
                 .collect(),
         ),
-        serde_yaml::Value::Mapping(mut map) => {
+        serde_json::Value::Object(mut map) => {
             for key in ["tool", "job"] {
-                let k = serde_yaml::Value::String(key.to_string());
-                if let Some(serde_yaml::Value::String(path_str)) = map.get(&k) {
+                if let Some(serde_json::Value::String(path_str)) = map.get(key) {
                     let new_path = relative_dir.join(path_str).to_string_lossy().into_owned();
-                    map.insert(k, serde_yaml::Value::String(new_path));
+                    map.insert(key.to_owned(), serde_json::Value::String(new_path));
                 }
             }
-            serde_yaml::Value::Mapping(map)
+            serde_json::Value::Object(map)
         }
         other => other,
     }
 }
 
-fn flatten_sequences(seq: Vec<serde_yaml::Value>) -> Vec<serde_yaml::Value> {
+fn flatten_sequences(seq: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
     let mut out = vec![];
     for item in seq {
         match item {
-            serde_yaml::Value::Sequence(inner) => out.extend(flatten_sequences(inner)),
+            serde_json::Value::Array(inner) => out.extend(flatten_sequences(inner)),
             other => out.push(other),
         }
     }
@@ -282,24 +281,23 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
     }
 }
 
-fn evaluate_result(output: &serde_yaml::Value, result: ExecutionResult) {
-    if let serde_yaml::Value::Mapping(output) = output {
+fn evaluate_result(output: &serde_json::Value, result: ExecutionResult) {
+    if let serde_json::Value::Object(output) = output {
         for (key, value) in output {
-            let key = key.as_str().unwrap().to_string();
             assert!(
-                result.outputs.contains_key(&key),
+                result.outputs.contains_key(key),
                 "Could not find key {}, outputs: {:#?}",
                 key,
                 result.outputs
             );
-            evaluate_item(value, result.outputs.get(&key).unwrap());
+            evaluate_item(value, result.outputs.get(key).unwrap());
         }
     } else {
         panic!()
     }
 }
 
-fn evaluate_item(value: &serde_yaml::Value, result: &DefaultValue) {
+fn evaluate_item(value: &serde_json::Value, result: &DefaultValue) {
     assert!(
         match result {
             DefaultValue::FileOrDirectory(fod) => compare_file_or_directory(value, fod),
@@ -309,11 +307,11 @@ fn evaluate_item(value: &serde_yaml::Value, result: &DefaultValue) {
     )
 }
 
-fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value) -> bool {
+fn compare_yaml_values(expected: &serde_json::Value, actual: &serde_json::Value) -> bool {
     match (expected, actual) {
-        (serde_yaml::Value::String(s), _) if s == "Any" => true,
+        (serde_json::Value::String(s), _) if s == "Any" => true,
 
-        (serde_yaml::Value::Mapping(exp_map), serde_yaml::Value::Mapping(act_map)) => {
+        (serde_json::Value::Object(exp_map), serde_json::Value::Object(act_map)) => {
             exp_map.iter().all(|(key, exp_val)| {
                 act_map
                     .get(key)
@@ -322,7 +320,7 @@ fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
             })
         }
 
-        (serde_yaml::Value::Sequence(exp_seq), serde_yaml::Value::Sequence(act_seq)) => {
+        (serde_json::Value::Array(exp_seq), serde_json::Value::Array(act_seq)) => {
             if exp_seq.len() != act_seq.len() {
                 return false;
             }
@@ -341,17 +339,17 @@ fn compare_yaml_values(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
             })
         }
 
-        (serde_yaml::Value::String(exp), serde_yaml::Value::String(act)) => exp == act,
-        (serde_yaml::Value::Number(exp), serde_yaml::Value::Number(act)) => exp == act,
-        (serde_yaml::Value::Bool(exp), serde_yaml::Value::Bool(act)) => exp == act,
-        (serde_yaml::Value::Null, serde_yaml::Value::Null) => true,
+        (serde_json::Value::String(exp), serde_json::Value::String(act)) => exp == act,
+        (serde_json::Value::Number(exp), serde_json::Value::Number(act)) => exp == act,
+        (serde_json::Value::Bool(exp), serde_json::Value::Bool(act)) => exp == act,
+        (serde_json::Value::Null, serde_json::Value::Null) => true,
 
         _ => false,
     }
 }
 
-fn compare_yaml_or_fod(expected: &serde_yaml::Value, actual: &serde_yaml::Value) -> bool {
-    if let Ok(default_value) = serde_yaml::from_value::<DefaultValue>(actual.clone()) {
+fn compare_yaml_or_fod(expected: &serde_json::Value, actual: &serde_json::Value) -> bool {
+    if let Ok(default_value) = serde_json::from_value::<DefaultValue>(actual.clone()) {
         match default_value {
             DefaultValue::FileOrDirectory(fod) => compare_file_or_directory(expected, &fod),
             DefaultValue::Any(yaml_val) => compare_yaml_values(expected, &yaml_val),
@@ -361,17 +359,17 @@ fn compare_yaml_or_fod(expected: &serde_yaml::Value, actual: &serde_yaml::Value)
     }
 }
 
-fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirectory) -> bool {
+fn compare_file_or_directory(expected: &serde_json::Value, actual: &FileOrDirectory) -> bool {
     match actual {
         FileOrDirectory::File(file) => {
-            if let Some(serde_yaml::Value::String(class)) = expected.get("class")
+            if let Some(serde_json::Value::String(class)) = expected.get("class")
                 && class != "File"
             {
                 eprintln!("Could not validate class for {file:?}");
                 return false;
             }
 
-            if let Some(serde_yaml::Value::String(expected_checksum)) = expected.get("checksum") {
+            if let Some(serde_json::Value::String(expected_checksum)) = expected.get("checksum") {
                 if let Some(actual_checksum) = &file.checksum {
                     if expected_checksum != actual_checksum {
                         eprintln!("Could not validate checksum for {file:?}");
@@ -384,7 +382,7 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
                 }
             }
 
-            if let Some(serde_yaml::Value::Number(expected_size)) = expected.get("size") {
+            if let Some(serde_json::Value::Number(expected_size)) = expected.get("size") {
                 if let Some(Integer::Long(actual_size)) = &file.size {
                     if expected_size.as_i64().unwrap() != *actual_size {
                         eprintln!("Could not validate size for {file:?}");
@@ -402,7 +400,7 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
                 }
             }
 
-            if let Some(serde_yaml::Value::String(expected_basename)) = expected.get("basename") {
+            if let Some(serde_json::Value::String(expected_basename)) = expected.get("basename") {
                 if let Some(actual_basename) = &file.basename {
                     if expected_basename != "Any" && expected_basename != actual_basename {
                         eprintln!(
@@ -417,7 +415,7 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
                 }
             }
 
-            if let Some(serde_yaml::Value::String(expected_format)) = expected.get("format") {
+            if let Some(serde_json::Value::String(expected_format)) = expected.get("format") {
                 if let Some(actual_format) = &file.format {
                     if expected_format != "Any" && expected_format != actual_format {
                         eprintln!("Could not validate format for {file:?}");
@@ -433,14 +431,14 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
             true
         }
         FileOrDirectory::Directory(directory) => {
-            if let Some(serde_yaml::Value::String(class)) = expected.get("class")
+            if let Some(serde_json::Value::String(class)) = expected.get("class")
                 && class != "Directory"
             {
                 eprintln!("Could not validate class for {directory:?}");
                 return false;
             }
 
-            if let Some(serde_yaml::Value::String(expected_basename)) = expected.get("basename") {
+            if let Some(serde_json::Value::String(expected_basename)) = expected.get("basename") {
                 if let Some(actual_basename) = &directory.basename {
                     if expected_basename != "Any" && expected_basename != actual_basename {
                         eprintln!("Could not validate basename for {directory:?}");
@@ -457,7 +455,7 @@ fn compare_file_or_directory(expected: &serde_yaml::Value, actual: &FileOrDirect
                 if let Some(actual_listing) = &directory.listing {
                     return compare_yaml_values(
                         exp_listing,
-                        &serde_yaml::to_value(actual_listing).unwrap(),
+                        &serde_json::to_value(actual_listing).unwrap(),
                     );
                 } else {
                     //require listing but not given

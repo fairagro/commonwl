@@ -58,7 +58,7 @@ pub(crate) fn replace_schema_definitions(
 
 fn add_schema_defs_to_command_inputs(
     inputs: &mut Vec<CommandInputParameter>,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     for input in inputs {
         match &mut input.r#type {
@@ -78,7 +78,7 @@ fn add_schema_defs_to_command_inputs(
 
 fn add_schema_defs_to_command_inputs_impl(
     r#type: &mut CommandInputType,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     match r#type {
         CommandInputType::CommandInputSchema(schema) => match &mut **schema {
@@ -112,18 +112,18 @@ fn add_schema_defs_to_command_inputs_impl(
         },
         CommandInputType::String(s) => {
             if let Some(def) = defs.get(&format!("#{s}")) {
-                let new_type: CommandInputType = serde_yaml::from_value(def.clone())?;
+                let new_type: CommandInputType = serde_json::from_value(def.clone())?;
                 *r#type = new_type;
             } else if s.starts_with('#')
                 && let Some(def) = defs.get(s)
             {
-                let new_type: CommandInputType = serde_yaml::from_value(def.clone())?;
+                let new_type: CommandInputType = serde_json::from_value(def.clone())?;
                 *r#type = new_type;
             } else if s.contains('#')
                 && let Some(ar) = s.split_once('#')
                 && let Some(def) = defs.get(&format!("#{}", ar.1))
             {
-                let new_type: CommandInputType = serde_yaml::from_value(def.clone())?;
+                let new_type: CommandInputType = serde_json::from_value(def.clone())?;
                 *r#type = new_type;
             }
         }
@@ -134,7 +134,7 @@ fn add_schema_defs_to_command_inputs_impl(
 
 fn add_schema_defs_to_inputs(
     inputs: &mut Vec<WorkflowInputParameter>,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     for input in inputs {
         match &mut input.r#type {
@@ -151,7 +151,7 @@ fn add_schema_defs_to_inputs(
 
 fn add_schema_defs_to_inputs_impl(
     r#type: &mut InputType,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     match r#type {
         InputType::InputSchema(schema) => match &mut **schema {
@@ -185,18 +185,18 @@ fn add_schema_defs_to_inputs_impl(
         },
         InputType::String(s) => {
             if let Some(def) = defs.get(&format!("#{s}")) {
-                let new_type: InputType = serde_yaml::from_value(def.clone())?;
+                let new_type: InputType = serde_json::from_value(def.clone())?;
                 *r#type = new_type;
             } else if s.starts_with('#')
                 && let Some(def) = defs.get(s)
             {
-                let new_type: InputType = serde_yaml::from_value(def.clone())?;
+                let new_type: InputType = serde_json::from_value(def.clone())?;
                 *r#type = new_type;
             } else if s.contains('#')
                 && let Some(ar) = s.split_once('#')
                 && let Some(def) = defs.get(&format!("#{}", ar.1))
             {
-                let new_type: InputType = serde_yaml::from_value(def.clone())?;
+                let new_type: InputType = serde_json::from_value(def.clone())?;
                 *r#type = new_type;
             }
         }
@@ -208,7 +208,7 @@ fn add_schema_defs_to_inputs_impl(
 
 fn add_schema_defs_to_command_outputs(
     inputs: &mut Vec<CommandOutputParameter>,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     for input in inputs {
         if let CommandOutputParameterType::CommandOutputType(OneOrMany::One(
@@ -216,7 +216,7 @@ fn add_schema_defs_to_command_outputs(
         )) = &mut input.r#type
             && let Some(def) = defs.get(&format!("#{s}"))
         {
-            let new_type: CommandOutputParameterType = serde_yaml::from_value(def.clone())?;
+            let new_type: CommandOutputParameterType = serde_json::from_value(def.clone())?;
             input.r#type = new_type;
         }
     }
@@ -225,13 +225,13 @@ fn add_schema_defs_to_command_outputs(
 
 fn add_schema_defs_to_expression_outputs(
     inputs: &mut Vec<ExpressionToolOutputParameter>,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     for input in inputs {
         if let OneOrMany::One(OutputType::String(s)) = &mut input.r#type
             && let Some(def) = defs.get(&format!("#{s}"))
         {
-            let new_type: OneOrMany<OutputType> = serde_yaml::from_value(def.clone())?;
+            let new_type: OneOrMany<OutputType> = serde_json::from_value(def.clone())?;
             input.r#type = new_type;
         }
     }
@@ -240,7 +240,7 @@ fn add_schema_defs_to_expression_outputs(
 
 fn add_schema_defs_to_outputs(
     inputs: &mut Vec<WorkflowOutputParameter>,
-    defs: &HashMap<String, serde_yaml::Value>,
+    defs: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     for input in inputs {
         if let CommandOutputParameterType::CommandOutputType(OneOrMany::One(
@@ -248,7 +248,7 @@ fn add_schema_defs_to_outputs(
         )) = &mut input.r#type
             && let Some(def) = defs.get(&format!("#{s}"))
         {
-            let new_type: CommandOutputParameterType = serde_yaml::from_value(def.clone())?;
+            let new_type: CommandOutputParameterType = serde_json::from_value(def.clone())?;
             input.r#type = new_type;
         }
     }
@@ -256,8 +256,8 @@ fn add_schema_defs_to_outputs(
 }
 
 pub(crate) fn get_schema_definitions(
-    value: &serde_yaml::Value,
-) -> anyhow::Result<HashMap<String, serde_yaml::Value>> {
+    value: &serde_json::Value,
+) -> anyhow::Result<HashMap<String, serde_json::Value>> {
     let mut defs = extract_schema_definitions(value);
 
     if !defs.is_empty() {
@@ -270,27 +270,26 @@ pub(crate) fn get_schema_definitions(
     Ok(defs)
 }
 
-fn extract_schema_definitions(value: &serde_yaml::Value) -> HashMap<String, serde_yaml::Value> {
+fn extract_schema_definitions(value: &serde_json::Value) -> HashMap<String, serde_json::Value> {
     let mut schemas = HashMap::new();
 
     // Flatten: types can be a Sequence of Mappings, or a Sequence containing
     // a nested Sequence (when $import resolves a multi-type file)
-    let type_defs: Vec<&serde_yaml::Value> = match value {
-        serde_yaml::Value::Sequence(types) => types
+    let type_defs: Vec<&serde_json::Value> = match value {
+        serde_json::Value::Array(types) => types
             .iter()
             .flat_map(|item| match item {
-                serde_yaml::Value::Sequence(inner) => inner.iter().collect::<Vec<_>>(),
+                serde_json::Value::Array(inner) => inner.iter().collect::<Vec<_>>(),
                 other => vec![other],
             })
             .collect(),
-        mapping @ serde_yaml::Value::Mapping(_) => vec![mapping],
+        mapping @ serde_json::Value::Object(_) => vec![mapping],
         _ => vec![],
     };
 
     for type_def in type_defs {
-        if let serde_yaml::Value::Mapping(type_map) = type_def
-            && let Some(serde_yaml::Value::String(name)) =
-                type_map.get(serde_yaml::Value::String("name".to_string()))
+        if let serde_json::Value::Object(type_map) = type_def
+            && let Some(serde_json::Value::String(name)) = type_map.get("name")
         {
             let mut type_def = type_def.clone();
             //validate names
@@ -304,11 +303,11 @@ fn extract_schema_definitions(value: &serde_yaml::Value) -> HashMap<String, serd
 }
 
 fn replace_schema_references(
-    value: &mut serde_yaml::Value,
-    schemas: &HashMap<String, serde_yaml::Value>,
+    value: &mut serde_json::Value,
+    schemas: &HashMap<String, serde_json::Value>,
 ) -> anyhow::Result<()> {
     match value {
-        serde_yaml::Value::String(s) => {
+        serde_json::Value::String(s) => {
             if s.starts_with('#') && schemas.contains_key(s) {
                 *value = schemas[s].clone();
             } else if s.contains('#')
@@ -323,14 +322,14 @@ fn replace_schema_references(
                 *value = schemas[&format!("#{s}")].clone();
             }
         }
-        serde_yaml::Value::Sequence(arr) => {
+        serde_json::Value::Array(arr) => {
             for item in arr {
                 replace_schema_references(item, schemas)?;
             }
         }
-        serde_yaml::Value::Mapping(map) => {
+        serde_json::Value::Object(map) => {
             for (k, v) in map {
-                if *k == serde_yaml::Value::String("name".to_string()) {
+                if *k == serde_json::Value::String("name".to_string()) {
                     continue;
                 }
                 replace_schema_references(v, schemas)?;
@@ -341,16 +340,16 @@ fn replace_schema_references(
     Ok(())
 }
 
-fn validate_field_name(schema: &mut serde_yaml::Value) {
-    if let serde_yaml::Value::Mapping(record) = schema {
+fn validate_field_name(schema: &mut serde_json::Value) {
+    if let serde_json::Value::Object(record) = schema {
         //sanitize name
-        if let Some(serde_yaml::Value::String(name)) = record.get_mut("name")
+        if let Some(serde_json::Value::String(name)) = record.get_mut("name")
             && short_name(name) != name
         {
             *name = short_name(name).into();
         }
 
-        if let Some(serde_yaml::Value::Sequence(fields)) = record.get_mut("fields") {
+        if let Some(serde_json::Value::Array(fields)) = record.get_mut("fields") {
             for field in fields {
                 validate_field_name(field);
             }

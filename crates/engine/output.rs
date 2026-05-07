@@ -173,11 +173,11 @@ async fn evaluate_command_binding(
         let eval_context = context.eval_context.clone().with_context(&value);
         results = match do_eval(output_eval, &eval_context) {
             Ok(value) => match value {
-                serde_yaml::Value::Sequence(vals) => vals
+                serde_json::Value::Array(vals) => vals
                     .into_iter()
-                    .filter_map(|item| serde_yaml::from_value(item).ok())
+                    .filter_map(|item| serde_json::from_value(item).ok())
                     .collect(),
-                single_value => vec![serde_yaml::from_value(single_value)?],
+                single_value => vec![serde_json::from_value(single_value)?],
             },
             Err(e) => anyhow::bail!(
                 "Failed to evaluate outputEval expression for output {output_id}: {e}"
@@ -523,7 +523,7 @@ fn collect_item<'a>(
                     );
                 }
             }
-            DefaultValue::Any(serde_yaml::to_value(fields)?)
+            DefaultValue::Any(serde_json::to_value(fields)?)
         }
         _ => {
             if let Some(binding) = output_binding {
@@ -542,13 +542,13 @@ fn collect_item<'a>(
                 if single && !values.is_empty() || is_any && values.len() == 1 {
                     values[0].clone()
                 } else if is_optional && values.is_empty() {
-                    DefaultValue::Any(serde_yaml::Value::Null)
+                    DefaultValue::Any(serde_json::Value::Null)
                 } else {
-                    let value = serde_yaml::to_value(values)?;
+                    let value = serde_json::to_value(values)?;
                     DefaultValue::Any(value)
                 }
             } else {
-                DefaultValue::Any(serde_yaml::Value::Null)
+                DefaultValue::Any(serde_json::Value::Null)
             }
         }
     };
@@ -567,18 +567,18 @@ fn validate_output_item_recurse<'a>(
             DefaultValue::FileOrDirectory(fod) => {
                 validate_output_item(fod, format, context, context.dest_dir, true, storage).await?;
             }
-            DefaultValue::Any(serde_yaml::Value::Mapping(map)) => {
+            DefaultValue::Any(serde_json::Value::Object(map)) => {
                 for item in map.values_mut() {
-                    let mut dv = serde_yaml::from_value(item.clone())?;
+                    let mut dv = serde_json::from_value(item.clone())?;
                     validate_output_item_recurse(&mut dv, format, context, storage.clone()).await?;
-                    *item = serde_yaml::to_value(dv)?;
+                    *item = serde_json::to_value(dv)?;
                 }
             }
-            DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+            DefaultValue::Any(serde_json::Value::Array(arr)) => {
                 for item in arr {
-                    let mut dv = serde_yaml::from_value(item.clone())?;
+                    let mut dv = serde_json::from_value(item.clone())?;
                     validate_output_item_recurse(&mut dv, format, context, storage.clone()).await?;
-                    *item = serde_yaml::to_value(dv)?;
+                    *item = serde_json::to_value(dv)?;
                 }
             }
             DefaultValue::Any(_) => {}
@@ -596,7 +596,7 @@ fn get_globs(glob: &OneOrMany<String>, context: &EvaluationContext) -> Vec<Strin
             if let Ok(value) = do_eval(glob, context) {
                 match value {
                     //we can get a list here also
-                    serde_yaml::Value::Sequence(vec) => {
+                    serde_json::Value::Array(vec) => {
                         for item in vec {
                             globs.push(item.as_str().unwrap().into());
                         }
@@ -672,7 +672,7 @@ async fn handle_dir(
 
 pub(crate) async fn collect_expression_outputs(
     outputs: &[ExpressionToolOutputParameter],
-    value: &serde_yaml::Value,
+    value: &serde_json::Value,
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
@@ -680,7 +680,7 @@ pub(crate) async fn collect_expression_outputs(
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
         if let Some(result) = value.get(&output_id) {
-            let mut value: DefaultValue = serde_yaml::from_value(result.clone())?;
+            let mut value: DefaultValue = serde_json::from_value(result.clone())?;
 
             //validate output to schema
             let valid = validate_output_type(&output.r#type, &value);
@@ -718,9 +718,9 @@ pub(crate) async fn collect_workflow_outputs(
                         let mut value = if let Some(pick_value) = output.pick_value {
                             // scatter+when produces an array under a single source — filter its elements
                             let items = match value.clone() {
-                                DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => arr
+                                DefaultValue::Any(serde_json::Value::Array(arr)) => arr
                                     .into_iter()
-                                    .map(|v| serde_yaml::from_value(v).map_err(Into::into))
+                                    .map(|v| serde_json::from_value(v).map_err(Into::into))
                                     .collect::<anyhow::Result<Vec<DefaultValue>>>()?,
                                 other => vec![other],
                             };
@@ -761,7 +761,7 @@ pub(crate) async fn collect_workflow_outputs(
                             values
                                 .get(item)
                                 .cloned()
-                                .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null))
+                                .unwrap_or(DefaultValue::Any(serde_json::Value::Null))
                         })
                         .collect::<Vec<_>>();
                     let merged = handle_link_merge(
@@ -771,7 +771,7 @@ pub(crate) async fn collect_workflow_outputs(
                     let mut value = if let Some(pick_value) = output.pick_value {
                         handle_pick_value(&output_id, pick_value, merged)?
                     } else if mir.is_some() {
-                        DefaultValue::Any(serde_yaml::to_value(merged)?)
+                        DefaultValue::Any(serde_json::to_value(merged)?)
                     } else {
                         anyhow::bail!(
                             "Needs to use either pick_value or MultipleInputFeatureRequirement with multiple output_sources"

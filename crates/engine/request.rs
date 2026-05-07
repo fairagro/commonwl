@@ -112,7 +112,7 @@ impl InputObject {
 
 /// Load an execution context from a CWL specification file and an inputs file.
 /// # Errors
-/// Returns error on failed `serde_yaml` parsing when evaluating `SchemaDefRequirement` and on `load_input_file_from_file`
+/// Returns error on failed `serde_json` parsing when evaluating `SchemaDefRequirement` and on `load_input_file_from_file`
 pub fn create_execution_request(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs_path: impl AsRef<Path> + std::fmt::Debug,
@@ -127,7 +127,7 @@ pub fn create_execution_request(
 
 /// Load an execution context from a CWL specification file and an already built inputs object (if inputs come as arguments, for example).
 /// # Errors
-/// Returns error on failed `serde_yaml` parsing when evaluating `SchemaDefRequirement`
+/// Returns error on failed `serde_json` parsing when evaluating `SchemaDefRequirement`
 pub fn create_execution_request_with_inputs(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs: InputObject,
@@ -144,7 +144,7 @@ pub fn create_execution_request_with_inputs(
 
 /// Load an execution context from a CWL Document and an inputs object (if coming from workflow step for example).
 /// # Errors
-/// Returns error on failed `serde_yaml` parsing when evaluating `SchemaDefRequirement`
+/// Returns error on failed `serde_json` parsing when evaluating `SchemaDefRequirement`
 pub fn create_execution_request_from_document(
     mut specification: CWLDocument,
     inputs: InputObject,
@@ -184,14 +184,14 @@ pub fn create_execution_request_from_document(
 
 /// Loads an `InputObject` from file via `path`
 /// # Errors
-/// Returns error on failed `serde_yaml` parsing
+/// Returns error on failed `serde_json` parsing
 pub fn load_input_file_from_file(
     path: impl AsRef<Path> + std::fmt::Debug,
     base_path: impl AsRef<Path>,
 ) -> anyhow::Result<InputObject> {
     let content = std::fs::read_to_string(path.as_ref())
         .with_context(|| format!("Could not read input file {path:?}"))?;
-    let mut values: HashMap<String, serde_yaml::Value> = serde_yaml::from_str(&content)?;
+    let mut values: HashMap<String, serde_json::Value> = serde_saphyr::from_str(&content)?;
 
     //calculate path relativity
     let diff_path = pathdiff::diff_paths(
@@ -208,19 +208,19 @@ pub fn load_input_file_from_file(
 
     //trying to get inputs:
     if let Some(req_raw) = values.remove("cwl:requirements") {
-        let reqs: Vec<ProcessRequirements> = serde_yaml::from_value(req_raw)?;
+        let reqs: Vec<ProcessRequirements> = serde_json::from_value(req_raw)?;
         input_object.requirements = reqs;
     }
     if let Some(hints_raw) = values.remove("cwl:hints") {
-        let hints: Vec<ProcessHints> = serde_yaml::from_value(hints_raw)?;
+        let hints: Vec<ProcessHints> = serde_json::from_value(hints_raw)?;
         input_object.hints = hints;
     }
 
     //move inputs off scope here
     let values = values
         .into_iter()
-        .map(|(k, v)| Ok((k, serde_yaml::from_value::<DefaultValue>(v)?)))
-        .collect::<Result<HashMap<_, _>, serde_yaml::Error>>()?;
+        .map(|(k, v)| Ok((k, serde_json::from_value::<DefaultValue>(v)?)))
+        .collect::<Result<HashMap<_, _>, serde_json::Error>>()?;
 
     input_object.inputs = values;
 
@@ -228,9 +228,9 @@ pub fn load_input_file_from_file(
 }
 
 fn adjust_path_to_base(
-    value: &mut serde_yaml::Value,
+    value: &mut serde_json::Value,
     diff_path: &Path,
-    visited: &mut HashSet<*const serde_yaml::Value>,
+    visited: &mut HashSet<*const serde_json::Value>,
 ) {
     let ptr = ptr::from_ref(value);
     if !visited.insert(ptr) {
@@ -238,12 +238,12 @@ fn adjust_path_to_base(
     }
 
     match value {
-        serde_yaml::Value::Sequence(values) => {
+        serde_json::Value::Array(values) => {
             for v in values {
                 adjust_path_to_base(v, diff_path, visited);
             }
         }
-        serde_yaml::Value::Mapping(mapping) => {
+        serde_json::Value::Object(mapping) => {
             for (_, v) in mapping.iter_mut() {
                 adjust_path_to_base(v, diff_path, visited);
             }

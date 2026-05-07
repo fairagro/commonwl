@@ -14,7 +14,8 @@ use commonwl_salad::deserialize::{
 };
 use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
-use serde_yaml::Value;
+use serde_json::Value;
+use crate::Result;
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
@@ -29,7 +30,7 @@ impl<'de> Deserialize<'de> for CommandInputParameterType {
     where
         D: serde::Deserializer<'de>,
     {
-        let value = serde_yaml::Value::deserialize(deserializer)?;
+        let value = serde_json::Value::deserialize(deserializer)?;
 
         if value == Value::String("stdin".to_string()) {
             return Ok(Self::Stdin);
@@ -99,7 +100,7 @@ impl CommandInputParameterType {
 #[serde(untagged)]
 pub enum DefaultValue {
     FileOrDirectory(FileOrDirectory),
-    Any(serde_yaml::Value),
+    Any(serde_json::Value),
 }
 
 impl From<files::File> for DefaultValue {
@@ -116,7 +117,7 @@ impl From<files::Directory> for DefaultValue {
 
 impl From<&str> for DefaultValue {
     fn from(value: &str) -> Self {
-        DefaultValue::Any(serde_yaml::Value::String(value.to_string()))
+        DefaultValue::Any(serde_json::Value::String(value.to_string()))
     }
 }
 
@@ -130,7 +131,7 @@ impl DefaultValue {
     }
 
     #[must_use]
-    pub fn try_get_value_ref(&self) -> Option<&Value> {
+    pub fn try_get_value_ref(&self) -> Option<&serde_json::Value> {
         match self {
             Self::FileOrDirectory(_) => None,
             Self::Any(value) => Some(value),
@@ -140,7 +141,7 @@ impl DefaultValue {
     #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Self::Any(serde_yaml::Value::String(s)) => Some(s),
+            Self::Any(serde_json::Value::String(s)) => Some(s),
             _ => None,
         }
     }
@@ -196,7 +197,9 @@ pub struct CommandInputParameter {
 
 make_shorthand_impl!(CommandInputParameter, "id", "type");
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -245,7 +248,9 @@ impl Default for OneOrMany<InputType> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -736,7 +741,7 @@ mod tests {
         }
 
         let contents = include_str!("../../testdata/command_inputs.yaml");
-        let res = serde_yaml::from_str::<InputHolder>(contents);
+        let res = serde_saphyr::from_str::<InputHolder>(contents);
         dbg!(&res);
         assert!(res.is_ok());
         assert_eq!(res.unwrap().inputs.len(), 14);
@@ -752,7 +757,7 @@ mod tests {
         }
 
         let contents = include_str!("../../testdata/command_input_typedsl.yaml");
-        let res = serde_yaml::from_str::<InputHolder>(contents);
+        let res = serde_saphyr::from_str::<InputHolder>(contents);
         dbg!(&res);
         assert!(res.is_ok());
         assert_eq!(res.unwrap().inputs.len(), 3);
@@ -772,7 +777,7 @@ mod tests {
         }
 
         let contents = include_str!("../../testdata/command_schemas.yaml");
-        let res = serde_yaml::from_str::<Bag>(contents);
+        let res = serde_saphyr::from_str::<Bag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
     }

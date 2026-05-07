@@ -78,7 +78,7 @@ fn collect_workflow_step_inputs(
                     data[0].clone()
                 } else {
                     //sequence
-                    DefaultValue::Any(serde_yaml::to_value(data)?)
+                    DefaultValue::Any(serde_json::to_value(data)?)
                 }
             } else {
                 //no multiple feature input requirement branch
@@ -87,21 +87,21 @@ fn collect_workflow_step_inputs(
                     match workflow_step_input.link_merge {
                         None | Some(LinkMergeMethod::MergeFlattened) => value.clone(),
                         Some(LinkMergeMethod::MergeNested) => {
-                            let yaml_value = serde_yaml::to_value(value)?;
-                            DefaultValue::Any(serde_yaml::Value::Sequence(vec![yaml_value]))
+                            let yaml_value = serde_json::to_value(value)?;
+                            DefaultValue::Any(serde_json::Value::Array(vec![yaml_value]))
                         }
                     }
                 } else {
-                    DefaultValue::Any(serde_yaml::Value::Null)
+                    DefaultValue::Any(serde_json::Value::Null)
                 }
             }
         } else {
-            DefaultValue::Any(serde_yaml::Value::Null)
+            DefaultValue::Any(serde_json::Value::Null)
         };
 
         //handle input defaults
         if let Some(default) = &workflow_step_input.default
-            && value == DefaultValue::Any(serde_yaml::Value::Null)
+            && value == DefaultValue::Any(serde_json::Value::Null)
         {
             //use step default
             value = default.clone();
@@ -133,7 +133,7 @@ pub(crate) fn eval_inputs(
             .inputs
             .get(step_input_id)
             .cloned()
-            .unwrap_or(DefaultValue::Any(serde_yaml::Value::Null));
+            .unwrap_or(DefaultValue::Any(serde_json::Value::Null));
         //handle value_from
         if let Some(value_from) = &workflow_step_input.value_from {
             let current_value = serde_json::to_value(value)?;
@@ -141,7 +141,7 @@ pub(crate) fn eval_inputs(
                 .clone()
                 .with_context(&current_value)
                 .with_inputs(inputs);
-            value = serde_yaml::from_value(do_eval(value_from, &eval_context)?)?;
+            value = serde_json::from_value(do_eval(value_from, &eval_context)?)?;
         }
         transformed.insert(step_input_id.clone(), value);
     }
@@ -161,10 +161,10 @@ pub(crate) fn handle_link_merge(
             let mut flattened = vec![];
             for value in values {
                 match value {
-                    DefaultValue::Any(serde_yaml::Value::Null) => {}
-                    DefaultValue::Any(serde_yaml::Value::Sequence(arr)) => {
+                    DefaultValue::Any(serde_json::Value::Null) => {}
+                    DefaultValue::Any(serde_json::Value::Array(arr)) => {
                         for item in arr {
-                            flattened.push(serde_yaml::from_value(item)?);
+                            flattened.push(serde_json::from_value(item)?);
                         }
                     }
                     other => flattened.push(other),
@@ -183,7 +183,7 @@ pub(crate) fn handle_pick_value(
     match pick_value {
         PickValueMethod::AllNonNull => {
             let filtered = values.into_iter().filter(|v| !v.is_null()).collect::<Vec<_>>();
-            Ok(DefaultValue::Any(serde_yaml::to_value(filtered)?))
+            Ok(DefaultValue::Any(serde_json::to_value(filtered)?))
         }
         PickValueMethod::FirstNonNull => {
             values

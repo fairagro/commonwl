@@ -77,7 +77,7 @@ pub fn build_command(
                     bindings.push(BoundBinding {
                         sort_key,
                         binding,
-                        value: DefaultValue::Any(serde_yaml::Value::Null),
+                        value: DefaultValue::Any(serde_json::Value::Null),
                     });
                 }
                 Argument::Binding(binding) => {
@@ -94,7 +94,7 @@ pub fn build_command(
                     bindings.push(BoundBinding {
                         sort_key,
                         binding: binding.clone(),
-                        value: DefaultValue::Any(serde_yaml::Value::Null),
+                        value: DefaultValue::Any(serde_json::Value::Null),
                     });
                 }
             }
@@ -109,9 +109,9 @@ pub fn build_command(
         //check for value given
         let value = inputs
             .get(input_id)
-            .unwrap_or(&DefaultValue::Any(serde_yaml::Value::Null));
+            .unwrap_or(&DefaultValue::Any(serde_json::Value::Null));
 
-        if matches!(value, DefaultValue::Any(serde_yaml::Value::Null))
+        if matches!(value, DefaultValue::Any(serde_json::Value::Null))
             && !input.r#type.is_null_allowed()
         {
             //We have null value and type is not nullable!
@@ -119,7 +119,7 @@ pub fn build_command(
         }
 
         //do not flags if false
-        if matches!(value, DefaultValue::Any(serde_yaml::Value::Bool(false))) {
+        if matches!(value, DefaultValue::Any(serde_json::Value::Bool(false))) {
             continue;
         }
 
@@ -220,7 +220,7 @@ fn collect_input_bindings(
                         get_binding_position(&rec_binding, eval_context).unwrap_or_default(),
                     ));
 
-                    let value = DefaultValue::Any(serde_yaml::Value::Null);
+                    let value = DefaultValue::Any(serde_json::Value::Null);
 
                     bindings.push(BoundBinding {
                         sort_key,
@@ -230,7 +230,7 @@ fn collect_input_bindings(
                 }
 
                 if let Some(fields) = &record.fields {
-                    let DefaultValue::Any(serde_yaml::Value::Mapping(map)) = value else {
+                    let DefaultValue::Any(serde_json::Value::Object(map)) = value else {
                         panic!("previous validation of `{name}` did not work")
                     };
                     for field in fields {
@@ -255,8 +255,8 @@ fn collect_input_bindings(
                                     items.iter().any(CommandInputType::is_null_allowed)
                                 }
                             };
-                            if let Some(value) = map.get(field.name.clone()) {
-                                let value = serde_yaml::from_value(value.clone())?;
+                            if let Some(value) = map.get(&field.name) {
+                                let value = serde_json::from_value(value.clone())?;
                                 let schema = field.r#type.clone();
 
                                 collect_input_bindings(
@@ -280,7 +280,7 @@ fn collect_input_bindings(
             }
             CommandInputSchema::Array(array) => {
                 //at this point we can assume, that input has the correct format
-                let DefaultValue::Any(serde_yaml::Value::Sequence(vec)) = value else {
+                let DefaultValue::Any(serde_json::Value::Array(vec)) = value else {
                     panic!("previous validation of `{name}` did not work")
                 };
 
@@ -294,7 +294,7 @@ fn collect_input_bindings(
                 if should_recurse {
                     for (ix, item) in vec.iter().enumerate() {
                         //reassign to DefaultValue
-                        let item = serde_yaml::from_value(item.clone())?;
+                        let item = serde_json::from_value(item.clone())?;
                         let mut sort_key = base_sort_key.to_owned();
                         //add root key
                         if let Some(binding) = &binding {
@@ -393,16 +393,16 @@ pub(crate) fn generate_arg(
                 ..Default::default()
             },
         )?;
-        value = serde_yaml::from_value(result)?;
+        value = serde_json::from_value(result)?;
     }
 
     let mut argl = vec![];
 
     match value {
         DefaultValue::Any(value) => match value {
-            serde_yaml::Value::Sequence(arr) => {
+            serde_json::Value::Array(arr) => {
                 if let Some(separator) = &binding.item_separator {
-                    argl = vec![DefaultValue::Any(serde_yaml::Value::String(
+                    argl = vec![DefaultValue::Any(serde_json::Value::String(
                         arr.iter()
                             .map(|i| value_as_string(i).unwrap_or_default())
                             .collect::<Vec<_>>()
@@ -423,7 +423,7 @@ pub(crate) fn generate_arg(
                     return Ok(vec![]);
                 }
             }
-            serde_yaml::Value::Mapping(_) => {
+            serde_json::Value::Object(_) => {
                 if let Some(prefix) = &binding.prefix {
                     return Ok(vec![prefix.clone()]);
                 }
@@ -440,7 +440,7 @@ pub(crate) fn generate_arg(
     Ok(argl
         .into_iter()
         .flat_map(|j| {
-            if let DefaultValue::Any(serde_yaml::Value::Null) = j {
+            if let DefaultValue::Any(serde_json::Value::Null) = j {
                 vec![]
             } else {
                 let s = to_str(&j);
@@ -467,7 +467,7 @@ fn use_value_from(
     ijsr: Option<&InlineJavascriptRequirement>,
 ) -> anyhow::Result<Vec<String>> {
     //evaluate first
-    let mut value = DefaultValue::Any(serde_yaml::Value::String(
+    let mut value = DefaultValue::Any(serde_json::Value::String(
         binding.value_from.clone().unwrap_or_default(),
     ));
 
@@ -482,9 +482,9 @@ fn use_value_from(
             ..Default::default()
         },
     ) {
-        let dv: DefaultValue = serde_yaml::from_value(result)?;
+        let dv: DefaultValue = serde_json::from_value(result)?;
         //do not add boolenas if false
-        if matches!(dv, DefaultValue::Any(serde_yaml::Value::Bool(false))) {
+        if matches!(dv, DefaultValue::Any(serde_json::Value::Bool(false))) {
             return Ok(vec![]);
         }
         value = dv;
@@ -493,7 +493,7 @@ fn use_value_from(
     }
 
     let values = match value {
-        DefaultValue::Any(serde_yaml::Value::Sequence(vec)) => vec
+        DefaultValue::Any(serde_json::Value::Array(vec)) => vec
             .iter()
             .map(|i| to_str(&DefaultValue::Any(i.clone())))
             .collect::<Vec<_>>(),
@@ -526,15 +526,15 @@ pub(crate) fn to_str(val: &DefaultValue) -> String {
             }
         },
         DefaultValue::Any(value) => match value {
-            serde_yaml::Value::String(s) => s.clone(),
-            serde_yaml::Value::Number(n) => n.to_string(),
+            serde_json::Value::String(s) => s.clone(),
+            serde_json::Value::Number(n) => n.to_string(),
             _ => String::new(),
         },
     }
 }
 
 fn is_argument(bound: &BoundBinding) -> bool {
-    matches!(bound.value, DefaultValue::Any(serde_yaml::Value::Null))
+    matches!(bound.value, DefaultValue::Any(serde_json::Value::Null))
 }
 
 #[allow(clippy::cast_possible_truncation)]
@@ -618,9 +618,9 @@ stdout: output.txt";
         "path": "hello.txt"
     }
 }"#;
-        let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
+        let doc: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
 
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -662,9 +662,9 @@ stdout: output.txt"#;
         let inputs = r"indir:
   class: Directory
   location: testdir";
-        let doc: CWLDocument = serde_yaml::from_str(yaml).unwrap();
+        let doc: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
 
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -685,9 +685,9 @@ stdout: output.txt"#;
         assert_eq!(
             normalize(&cmd),
             vec![
-                &shell_cmd[0],
-                &shell_cmd[1],
-                "'cd' './indir-<ID>/testdir' && 'find' '.' | 'sort'"
+                shell_cmd[0].clone(),
+                shell_cmd[1].clone(),
+                "'cd' './indir-<ID>/testdir' && 'find' '.' | 'sort'".to_string()
             ]
         );
     }
@@ -699,7 +699,7 @@ stdout: output.txt"#;
         let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -746,7 +746,7 @@ stdout: output.txt"#;
         let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/bwa-mem-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -786,7 +786,7 @@ stdout: output.txt"#;
         let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/record-order-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -817,7 +817,7 @@ stdout: output.txt"#;
         let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/empty-array-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -845,7 +845,7 @@ stdout: output.txt"#;
         let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/cat-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -873,7 +873,7 @@ stdout: output.txt"#;
         let doc = load_cwl_file(tool_path, true).unwrap();
 
         let inputs = include_str!("../../testdata/cwl/tests/bool-empty-inputbinding-job.json");
-        let input_values = serde_yaml::from_str(inputs).unwrap();
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
         let inputs = collect_inputs(
             &doc,
             &input_values,
@@ -897,7 +897,7 @@ stdout: output.txt"#;
     #[test]
     fn test_generate_arg_without_prefix() {
         let b = CommandLineBinding::builder().build(); //all none
-        let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
+        let v = DefaultValue::Any(serde_json::Value::String("foo".into()));
 
         let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["foo"]);
@@ -909,7 +909,7 @@ stdout: output.txt"#;
             .prefix("--opt")
             .separate(true)
             .build();
-        let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
+        let v = DefaultValue::Any(serde_json::Value::String("foo".into()));
 
         let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--opt", "foo"]);
@@ -921,7 +921,7 @@ stdout: output.txt"#;
             .prefix("--opt=")
             .separate(false)
             .build();
-        let v = DefaultValue::Any(serde_yaml::Value::String("foo".into()));
+        let v = DefaultValue::Any(serde_json::Value::String("foo".into()));
 
         let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
         assert_eq!(res, vec!["--opt=foo"]);
@@ -933,10 +933,10 @@ stdout: output.txt"#;
             .prefix("--list")
             .item_separator(",")
             .build();
-        let v = DefaultValue::Any(serde_yaml::Value::Sequence(vec![
-            serde_yaml::Value::String("a".into()),
-            serde_yaml::Value::String("b".into()),
-            serde_yaml::Value::String("c".into()),
+        let v = DefaultValue::Any(serde_json::Value::Array(vec![
+            serde_json::Value::String("a".into()),
+            serde_json::Value::String("b".into()),
+            serde_json::Value::String("c".into()),
         ]));
 
         let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
@@ -946,10 +946,10 @@ stdout: output.txt"#;
     #[test]
     fn test_generate_arg_sequence_without_separator() {
         let b = CommandLineBinding::builder().prefix("--list").build();
-        let v = DefaultValue::Any(serde_yaml::Value::Sequence(vec![
-            serde_yaml::Value::String("a".into()),
-            serde_yaml::Value::String("b".into()),
-            serde_yaml::Value::String("c".into()),
+        let v = DefaultValue::Any(serde_json::Value::Array(vec![
+            serde_json::Value::String("a".into()),
+            serde_json::Value::String("b".into()),
+            serde_json::Value::String("c".into()),
         ]));
 
         let res = generate_arg(&b, v, &Runtime::default(), None, None).unwrap();
@@ -979,17 +979,17 @@ stdout: output.txt"#;
         if let CommandInputSchema::Array(array_schema) = schema {
             //array schema recurse!
             let b = i.input_binding.unwrap();
-            let v = DefaultValue::Any(serde_yaml::Value::Sequence(vec![
-                serde_yaml::Value::String("a".into()),
-                serde_yaml::Value::String("b".into()),
-                serde_yaml::Value::String("c".into()),
+            let v = DefaultValue::Any(serde_json::Value::Array(vec![
+                serde_json::Value::String("a".into()),
+                serde_json::Value::String("b".into()),
+                serde_json::Value::String("c".into()),
             ]));
             let mut res = generate_arg(&b, v.clone(), &Runtime::default(), None, None).unwrap(); //generates only -Y
             if let Some(inner_b) = &array_schema.input_binding {
-                if let Some(serde_yaml::Value::Sequence(vec)) = v.try_get_value_ref() {
+                if let Some(serde_json::Value::Array(vec)) = v.try_get_value_ref() {
                     for inner_v in vec {
                         //re-serde
-                        let v: DefaultValue = serde_yaml::from_value(inner_v.clone()).unwrap();
+                        let v: DefaultValue = serde_json::from_value(inner_v.clone()).unwrap();
                         res.extend(
                             generate_arg(inner_b, v, &Runtime::default(), None, None).unwrap(),
                         );

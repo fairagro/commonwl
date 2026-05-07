@@ -1,7 +1,6 @@
 use anyhow::Context;
 use base16ct::HexDisplay;
 use serde::{Deserialize, Serialize};
-use serde_yaml::Value;
 use sha1::Digest;
 use sha1::Sha1;
 use std::env;
@@ -13,6 +12,7 @@ use std::path::Path;
 use std::path::PathBuf;
 
 pub mod documents;
+mod error;
 pub mod files;
 pub mod format;
 pub mod inputs;
@@ -22,6 +22,7 @@ pub mod requirements;
 pub mod types;
 
 mod load;
+pub use crate::error::*;
 pub use commonwl_salad::Identifiable;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
@@ -240,12 +241,12 @@ pub trait ExtractFromEnum<E> {
 /// Returns `String`, `Number` or `Bool` as String
 /// # Errors
 /// otherwise
-pub fn value_as_string(value: &Value) -> anyhow::Result<String> {
+pub fn value_as_string(value: &serde_json::Value) -> Result<String> {
     match value {
-        Value::String(s) => Ok(s.clone()),
-        Value::Number(n) => Ok(n.to_string()),
-        Value::Bool(b) => Ok(b.to_string()),
-        _ => anyhow::bail!("Value is not a string, number, or bool"),
+        serde_json::Value::String(s) => Ok(s.clone()),
+        serde_json::Value::Number(n) => Ok(n.to_string()),
+        serde_json::Value::Bool(b) => Ok(b.to_string()),
+        _ => Err(Error::Guard("Value is not a string, number, or bool")),
     }
 }
 
@@ -291,7 +292,7 @@ pub struct FileMetaData {
 /// Tries to retrieve `FileMetaData` for given `Path`
 /// # Errors
 /// if file does no exist
-pub fn get_file_metadata(path: &Path) -> anyhow::Result<FileMetaData> {
+pub fn get_file_metadata(path: &Path) -> Result<FileMetaData> {
     let metadata = fs::metadata(path)
         .with_context(|| format!("Can not retrieve File metadata for {}", path.display()))?;
     let size = metadata.len();
