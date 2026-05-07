@@ -1,3 +1,4 @@
+use crate::Result;
 use crate::files::File;
 use crate::outputs::{LinkMergeMethod, PickValueMethod};
 use crate::types::{CWLType, SecondaryFileSchema};
@@ -15,7 +16,6 @@ use commonwl_salad::deserialize::{
 use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::Result;
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
@@ -95,7 +95,7 @@ impl CommandInputParameterType {
         )
     }
 }
-
+#[allow(clippy::large_enum_variant)]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum DefaultValue {

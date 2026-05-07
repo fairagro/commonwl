@@ -226,7 +226,7 @@ pub(crate) fn get_format_validator(
             mapping
                 .iter()
                 .filter_map(|(k, v)| {
-                    let key = k.to_string();
+                    let key = k.clone();
                     let value = v.as_str()?.to_string();
                     Some((key, value))
                 })

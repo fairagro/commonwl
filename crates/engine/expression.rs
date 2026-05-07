@@ -414,7 +414,7 @@ fn to_str(value: &serde_json::Value) -> String {
         serde_json::Value::Bool(b) => b.to_string(),
         serde_json::Value::Null => "null".to_string(),
         serde_json::Value::Object(m) => serde_json::to_string_pretty(m).unwrap_or(String::new()),
-        _ => String::new(),
+        serde_json::Value::Array(_) => String::new(),
     }
 }
 
