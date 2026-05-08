@@ -1,15 +1,16 @@
 use crate::diagnostics;
 use dashmap::DashMap;
+use ropey::Rope;
 use std::sync::Arc;
 use tower_lsp_server::{
     Client, LanguageServer,
     ls_types::{
-        InitializeParams, InitializeResult, ServerCapabilities, TextDocumentSyncCapability,
-        TextDocumentSyncKind, Uri,
+        DocumentFormattingParams, InitializeParams, InitializeResult, OneOf, Position, Range,
+        ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, TextEdit, Uri,
     },
 };
 
-type DocumentStore = Arc<DashMap<Uri, String>>;
+type DocumentStore = Arc<DashMap<Uri, Rope>>;
 
 #[derive(Debug)]
 pub struct Backend {
@@ -28,9 +29,27 @@ impl Backend {
     //reparse file(s) on every change
     async fn on_change(&self, uri: Uri, text: String) {
         let diags = diagnostics::parse_and_check(&text);
-        self.documents.insert(uri.clone(), text);
+        self.documents.insert(uri.clone(), Rope::from_str(&text));
 
         self.client.publish_diagnostics(uri, diags, None).await;
+    }
+
+    async fn format_text(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
+        let uri = params.text_document.uri;
+        let rope = self.documents.get(&uri)?;
+
+        let new_text = cwl_core::format::format_cwl(&rope.to_string()).unwrap_or(rope.to_string());
+
+        let last_line = rope.len_lines().saturating_sub(1);
+        let last_col = rope.line(last_line).len_chars().saturating_sub(1);
+
+        Some(vec![TextEdit {
+            range: Range {
+                start: Position::new(0, 0),
+                end: Position::new(last_line as u32, last_col as u32),
+            },
+            new_text,
+        }])
     }
 }
 
@@ -44,6 +63,7 @@ impl LanguageServer for Backend {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
                 )),
+                document_formatting_provider: Some(OneOf::Left(true)),
                 ..Default::default()
             },
             ..Default::default()
@@ -73,5 +93,12 @@ impl LanguageServer for Backend {
         self.client
             .publish_diagnostics(params.text_document.uri, vec![], None)
             .await;
+    }
+
+    async fn formatting(
+        &self,
+        params: tower_lsp_server::ls_types::DocumentFormattingParams,
+    ) -> tower_lsp_server::jsonrpc::Result<Option<Vec<tower_lsp_server::ls_types::TextEdit>>> {
+        Ok(self.format_text(params).await)
     }
 }
