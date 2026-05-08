@@ -1,6 +1,6 @@
 use crate::diagnostics;
+use crop::Rope;
 use dashmap::DashMap;
-use ropey::Rope;
 use std::sync::Arc;
 use tower_lsp_server::{
     Client, LanguageServer,
@@ -27,9 +27,9 @@ impl Backend {
     }
 
     //reparse file(s) on every change
-    async fn on_change(&self, uri: Uri, text: String) {
-        let diags = diagnostics::parse_and_check(&text);
-        self.documents.insert(uri.clone(), Rope::from_str(&text));
+    async fn on_change(&self, uri: Uri, text: &str) {
+        let diags = diagnostics::parse_and_check(text);
+        self.documents.insert(uri.clone(), Rope::from(text));
 
         self.client.publish_diagnostics(uri, diags, None).await;
     }
@@ -40,13 +40,13 @@ impl Backend {
 
         let new_text = cwl_core::format::format_cwl(&rope.to_string()).unwrap_or(rope.to_string());
 
-        let last_line = rope.len_lines().saturating_sub(1);
-        let last_col = rope.line(last_line).len_chars().saturating_sub(1);
-
         Some(vec![TextEdit {
             range: Range {
                 start: Position::new(0, 0),
-                end: Position::new(last_line as u32, last_col as u32),
+                end: Position::new(
+                    rope.line_len() as u32,
+                    rope.line(rope.line_len() - 1).byte_len() as u32,
+                ),
             },
             new_text,
         }])
@@ -75,14 +75,14 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: tower_lsp_server::ls_types::DidOpenTextDocumentParams) {
-        self.on_change(params.text_document.uri, params.text_document.text)
+        self.on_change(params.text_document.uri, &params.text_document.text)
             .await
     }
 
     async fn did_change(&self, params: tower_lsp_server::ls_types::DidChangeTextDocumentParams) {
         //we only core if - not what changed as full reparse is impl'd
         if let Some(change) = params.content_changes.into_iter().last() {
-            self.on_change(params.text_document.uri, change.text).await
+            self.on_change(params.text_document.uri, &change.text).await
         }
     }
 
