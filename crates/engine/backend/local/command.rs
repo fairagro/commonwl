@@ -55,9 +55,10 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
 
                 // stdin: open the file and pipe its contents in
                 if let Some(stdin_path) = execution.stdin() {
+                    debug!("reading stdin {stdin_path}");
                     let file = File::open(stdin_path)
                         .await
-                        .map_err(|e| TaskRunError::Other(e.into()))?;
+                        .context("Could not open stdin path")?;
                     command.stdin(file.into_std().await);
                 } else {
                     command.stdin(Stdio::null());
@@ -92,7 +93,6 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
                     .spawn()
                     .map_err(|e| TaskRunError::Other(e.into()))
                     .context("Task could not run")?;
-
                 let status = select! {
                     biased;
                     () = token.cancelled() =>{

@@ -599,7 +599,10 @@ pub async fn execute_commandline_tool(
         if let Some(stdin) = &mut stdin {
             //evaluate expression
             *stdin = if let Ok(value) = do_eval(stdin, eval_context) {
-                serde_saphyr::to_string(&value)?.trim().to_owned()
+                match value {
+                    serde_json::Value::String(s) => s,
+                    other => serde_saphyr::to_string(&other)?.trim().to_owned(),
+                }
             } else {
                 stdin.clone()
             };
@@ -698,7 +701,6 @@ pub async fn execute_commandline_tool(
                 format!("Could not create dir {}", request.out_dir.to_string_lossy())
             })?;
         }
-
         let outputs = collect_command_outputs(
             &tool.outputs,
             &result.stdout_file,

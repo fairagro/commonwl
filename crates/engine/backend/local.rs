@@ -136,7 +136,7 @@ impl TaskBackend for LocalBackend {
             } else {
                 None
             };
-
+ 
             let options = ContainerBuildOptions::builder()
                 .docker_image_id(image_id)
                 .network(request.network)
@@ -150,6 +150,7 @@ impl TaskBackend for LocalBackend {
                 .build();
             args = build_container_command(args, &inputs, options, request.specificationdir)?;
         }
+       
         //build crankshaft task object
         #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
@@ -217,7 +218,7 @@ impl TaskBackend for LocalBackend {
                 .read_only(false)
                 .build(),
         );
-
+ 
         //handle stderr output
         let stderr_out_file = if let Some(stderr) = request.stderr_file {
             let stderr = do_eval_to_string(stderr, request.eval_context);
