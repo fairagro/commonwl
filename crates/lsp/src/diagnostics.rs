@@ -4,28 +4,35 @@ pub fn parse_and_check(text: &str) -> Vec<Diagnostic> {
     let result = cwl_core::from_str(text);
 
     match result {
-        Ok(_) => vec![],
-        Err(e) => {
-            let message = e.to_string();
-            let (line, offset, len) = position_from_error(e);
-
-            vec![Diagnostic {
-                range: Range {
-                    start: Position {
-                        line,
-                        character: offset,
-                    },
-                    end: Position {
-                        line,
-                        character: offset + len,
-                    },
-                },
-                severity: Some(DiagnosticSeverity::ERROR),
-                source: Some(env!("CARGO_CRATE_NAME").to_owned()),
-                message,
-                ..Default::default()
-            }]
+        Ok(_) => {
+            eprintln!("[diag] parsed OK");
+            vec![]
         }
+        Err(e) => match e {
+            cwl_core::Error::ParsingFailed(e) => {
+                let message = e.to_string();
+                eprintln!("[diag] parsed error {message}");
+                let (line, offset, len) = position_from_error(cwl_core::Error::ParsingFailed(e));
+
+                vec![Diagnostic {
+                    range: Range {
+                        start: Position {
+                            line,
+                            character: offset,
+                        },
+                        end: Position {
+                            line,
+                            character: offset + len,
+                        },
+                    },
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    source: Some(env!("CARGO_CRATE_NAME").to_owned()),
+                    message,
+                    ..Default::default()
+                }]
+            }
+            _ => vec![],
+        },
     }
 }
 

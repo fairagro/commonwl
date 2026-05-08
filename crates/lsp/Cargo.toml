@@ -1,5 +1,5 @@
 [package]
-name = "lsp"
+name = "cwl-lsp"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

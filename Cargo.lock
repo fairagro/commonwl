@@ -1401,6 +1401,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cwl-lsp"
+version = "0.1.2"
+dependencies = [
+ "cwl_core",
+ "dashmap",
+ "serde-saphyr",
+ "tokio",
+ "tower-lsp-server",
+]
+
+[[package]]
 name = "cwl_core"
 version = "0.1.2"
 dependencies = [
@@ -2813,17 +2824,6 @@ dependencies = [
  "percent-encoding",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "lsp"
-version = "0.1.2"
-dependencies = [
- "cwl_core",
- "dashmap",
- "serde-saphyr",
- "tokio",
- "tower-lsp-server",
 ]
 
 [[package]]
