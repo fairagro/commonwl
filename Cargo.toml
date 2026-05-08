@@ -3,7 +3,7 @@ members = [
     "crates/commonwl",
     "crates/conformance",
     "crates/core",
-    "crates/engine",
+    "crates/engine", "crates/lsp",
     "crates/salad",
     "crates/salad_derive",
     "crates/storage",

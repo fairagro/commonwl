@@ -24,6 +24,7 @@ pub mod types;
 mod load;
 pub use crate::error::*;
 pub use commonwl_salad::Identifiable;
+pub use load::from_str;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
 

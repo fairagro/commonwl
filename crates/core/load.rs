@@ -25,12 +25,16 @@ pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
         fs::read_to_string(&path).with_context(|| format!("CWL File {path:?}"))?
     };
 
+    from_str(&contents)
+}
+
+pub fn from_str(contents: &str) -> Result<CWLDocument> {
     if contents.contains("$graph") {
-        let packed = serde_saphyr::from_str_with_options::<PackedCWL>(&contents, saphyr_options())
+        let packed = serde_saphyr::from_str_with_options::<PackedCWL>(contents, saphyr_options())
             .context("Could not parse to packed CWL")?;
         packed.unpack(None)
     } else {
-        serde_saphyr::from_str_with_options::<CWLDocument>(&contents, saphyr_options())
+        serde_saphyr::from_str_with_options::<CWLDocument>(contents, saphyr_options())
             .map_err(Into::into)
     }
 }

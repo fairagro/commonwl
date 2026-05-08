@@ -1,0 +1,13 @@
+[package]
+name = "lsp"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+tower-lsp-server = "0.23.0"
+tokio.workspace = true
+cwl_core.workspace = true
+serde-saphyr.workspace = true
+dashmap = "6.1.0"
