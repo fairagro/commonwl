@@ -41,16 +41,16 @@ pub fn encode(tokens: &[AbsoluteToken]) -> Vec<SemanticToken> {
     result
 }
 
-pub const KEYWORD: u32 = 0;
-pub const PROPERTY: u32 = 1;
-pub const TYPE: u32 = 2;
-pub const CLASS: u32 = 3;
-pub const DECORATOR: u32 = 4;
-pub const NAMESPACE: u32 = 5;
-pub const ENUM_MEMBER: u32 = 6;
-pub const NUMBER: u32 = 7;
-pub const STRING: u32 = 8;
-pub const VARIABLE: u32 = 9;
+const KEYWORD: u32 = 0;
+const _PROPERTY: u32 = 1;
+const TYPE: u32 = 2;
+const CLASS: u32 = 3;
+const _DECORATOR: u32 = 4;
+const NAMESPACE: u32 = 5;
+const ENUM_MEMBER: u32 = 6;
+const NUMBER: u32 = 7;
+const STRING: u32 = 8;
+const VARIABLE: u32 = 9;
 
 pub fn legend_token_types() -> Vec<SemanticTokenType> {
     vec![
