@@ -1,6 +1,6 @@
 use crate::diagnostics;
-use crop::Rope;
 use dashmap::DashMap;
+use ropey::Rope;
 use std::sync::Arc;
 use tower_lsp_server::{
     Client, LanguageServer,
@@ -36,17 +36,17 @@ impl Backend {
 
     async fn format_text(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
         let uri = params.text_document.uri;
-        let rope = self.documents.get(&uri)?;
+        let rope = &self.documents.get(&uri)?;
 
         let new_text = cwl_core::format::format_cwl(&rope.to_string()).unwrap_or(rope.to_string());
+
+        let last_line = rope.len_lines() - 1;
+        let last_col = rope.line(last_line).len_chars();
 
         Some(vec![TextEdit {
             range: Range {
                 start: Position::new(0, 0),
-                end: Position::new(
-                    rope.line_len() as u32,
-                    rope.line(rope.line_len() - 1).byte_len() as u32,
-                ),
+                end: Position::new(last_line as u32, last_col as u32),
             },
             new_text,
         }])

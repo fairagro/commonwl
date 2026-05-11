@@ -12,44 +12,58 @@ pub fn parse_and_check(text: &str) -> Vec<Diagnostic> {
             cwl_core::Error::ParsingFailed(e) => {
                 let message = e.to_string();
                 eprintln!("[diag] parsed error {message}");
-                let (line, offset, len) = position_from_error(cwl_core::Error::ParsingFailed(e));
-
-                vec![Diagnostic {
-                    range: Range {
-                        start: Position {
-                            line,
-                            character: offset,
-                        },
-                        end: Position {
-                            line,
-                            character: offset + len,
-                        },
-                    },
-                    severity: Some(DiagnosticSeverity::ERROR),
-                    source: Some(env!("CARGO_CRATE_NAME").to_owned()),
-                    message,
-                    ..Default::default()
-                }]
+                if let Some((start, end)) =
+                    position_from_error(text, cwl_core::Error::ParsingFailed(e))
+                {
+                    vec![Diagnostic {
+                        range: Range { start, end },
+                        severity: Some(DiagnosticSeverity::ERROR),
+                        source: Some(env!("CARGO_CRATE_NAME").to_owned()),
+                        message,
+                        ..Default::default()
+                    }]
+                } else {
+                    vec![]
+                }
             }
             _ => vec![],
         },
     }
 }
 
-fn position_from_error(e: cwl_core::Error) -> (u32, u32, u32) {
+fn position_from_error(text: &str, e: cwl_core::Error) -> Option<(Position, Position)> {
     match e {
         cwl_core::Error::ParsingFailed(error) => {
-            let rest = match error.location() {
-                Some(r) => r,
-                None => return (0, 0, 0),
-            };
+            let rest = error.location()?;
 
-            (
-                rest.line().try_into().unwrap_or_default(),
-                rest.span().offset().try_into().unwrap_or_default(),
-                rest.span().len().try_into().unwrap_or_default(),
-            )
+            let start_offset = rest.span().offset();
+            let end_offset = start_offset + rest.span().len();
+
+            Some((
+                offset_to_position(text, start_offset),
+                offset_to_position(text, end_offset),
+            ))
         }
-        _ => (0, 0, 0),
+        _ => None,
     }
+}
+
+pub fn offset_to_position(text: &str, offset: u64) -> Position {
+    let mut line = 0;
+    let mut col = 0;
+
+    for (i, ch) in text.char_indices() {
+        if i as u64 >= offset {
+            break;
+        }
+
+        if ch == '\n' {
+            line += 1;
+            col = 0;
+        } else {
+            col += 1;
+        }
+    }
+
+    Position::new(line, col)
 }
