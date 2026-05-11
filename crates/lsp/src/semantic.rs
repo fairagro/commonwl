@@ -277,7 +277,7 @@ fn classify_value(value: &str, tag: Option<&Tag>) -> u32 {
     }
 
     if CWL_REQUIREMENTS.contains(value) {
-        return DECORATOR;
+        return CLASS;
     }
 
     if CWL_PRIMITIVE_TYPES.contains(value) {
