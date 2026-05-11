@@ -1,7 +1,7 @@
 use crate::{
     diagnostics,
     document::DocumentData,
-    semantic::{AbsoluteToken, encode},
+    semantic::{self, AbsoluteToken, encode, legend_token_types},
     symbols::YamlSymbol,
     vocab::*,
 };
@@ -13,7 +13,7 @@ use tower_lsp_server::{
     Client, LanguageServer,
     ls_types::{
         DocumentFormattingParams, DocumentSymbolParams, DocumentSymbolResponse, InitializeParams,
-        InitializeResult, Location, OneOf, Position, Range, SemanticTokenType, SemanticTokens,
+        InitializeResult, Location, OneOf, Position, Range, SemanticTokens,
         SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
         SemanticTokensParams, SemanticTokensResult, SemanticTokensServerCapabilities,
         ServerCapabilities, SymbolInformation, SymbolKind, TextDocumentSyncCapability,
@@ -97,17 +97,7 @@ impl LanguageServer for Backend {
                         SemanticTokensOptions {
                             full: Some(SemanticTokensFullOptions::Bool(true)),
                             legend: SemanticTokensLegend {
-                                token_types: vec![
-                                    SemanticTokenType::PROPERTY,
-                                    SemanticTokenType::STRING,
-                                    SemanticTokenType::NUMBER,
-                                    SemanticTokenType::KEYWORD,
-                                    SemanticTokenType::VARIABLE,
-                                    SemanticTokenType::TYPE,
-                                    SemanticTokenType::COMMENT,
-                                    SemanticTokenType::NAMESPACE,
-                                ],
-
+                                token_types: legend_token_types(),
                                 token_modifiers: vec![],
                             },
 
@@ -227,71 +217,138 @@ fn build_symbols(text: &str) -> Vec<YamlSymbol> {
     symbols
 }
 
+#[derive(Clone, Copy)]
+enum Ctx {
+    Key,
+    Value,
+    Sequence,
+}
+
 fn build_semantic_tokens(text: &str) -> Vec<AbsoluteToken> {
     let mut tokens = Vec::new();
+    let mut stack: Vec<Ctx> = Vec::new();
 
     for item in Parser::new_from_str(text) {
-        let Ok((event, span)) = item else {
-            continue;
-        };
+        let Ok((event, span)) = item else { continue };
 
-        if let Event::Scalar(value, _, _, _) = event {
-            let start = marker_to_position(span.start);
-            let end = marker_to_position(span.end);
-            let length = end.character - start.character;
-            let token_type = classify(&value);
-            tokens.push(AbsoluteToken {
-                line: start.line,
-                start: start.character,
-                length,
-                token_type,
-                modifiers: 0,
-            });
+        match event {
+            // Push fresh Key context; the nested structure itself consumed
+            // the parent Value slot — flip parent Value→Key immediately.
+            Event::MappingStart(..) => {
+                if let Some(ctx) = stack.last_mut()
+                    && matches!(ctx, Ctx::Value)
+                {
+                    *ctx = Ctx::Key;
+                }
+                stack.push(Ctx::Key);
+            }
+
+            // Same idea: sequence-as-value consumes the parent Value slot.
+            Event::SequenceStart(..) => {
+                if let Some(ctx) = stack.last_mut()
+                    && matches!(ctx, Ctx::Value)
+                {
+                    *ctx = Ctx::Key;
+                }
+                stack.push(Ctx::Sequence);
+            }
+
+            Event::MappingEnd | Event::SequenceEnd => {
+                stack.pop();
+            }
+
+            Event::Scalar(value, _, _, _) => {
+                let is_key = matches!(stack.last(), Some(Ctx::Key));
+
+                // Advance the mapping alternation; sequences never flip.
+                if let Some(ctx) = stack.last_mut() {
+                    match ctx {
+                        Ctx::Key => *ctx = Ctx::Value,
+                        Ctx::Value => *ctx = Ctx::Key,
+                        Ctx::Sequence => {}
+                    }
+                }
+
+                let start = marker_to_position(span.start);
+                let end = marker_to_position(span.end);
+                let length = end.character - start.character;
+
+                tokens.push(AbsoluteToken {
+                    line: start.line,
+                    start: start.character,
+                    length,
+                    token_type: classify(&value, is_key),
+                    modifiers: 0,
+                });
+            }
+            _ => {}
         }
     }
 
     tokens
 }
 
-fn classify(value: &str) -> u32 {
-    if CWL_CLASSES.contains(value) {
-        return 5;
+fn classify(value: &str, is_key: bool) -> u32 {
+    if is_key {
+        classify_key(value)
+    } else {
+        classify_value(value)
     }
-    if CWL_REQUIREMENTS.contains(value) {
-        return 7;
-    }
+}
+
+/// Keys are field names — they're either schema-defined or user-defined.
+fn classify_key(value: &str) -> u32 {
+    // Structural schema keywords: class, cwlVersion, doc, label, intent
     if CWL_CORE_FIELDS.contains(value) {
-        return 3;
+        return semantic::KEYWORD;
     }
-    if CWL_IO_FIELDS.contains(value) {
-        return 0;
+    // Named field properties: inputs, outputs, baseCommand, arguments, steps …
+    if CWL_IO_FIELDS.contains(value)
+        || CWL_WORKFLOW_FIELDS.contains(value)
+        || CWL_COMMAND_FIELDS.contains(value)
+    {
+        return semantic::PROPERTY;
     }
-    if CWL_WORKFLOW_FIELDS.contains(value) {
-        return 0;
+    // Requirements/hints used as mapping keys (shorthand form):
+    //   requirements:
+    //     DockerRequirement:   ← key
+    //       dockerPull: …
+    if CWL_REQUIREMENTS.contains(value) || CWL_HINT_FIELDS.contains(value) {
+        return semantic::DECORATOR;
     }
-    if CWL_COMMAND_FIELDS.contains(value) {
-        return 0;
+    // Everything else is a user-defined identifier: step IDs, port names, tool IDs
+    semantic::VARIABLE
+}
+
+/// Values are what fields are set to — types, classes, literals, user strings.
+fn classify_value(value: &str) -> u32 {
+    // CWL class declarations: CommandLineTool, Workflow, ExpressionTool, Operation
+    if CWL_CLASSES.contains(value) {
+        return semantic::CLASS;
     }
-    if CWL_HINT_FIELDS.contains(value) {
-        return 7;
+    // Requirements as values (list form):  - class: DockerRequirement
+    if CWL_REQUIREMENTS.contains(value) {
+        return semantic::DECORATOR;
     }
+    // CWL primitive types: string, int, long, float, double, boolean, null, File, Directory
     if CWL_PRIMITIVE_TYPES.contains(value) {
-        return 5;
+        return semantic::TYPE;
     }
-    if CWL_SCATTER_METHODS.contains(value) {
-        return 3;
+    // Fixed enum members: dotproduct / nested_crossproduct, merge_nested, first_non_null …
+    if CWL_SCATTER_METHODS.contains(value)
+        || CWL_LINK_MERGE.contains(value)
+        || CWL_PICK_VALUE.contains(value)
+    {
+        return semantic::ENUM_MEMBER;
     }
-    if CWL_LINK_MERGE.contains(value) {
-        return 3;
-    }
-    if CWL_PICK_VALUE.contains(value) {
-        return 3;
-    }
+    // Namespace-prefixed tokens: s:author, edam:data_0006, $namespaces entries
     if value.contains(':') {
-        return 7;
+        return semantic::NAMESPACE;
     }
+    // Numeric literals
     if value.parse::<f64>().is_ok() {
-        return 2;
+        return semantic::NUMBER;
     }
-    1
+    // User strings: file paths, expressions, step source references
+    semantic::STRING
 }
