@@ -121,7 +121,7 @@ impl LanguageServer for Backend {
     }
 
     async fn did_change(&self, params: tower_lsp_server::ls_types::DidChangeTextDocumentParams) {
-        //we only core if - not what changed as full reparse is impl'd
+        //we only care if - not what changed as full reparse is impl'd
         if let Some(change) = params.content_changes.into_iter().last() {
             self.on_change(params.text_document.uri, &change.text).await
         }
@@ -225,6 +225,7 @@ enum Ctx {
 }
 
 fn build_semantic_tokens(text: &str) -> Vec<AbsoluteToken> {
+    let rope = Rope::from(text);
     let mut tokens = Vec::new();
     let mut stack: Vec<Ctx> = Vec::new();
 
@@ -260,7 +261,6 @@ fn build_semantic_tokens(text: &str) -> Vec<AbsoluteToken> {
             Event::Scalar(value, _, _, _) => {
                 let is_key = matches!(stack.last(), Some(Ctx::Key));
 
-                // Advance the mapping alternation; sequences never flip.
                 if let Some(ctx) = stack.last_mut() {
                     match ctx {
                         Ctx::Key => *ctx = Ctx::Value,
@@ -271,21 +271,77 @@ fn build_semantic_tokens(text: &str) -> Vec<AbsoluteToken> {
 
                 let start = marker_to_position(span.start);
                 let end = marker_to_position(span.end);
-                let length = end.character - start.character;
 
-                tokens.push(AbsoluteToken {
-                    line: start.line,
-                    start: start.character,
-                    length,
-                    token_type: classify(&value, is_key),
-                    modifiers: 0,
-                });
+                push_span_tokens(&mut tokens, &rope, start, end, classify(&value, is_key));
+            }
+
+            Event::Alias(_) => {
+                if let Some(ctx) = stack.last_mut() {
+                    match ctx {
+                        Ctx::Key => *ctx = Ctx::Value,
+                        Ctx::Value => *ctx = Ctx::Key,
+                        Ctx::Sequence => {}
+                    }
+                }
+
+                let start = marker_to_position(span.start);
+                let end = marker_to_position(span.end);
+
+                push_span_tokens(&mut tokens, &rope, start, end, semantic::VARIABLE);
             }
             _ => {}
         }
     }
 
+    tokens.sort_by_key(|t| (t.line, t.start));
     tokens
+}
+
+fn push_span_tokens(
+    tokens: &mut Vec<AbsoluteToken>,
+    rope: &Rope,
+    start: Position,
+    end: Position,
+    token_type: u32,
+) {
+    if start.line == end.line {
+        let length = end.character.saturating_sub(start.character);
+        if length > 0 {
+            tokens.push(AbsoluteToken {
+                line: start.line,
+                start: start.character,
+                length,
+                token_type,
+                modifiers: 0,
+            });
+        }
+
+        return;
+    }
+
+    for line in start.line..=end.line {
+        let line_text = rope.line(line as usize).to_string();
+        let line_len = line_text.trim_end_matches('\n').chars().count() as u32;
+
+        let (segment_start, length) = if line == start.line {
+            let start_col = start.character;
+            (start_col, line_len.saturating_sub(start_col))
+        } else if line == end.line {
+            (0, end.character)
+        } else {
+            (0, line_len)
+        };
+
+        if length > 0 {
+            tokens.push(AbsoluteToken {
+                line,
+                start: segment_start,
+                length,
+                token_type,
+                modifiers: 0,
+            });
+        }
+    }
 }
 
 fn classify(value: &str, is_key: bool) -> u32 {
@@ -351,4 +407,41 @@ fn classify_value(value: &str) -> u32 {
     }
     // User strings: file paths, expressions, step source references
     semantic::STRING
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::semantic;
+
+    #[test]
+    fn multiline_scalar_is_split_into_line_tokens() {
+        let yaml = "value: |\n  line1\n  line2\n";
+        let tokens = build_semantic_tokens(yaml);
+
+        // Expect a key token and two content segments for the multi-line scalar.
+        assert_eq!(tokens.len(), 3);
+        assert_eq!(tokens[0].token_type, semantic::VARIABLE);
+        assert_eq!(tokens[1].line, 1);
+        assert_eq!(tokens[2].line, 2);
+        assert_eq!(tokens[1].length, 5);
+        assert_eq!(tokens[2].length, 7);
+    }
+
+    #[test]
+    fn alias_event_generates_variable_token() {
+        let yaml = "anchor: &id foo\nalias: *id\n";
+        let tokens = build_semantic_tokens(yaml);
+
+        assert!(
+            tokens
+                .iter()
+                .any(|token| token.token_type == semantic::VARIABLE)
+        );
+        assert!(
+            tokens
+                .iter()
+                .any(|token| token.line == 1 && token.length > 0)
+        );
+    }
 }
