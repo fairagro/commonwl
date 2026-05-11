@@ -1406,11 +1406,13 @@ version = "0.1.2"
 dependencies = [
  "cwl_core",
  "dashmap",
+ "granit-parser",
  "ropey",
  "serde-saphyr",
  "serde_json",
  "tokio",
  "tower-lsp-server",
+ "tracing-subscriber",
 ]
 
 [[package]]

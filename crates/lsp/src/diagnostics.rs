@@ -1,12 +1,13 @@
+use cwl_core::documents::CWLDocument;
 use tower_lsp_server::ls_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
-pub fn parse_and_check(text: &str) -> Vec<Diagnostic> {
+pub fn parse_and_check(text: &str) -> (Option<CWLDocument>, Vec<Diagnostic>) {
     let result = cwl_core::from_str(text);
 
     match result {
-        Ok(_) => {
+        Ok(doc) => {
             eprintln!("[diag] parsed OK");
-            vec![]
+            (Some(doc), vec![])
         }
         Err(e) => match e {
             cwl_core::Error::ParsingFailed(e) => {
@@ -15,18 +16,21 @@ pub fn parse_and_check(text: &str) -> Vec<Diagnostic> {
                 if let Some((start, end)) =
                     position_from_error(text, cwl_core::Error::ParsingFailed(e))
                 {
-                    vec![Diagnostic {
-                        range: Range { start, end },
-                        severity: Some(DiagnosticSeverity::ERROR),
-                        source: Some(env!("CARGO_CRATE_NAME").to_owned()),
-                        message,
-                        ..Default::default()
-                    }]
+                    (
+                        None,
+                        vec![Diagnostic {
+                            range: Range { start, end },
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            source: Some(env!("CARGO_CRATE_NAME").to_owned()),
+                            message,
+                            ..Default::default()
+                        }],
+                    )
                 } else {
-                    vec![]
+                    (None, vec![])
                 }
             }
-            _ => vec![],
+            _ => (None, vec![]),
         },
     }
 }

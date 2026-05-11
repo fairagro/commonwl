@@ -13,3 +13,5 @@ serde_json.workspace = true
 tower-lsp-server = "0.23.0"
 dashmap = "6.1.0"
 ropey = "1.6.1"
+tracing-subscriber.workspace = true
+granit-parser = "0.0.2"
