@@ -3,7 +3,6 @@ use tower_lsp_server::ls_types::{Diagnostic, DiagnosticSeverity, Position, Range
 
 pub fn parse_and_check(text: &str) -> (Option<CWLDocument>, Vec<Diagnostic>) {
     let result = cwl_core::from_str(text);
-
     match result {
         Ok(doc) => {
             eprintln!("[diag] parsed OK");
@@ -27,10 +26,34 @@ pub fn parse_and_check(text: &str) -> (Option<CWLDocument>, Vec<Diagnostic>) {
                         }],
                     )
                 } else {
-                    (None, vec![])
+                    (
+                        None,
+                        vec![Diagnostic {
+                            range: Range {
+                                start: Position::new(0, 0),
+                                end: Position::new(0, 0),
+                            },
+                            severity: Some(DiagnosticSeverity::ERROR),
+                            source: Some(env!("CARGO_CRATE_NAME").to_owned()),
+                            message,
+                            ..Default::default()
+                        }],
+                    )
                 }
             }
-            _ => (None, vec![]),
+            _ => (
+                None,
+                vec![Diagnostic {
+                    range: Range {
+                        start: Position::new(0, 0),
+                        end: Position::new(0, 0),
+                    },
+                    severity: Some(DiagnosticSeverity::ERROR),
+                    source: Some(env!("CARGO_CRATE_NAME").to_owned()),
+                    message: e.to_string(),
+                    ..Default::default()
+                }],
+            ),
         },
     }
 }

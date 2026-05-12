@@ -30,11 +30,12 @@ pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
 
 pub fn from_str(contents: &str) -> Result<CWLDocument> {
     if contents.contains("$graph") {
-        let packed = serde_saphyr::from_str_with_options::<PackedCWL>(contents, saphyr_options())
-            .context("Could not parse to packed CWL")?;
+        let packed =
+            serde_saphyr::from_str_with_options_validate::<PackedCWL>(contents, saphyr_options())
+                .context("Could not parse to packed CWL")?;
         packed.unpack(None)
     } else {
-        serde_saphyr::from_str_with_options::<CWLDocument>(contents, saphyr_options())
+        serde_saphyr::from_str_with_options_validate::<CWLDocument>(contents, saphyr_options())
             .map_err(Into::into)
     }
 }
@@ -57,7 +58,8 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
         } else {
             fs::read_to_string(path).with_context(|| format!("CWL File {}", path.display()))?
         };
-        let pack = serde_saphyr::from_str_with_options::<PackedCWL>(&contents, saphyr_options())?;
+        let pack =
+            serde_saphyr::from_str_with_options_validate::<PackedCWL>(&contents, saphyr_options())?;
         return pack.unpack(Some(fragment));
     }
     Err(anyhow::anyhow!("Packed CWL could not be loaded. Can not guess fragment").into())
@@ -109,8 +111,10 @@ fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::error::Error;
+    use validator::Validate;
+
+use super::*;
+    use crate::{documents::CommandLineTool, error::Error};
     use std::path::PathBuf;
 
     #[test]
@@ -159,5 +163,13 @@ mod tests {
             let contents = fs::read_to_string(instruction_file).unwrap();
             serde_saphyr::from_str(&contents).unwrap()
         }
+    }
+
+    #[test]
+    fn validate_cwl_version() {
+        let tool = CommandLineTool::builder()
+            .cwl_version("1vaa1.2")
+            .build();
+        tool.validate().expect_err("");
     }
 }

@@ -16,6 +16,7 @@ use commonwl_salad::deserialize::{
 use commonwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use validator::Validate;
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
@@ -155,7 +156,19 @@ impl DefaultValue {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable)]
+#[derive(
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandInputParameter {
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
@@ -177,6 +190,7 @@ pub struct CommandInputParameter {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -198,7 +212,17 @@ pub struct CommandInputParameter {
 make_shorthand_impl!(CommandInputParameter, "id", "type");
 
 #[derive(
-    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowInputParameter {
@@ -221,6 +245,7 @@ pub struct WorkflowInputParameter {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -249,7 +274,17 @@ impl Default for OneOrMany<InputType> {
 }
 
 #[derive(
-    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct OperationInputParameter {
@@ -272,6 +307,7 @@ pub struct OperationInputParameter {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]

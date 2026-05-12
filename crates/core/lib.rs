@@ -1,5 +1,6 @@
 use anyhow::Context;
 use base16ct::HexDisplay;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use sha1::Digest;
 use sha1::Sha1;
@@ -10,6 +11,7 @@ use std::hash::Hash;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 pub mod documents;
 mod error;
@@ -27,6 +29,10 @@ pub use commonwl_salad::Identifiable;
 pub use load::from_str;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
+
+static CWL_VERSION: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^v(\d+)\.(\d+)(?:\.(\d+)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?)?$").unwrap()
+});
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]

@@ -35,27 +35,26 @@ impl Backend {
     }
 
     //reparse file(s) on every change
-    async fn on_change(&self, uri: Uri, text: &str) {
+    async fn on_change(&self, uri: Uri, version: i32, text: &str) {
         let (ast, diagnostics) = diagnostics::parse_and_check(text);
 
+        let rope = Rope::from(text);
         let symbols = build_symbols(text);
         let semantic_tokens = build_semantic_tokens(text);
-        let rope = Rope::from(text);
-
-        self.client
-            .publish_diagnostics(uri.clone(), diagnostics.clone(), None)
-            .await;
 
         self.documents.insert(
-            uri,
+            uri.clone(),
             DocumentData {
                 text: rope,
-                diagnostics,
                 symbols,
                 semantic_tokens,
                 ast,
             },
         );
+
+        self.client
+            .publish_diagnostics(uri, diagnostics, Some(version))
+            .await;
     }
 
     async fn format_text(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
@@ -113,17 +112,25 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: tower_lsp_server::ls_types::DidOpenTextDocumentParams) {
-        self.on_change(params.text_document.uri, &params.text_document.text)
-            .await
+        self.on_change(
+            params.text_document.uri,
+            params.text_document.version,
+            &params.text_document.text,
+        )
+        .await
     }
 
     async fn did_change(&self, params: tower_lsp_server::ls_types::DidChangeTextDocumentParams) {
         //we only care if - not what changed as full reparse is impl'd
         if let Some(change) = params.content_changes.into_iter().last() {
-            self.on_change(params.text_document.uri, &change.text).await
+            self.on_change(
+                params.text_document.uri,
+                params.text_document.version,
+                &change.text,
+            )
+            .await
         }
     }
-
     async fn did_close(&self, params: tower_lsp_server::ls_types::DidCloseTextDocumentParams) {
         self.documents.remove(&params.text_document.uri);
 
