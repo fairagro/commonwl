@@ -18,6 +18,10 @@ pub fn encode(tokens: &[AbsoluteToken]) -> Vec<SemanticToken> {
     let mut prev_start = 0;
 
     for token in tokens {
+        if token.line < prev_line || (token.line == prev_line && token.start < prev_start) {
+            continue;
+        }
+        
         let delta_line = token.line - prev_line;
 
         let delta_start = if delta_line == 0 {
@@ -68,6 +72,9 @@ pub fn legend_token_types() -> Vec<SemanticTokenType> {
 }
 
 fn marker_to_position(marker: Marker) -> Position {
+    if marker.line() == 0 {
+        return Position::new(0, 0);
+    }
     Position::new((marker.line() - 1) as u32, marker.col() as u32)
 }
 
@@ -209,6 +216,7 @@ fn push_span_tokens(
     end: Position,
     token_type: u32,
 ) {
+    let total_lines = rope.len_lines() as u32;
     if start.line == end.line {
         let length = end.character.saturating_sub(start.character);
         if length > 0 {
@@ -225,6 +233,9 @@ fn push_span_tokens(
     }
 
     for line in start.line..=end.line {
+        if line >= total_lines {
+            break;
+        }
         let line_text = rope.line(line as usize).to_string();
         let line_len = line_text.trim_end_matches('\n').chars().count() as u32;
 

@@ -37,10 +37,25 @@ impl Backend {
     //reparse file(s) on every change
     async fn on_change(&self, uri: Uri, version: i32, text: &str) {
         let (ast, diagnostics) = diagnostics::parse_and_check(text);
-
         let rope = Rope::from(text);
-        let symbols = build_symbols(text);
-        let semantic_tokens = build_semantic_tokens(text);
+
+        let text_owned = text.to_string();
+        let builder_result = tokio::time::timeout(
+            std::time::Duration::from_millis(500),
+            tokio::task::spawn_blocking(move || {
+                (
+                    build_symbols(&text_owned),
+                    build_semantic_tokens(&text_owned),
+                )
+            }),
+        )
+        .await;
+
+        let (symbols, semantic_tokens) = match builder_result {
+            Ok(Ok(result)) => result,
+            Ok(Err(_)) => (vec![], vec![]),
+            Err(_) => (vec![], vec![]),
+        };
 
         self.documents.insert(
             uri.clone(),
