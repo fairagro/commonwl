@@ -1,5 +1,5 @@
 use crate::{
-    CWL_VERSION, OneOrMany, Result,
+    OneOrMany, Result,
     documents::{
         CWLDocument, CommandLineTool, ExpressionTool, Operation, StringOrDocument, Workflow,
         WorkflowStep,
@@ -13,6 +13,7 @@ use crate::{
         DockerRequirement, InitialWorkDirRequirement, InlineJavascriptRequirement, ListingItems,
         StringOrInclude, ToolRequirements, WorkDirItems, WorkflowRequirements,
     },
+    validate::CWL_VERSION,
 };
 use anyhow::ensure;
 use commonwl_salad::Identifiable;

@@ -1,4 +1,3 @@
-use crate::CWL_VERSION;
 use crate::ExtractFromEnum;
 use crate::OneOrMany;
 use crate::inputs::{
@@ -11,6 +10,7 @@ use crate::outputs::{
     WorkflowOutputParameter,
 };
 use crate::requirements::{ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements};
+use crate::validate::{CWL_VERSION, validate_expression};
 use bon::Builder;
 use commonwl_salad::{
     Identifiable,
@@ -337,6 +337,7 @@ pub struct ExpressionTool {
     #[builder(default, into)]
     pub outputs: Vec<ExpressionToolOutputParameter>,
     #[builder(into)]
+    #[validate(custom(function = "validate_expression"))]
     pub expression: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
