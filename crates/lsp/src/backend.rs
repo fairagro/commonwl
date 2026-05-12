@@ -27,6 +27,7 @@ pub struct Backend {
 }
 
 impl Backend {
+    #[must_use]
     pub fn new(client: Client) -> Self {
         Self {
             client,
@@ -53,8 +54,7 @@ impl Backend {
 
         let (symbols, semantic_tokens) = match builder_result {
             Ok(Ok(result)) => result,
-            Ok(Err(_)) => (vec![], vec![]),
-            Err(_) => (vec![], vec![]),
+            Ok(Err(_)) | Err(_) => (vec![], vec![]),
         };
 
         self.documents.insert(
@@ -72,7 +72,7 @@ impl Backend {
             .await;
     }
 
-    async fn format_text(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
+    fn format_text(&self, params: DocumentFormattingParams) -> Option<Vec<TextEdit>> {
         let uri = params.text_document.uri;
         let rope = &self.documents.get(&uri)?.text;
 
@@ -84,7 +84,10 @@ impl Backend {
         Some(vec![TextEdit {
             range: Range {
                 start: Position::new(0, 0),
-                end: Position::new(last_line as u32, last_col as u32),
+                end: Position::new(
+                    u32::try_from(last_col).unwrap_or_default(),
+                    u32::try_from(last_col).unwrap_or_default(),
+                ),
             },
             new_text,
         }])
@@ -132,7 +135,7 @@ impl LanguageServer for Backend {
             params.text_document.version,
             &params.text_document.text,
         )
-        .await
+        .await;
     }
 
     async fn did_change(&self, params: tower_lsp_server::ls_types::DidChangeTextDocumentParams) {
@@ -143,7 +146,7 @@ impl LanguageServer for Backend {
                 params.text_document.version,
                 &change.text,
             )
-            .await
+            .await;
         }
     }
     async fn did_close(&self, params: tower_lsp_server::ls_types::DidCloseTextDocumentParams) {
@@ -159,7 +162,7 @@ impl LanguageServer for Backend {
         &self,
         params: tower_lsp_server::ls_types::DocumentFormattingParams,
     ) -> tower_lsp_server::jsonrpc::Result<Option<Vec<tower_lsp_server::ls_types::TextEdit>>> {
-        Ok(self.format_text(params).await)
+        Ok(self.format_text(params))
     }
 
     async fn semantic_tokens_full(

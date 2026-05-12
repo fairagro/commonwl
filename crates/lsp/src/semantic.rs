@@ -1,4 +1,10 @@
-use crate::{symbols::YamlSymbol, vocab::*};
+use crate::{
+    symbols::YamlSymbol,
+    vocab::{
+        CWL_CLASSES, CWL_LINK_MERGE, CWL_PICK_VALUE, CWL_PRIMITIVE_TYPES, CWL_REQUIREMENTS,
+        CWL_SCATTER_METHODS,
+    },
+};
 use granit_parser::{Event, Marker, Parser, Tag};
 use ropey::Rope;
 use tower_lsp_server::ls_types::{Position, Range, SemanticToken, SemanticTokenType, SymbolKind};
@@ -12,6 +18,7 @@ pub struct AbsoluteToken {
     pub modifiers: u32,
 }
 
+#[must_use]
 pub fn encode(tokens: &[AbsoluteToken]) -> Vec<SemanticToken> {
     let mut result = Vec::new();
     let mut prev_line = 0;
@@ -21,7 +28,7 @@ pub fn encode(tokens: &[AbsoluteToken]) -> Vec<SemanticToken> {
         if token.line < prev_line || (token.line == prev_line && token.start < prev_start) {
             continue;
         }
-        
+
         let delta_line = token.line - prev_line;
 
         let delta_start = if delta_line == 0 {
@@ -56,6 +63,7 @@ const NUMBER: u32 = 7;
 const STRING: u32 = 8;
 const VARIABLE: u32 = 9;
 
+#[must_use]
 pub fn legend_token_types() -> Vec<SemanticTokenType> {
     vec![
         SemanticTokenType::KEYWORD,     // 0
@@ -75,7 +83,10 @@ fn marker_to_position(marker: Marker) -> Position {
     if marker.line() == 0 {
         return Position::new(0, 0);
     }
-    Position::new((marker.line() - 1) as u32, marker.col() as u32)
+    Position::new(
+        u32::try_from(marker.line() - 1).unwrap_or_default(),
+        u32::try_from(marker.col()).unwrap_or_default(),
+    )
 }
 
 pub(crate) fn build_symbols(text: &str) -> Vec<YamlSymbol> {
@@ -216,7 +227,7 @@ fn push_span_tokens(
     end: Position,
     token_type: u32,
 ) {
-    let total_lines = rope.len_lines() as u32;
+    let total_lines = u32::try_from(rope.len_lines()).unwrap_or_default();
     if start.line == end.line {
         let length = end.character.saturating_sub(start.character);
         if length > 0 {
@@ -237,7 +248,8 @@ fn push_span_tokens(
             break;
         }
         let line_text = rope.line(line as usize).to_string();
-        let line_len = line_text.trim_end_matches('\n').chars().count() as u32;
+        let line_len =
+            u32::try_from(line_text.trim_end_matches('\n').chars().count()).unwrap_or_default();
 
         let (segment_start, length) = if line == start.line {
             let start_col = start.character;

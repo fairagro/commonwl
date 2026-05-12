@@ -28,6 +28,9 @@ pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
     from_str(&contents)
 }
 
+/// Loads a `CWLDocument` from a string, may be packed or unpacked
+/// # Errors
+/// If the string is not a valid CWL Document, or if it is a packed CWL Document but can not be unpacked
 pub fn from_str(contents: &str) -> Result<CWLDocument> {
     if contents.contains("$graph") {
         let packed =
@@ -113,7 +116,7 @@ fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
 mod tests {
     use validator::Validate;
 
-use super::*;
+    use super::*;
     use crate::{documents::CommandLineTool, error::Error};
     use std::path::PathBuf;
 
@@ -167,9 +170,7 @@ use super::*;
 
     #[test]
     fn validate_cwl_version() {
-        let tool = CommandLineTool::builder()
-            .cwl_version("1vaa1.2")
-            .build();
+        let tool = CommandLineTool::builder().cwl_version("1vaa1.2").build();
         tool.validate().expect_err("");
     }
 }

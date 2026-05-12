@@ -1,6 +1,7 @@
 use cwl_core::documents::CWLDocument;
 use tower_lsp_server::ls_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
+#[must_use] 
 pub fn parse_and_check(text: &str) -> (Option<CWLDocument>, Vec<Diagnostic>) {
     let result = cwl_core::from_str(text);
     match result {
@@ -75,6 +76,7 @@ fn position_from_error(text: &str, e: cwl_core::Error) -> Option<(Position, Posi
     }
 }
 
+#[must_use] 
 pub fn offset_to_position(text: &str, offset: u64) -> Position {
     let mut line = 0;
     let mut col = 0;
