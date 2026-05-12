@@ -17,7 +17,9 @@ serde_json.workspace = true
 commonwl_salad = { version = "0", path = "../salad", features = ["derive"] }
 url.workspace = true
 thiserror.workspace = true
-miette = { version = "7.6.0", features = ["fancy"] }
+validator.workspace = true
+miette = { version = "7.6.0" }
+regex = "1.12.3"
 
 [lib]
 path = "lib.rs"

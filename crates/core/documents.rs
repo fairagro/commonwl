@@ -10,6 +10,7 @@ use crate::outputs::{
     WorkflowOutputParameter,
 };
 use crate::requirements::{ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements};
+use crate::validate::{CWL_VERSION, validate_expression};
 use bon::Builder;
 use commonwl_salad::{
     Identifiable,
@@ -17,6 +18,7 @@ use commonwl_salad::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use validator::Validate;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "class")]
@@ -25,6 +27,17 @@ pub enum CWLDocument {
     ExpressionTool(ExpressionTool),
     Operation(Operation),
     Workflow(Workflow),
+}
+
+impl Validate for CWLDocument {
+    fn validate(&self) -> std::result::Result<(), validator::ValidationErrors> {
+        match self {
+            Self::CommandLineTool(clt) => clt.validate(),
+            Self::ExpressionTool(et) => et.validate(),
+            Self::Operation(op) => op.validate(),
+            Self::Workflow(wf) => wf.validate(),
+        }
+    }
 }
 
 impl CWLDocument {
@@ -245,7 +258,9 @@ impl_document_defaults!(ExpressionTool, WorkflowRequirements, WorkflowHints);
 impl_document_defaults!(Operation, WorkflowRequirements, WorkflowHints);
 impl_document_defaults!(Workflow, WorkflowRequirements, WorkflowHints);
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default, Builder, Identifiable, PartialEq)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Default, Builder, Identifiable, PartialEq, Validate,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLineTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -275,6 +290,7 @@ pub struct CommandLineTool {
     pub hints: Option<Vec<ToolHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -309,7 +325,9 @@ pub struct CommandLineTool {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpressionTool {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -319,6 +337,7 @@ pub struct ExpressionTool {
     #[builder(default, into)]
     pub outputs: Vec<ExpressionToolOutputParameter>,
     #[builder(into)]
+    #[validate(custom(function = "validate_expression"))]
     pub expression: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -341,6 +360,7 @@ pub struct ExpressionTool {
     pub hints: Option<Vec<WorkflowHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -351,7 +371,9 @@ pub struct ExpressionTool {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Operation {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -381,6 +403,7 @@ pub struct Operation {
     pub hints: Option<Vec<WorkflowHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -391,7 +414,9 @@ pub struct Operation {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Workflow {
     #[serde(deserialize_with = "deserialize_map_list_id")]
@@ -424,6 +449,7 @@ pub struct Workflow {
     pub hints: Option<Vec<WorkflowHints>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
@@ -451,7 +477,7 @@ impl Workflow {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq, Builder)]
+#[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq, Builder, Validate)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkflowStep {
     #[serde(deserialize_with = "deserialize_map_list_id")]

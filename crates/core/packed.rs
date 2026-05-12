@@ -13,18 +13,21 @@ use crate::{
         DockerRequirement, InitialWorkDirRequirement, InlineJavascriptRequirement, ListingItems,
         StringOrInclude, ToolRequirements, WorkDirItems, WorkflowRequirements,
     },
+    validate::CWL_VERSION,
 };
 use anyhow::ensure;
 use commonwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 use url::Url;
+use validator::Validate;
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, Validate)]
 #[serde(rename_all = "camelCase")]
 pub struct PackedCWL {
     #[serde(rename = "$graph")]
     pub graph: Vec<CWLDocument>,
+    #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
 }
 
