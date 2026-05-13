@@ -30,12 +30,13 @@ pub(crate) fn cwl_version(doc: &CWLDocument) -> anyhow::Result<Version> {
 
 pub(crate) const V1_2_0: Version = Version::new(1, 2, 0);
 
+#[cfg(feature = "tes")]
+pub use backend::tes::TesBackend;
 pub use backend::{
     EngineStatus, ExecutionResult, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
     docker::DockerBackend,
     evaluate_exitcodes, execute, execute_commandline_tool, execute_workflow,
     local::{LocalBackend, command::CommandBackend},
-    tes::TesBackend,
 };
 pub use docker::{
     ContainerBuildOptions, ContainerBuildOptionsBuilder, ContainerEngine, build_container_command,

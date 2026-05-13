@@ -60,6 +60,7 @@ use uuid::Uuid;
 pub mod docker;
 pub mod local;
 pub mod mount;
+#[cfg(feature = "tes")]
 pub mod tes;
 
 #[async_trait]

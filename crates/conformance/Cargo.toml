@@ -7,7 +7,7 @@ license.workspace = true
 publish = false
 
 [dependencies]
-commonwl = { version = "0", path = "../commonwl", features = ["engine"] }
+commonwl = { version = "0", path = "../commonwl", features = ["engine", "tes"] }
 cwl_engine_storage = { path = "../storage" }
 crankshaft = { version = "0.9.0", features = ["docker"] }
 anyhow.workspace = true
