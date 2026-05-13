@@ -1,5 +1,6 @@
 [package]
 name = "cwl-lsp"
+description = "CWL Language Server"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true

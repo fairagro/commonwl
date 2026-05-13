@@ -1,5 +1,6 @@
 [package]
 name = "cwl_engine_storage"
+description = "Part of `CommonWL`. Storage impl"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
