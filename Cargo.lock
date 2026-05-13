@@ -1046,29 +1046,10 @@ dependencies = [
 
 [[package]]
 name = "commonwl"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "cwl_core",
  "cwl_engine",
-]
-
-[[package]]
-name = "commonwl_salad"
-version = "0.1.2"
-dependencies = [
- "commonwl_salad_derive",
- "serde",
- "serde-saphyr",
- "serde_json",
-]
-
-[[package]]
-name = "commonwl_salad_derive"
-version = "0.1.2"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -1087,12 +1068,12 @@ dependencies = [
 
 [[package]]
 name = "conformance"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
  "commonwl",
- "crankshaft",
+ "crankshaft 0.9.0",
  "cwl_engine_storage",
  "serde_json",
  "tokio",
@@ -1171,8 +1152,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fe3b288ff149d1e5a10a2b91265bd2b8d54c4a7f4d3684f90e84199ab3b3f53"
 dependencies = [
  "crankshaft-config",
- "crankshaft-docker",
- "crankshaft-engine",
+ "crankshaft-docker 0.4.0",
+ "crankshaft-engine 0.9.0",
+ "crankshaft-events",
+]
+
+[[package]]
+name = "crankshaft"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bac450b95dcae324ca65cedff15f8f991d58dde49be0698b264c7d0397b65b3a"
+dependencies = [
+ "crankshaft-config",
+ "crankshaft-docker 0.5.0",
+ "crankshaft-engine 0.10.0",
  "crankshaft-events",
 ]
 
@@ -1215,6 +1208,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "crankshaft-docker"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4ab14fcfa01bb9286f405558f5a43b4ea1507523441112500ff13c91aa03483"
+dependencies = [
+ "anyhow",
+ "bollard",
+ "crankshaft-events",
+ "futures",
+ "indexmap 2.14.0",
+ "nix 0.30.1",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-retry2 0.7.0",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "crankshaft-engine"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1225,7 +1238,40 @@ dependencies = [
  "bollard",
  "bon",
  "crankshaft-config",
- "crankshaft-docker",
+ "crankshaft-docker 0.4.0",
+ "crankshaft-events",
+ "futures",
+ "growable-bloom-filter",
+ "indexmap 2.14.0",
+ "nix 0.30.1",
+ "nonempty",
+ "rand",
+ "regex",
+ "shlex",
+ "ssh2",
+ "tempfile",
+ "tes",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-metrics",
+ "tokio-util",
+ "tracing",
+ "url",
+ "whoami",
+]
+
+[[package]]
+name = "crankshaft-engine"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46d0196dc242411b549237c7c639642f1eed1c8a8a45f58fd52501ef5c284610"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bollard",
+ "bon",
+ "crankshaft-config",
+ "crankshaft-docker 0.5.0",
  "crankshaft-events",
  "futures",
  "growable-bloom-filter",
@@ -1402,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "cwl-lsp"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "cwl_core",
  "dashmap",
@@ -1417,12 +1463,12 @@ dependencies = [
 
 [[package]]
 name = "cwl_core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base16ct 1.0.0",
  "bon",
- "commonwl_salad",
+ "cwl_salad",
  "miette",
  "regex",
  "serde",
@@ -1436,7 +1482,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1444,7 +1490,7 @@ dependencies = [
  "boa_engine",
  "bollard",
  "bon",
- "crankshaft",
+ "crankshaft 0.10.0",
  "cwl_core",
  "cwl_engine_storage",
  "dircpy",
@@ -1475,7 +1521,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine_storage"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1489,6 +1535,25 @@ dependencies = [
  "tracing",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "cwl_salad"
+version = "0.2.0"
+dependencies = [
+ "cwl_salad_derive",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+]
+
+[[package]]
+name = "cwl_salad_derive"
+version = "0.2.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -12,7 +12,7 @@ use crate::outputs::{
 use crate::requirements::{ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements};
 use crate::validate::{CWL_VERSION, validate_expression};
 use bon::Builder;
-use commonwl_salad::{
+use cwl_salad::{
     Identifiable,
     deserialize::{FromShortHand, deserialize_map_list_id, deserialize_map_list_option_class},
 };

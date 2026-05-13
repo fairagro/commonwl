@@ -20,7 +20,7 @@ serde_json.workspace = true
 cwl_core.workspace = true
 
 # runtime
-crankshaft = { version = "0.9.0", features = ["docker"] }
+crankshaft = { version = "0.10.0", features = ["docker"] }
 boa_engine = "0.21.0"
 bollard = "^0.19"
 tokio.workspace = true

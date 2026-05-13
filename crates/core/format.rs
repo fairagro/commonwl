@@ -1,4 +1,4 @@
-use commonwl_salad::Mapping;
+use cwl_salad::Mapping;
 use serde_json::Value;
 use std::{collections::HashMap, error::Error};
 use crate::Result;

@@ -1,5 +1,5 @@
 #[cfg(feature = "derive")]
-pub use commonwl_salad_derive::Identifiable;
+pub use cwl_salad_derive::Identifiable;
 use serde_json::{Map, Value};
 
 pub trait Identifiable {

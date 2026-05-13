@@ -2,10 +2,10 @@ use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
 use crate::{BoolOrExpression, IntegerOrExpression, NumberOrExpression};
 use crate::{ExtractFromEnum, OneOrMany};
 use bon::Builder;
-use commonwl_salad::deserialize::{
+use cwl_salad::deserialize::{
     FromShortHand, deserialize_map_list_envname, deserialize_map_list_package,
 };
-use commonwl_salad::make_shorthand_impl;
+use cwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -322,7 +322,7 @@ pub struct StepInputExpressionRequirement;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use commonwl_salad::deserialize::deserialize_map_list_class;
+    use cwl_salad::deserialize::deserialize_map_list_class;
 
     #[derive(Serialize, Deserialize, Debug)]
     struct RequirementsBag {

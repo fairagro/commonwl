@@ -14,7 +14,7 @@ sha1.workspace = true
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
-commonwl_salad = { version = "0", path = "../salad", features = ["derive"] }
+cwl_salad = { version = "0", path = "../salad", features = ["derive"] }
 url.workspace = true
 thiserror.workspace = true
 validator.workspace = true

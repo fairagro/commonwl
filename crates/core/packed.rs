@@ -16,7 +16,7 @@ use crate::{
     validate::CWL_VERSION,
 };
 use anyhow::ensure;
-use commonwl_salad::Identifiable;
+use cwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 use url::Url;

@@ -1,5 +1,5 @@
 [package]
-name = "commonwl_salad_derive"
+name = "cwl_salad_derive"
 description = "Derive Macro for commonwl_salad"
 version.workspace = true
 edition.workspace = true

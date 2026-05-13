@@ -138,7 +138,10 @@ impl TaskBackend for DockerBackend {
             .map(ToString::to_string)
             .collect::<Vec<_>>();
         // manually check for an entypoint
-        if let Some(entrypoint) = self.get_docker_entrypoint(&container).await? {
+        if let Some(entrypoint) = self
+            .get_docker_entrypoint(&container, token.clone())
+            .await?
+        {
             args.splice(0..0, entrypoint);
         }
 
@@ -305,9 +308,13 @@ impl TaskBackend for DockerBackend {
 
 impl DockerBackend {
     ///Crankshaft backend overwrites docker entrypoint, so we need to get it beforehand and append it to the command
-    async fn get_docker_entrypoint(&self, container: &str) -> anyhow::Result<Option<Vec<String>>> {
+    async fn get_docker_entrypoint(
+        &self,
+        container: &str,
+        token: CancellationToken,
+    ) -> anyhow::Result<Option<Vec<String>>> {
         //ensure image
-        self.client.ensure_image(container).await?;
+        self.client.ensure_image(container, token).await?;
         let info = self.client.inner().inspect_image(container).await?;
         if let Some(cfg) = info.config
             && let Some(entrypoint) = cfg.entrypoint

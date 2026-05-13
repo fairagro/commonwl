@@ -50,7 +50,7 @@ pub struct SecondaryFileSchema {
 mod tests {
     use super::*;
     use crate::OneOrMany;
-    use commonwl_salad::deserialize::deserialize_with_secondary_files_dsl;
+    use cwl_salad::deserialize::deserialize_with_secondary_files_dsl;
 
     #[test]
     #[allow(unused)]

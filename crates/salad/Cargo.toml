@@ -1,5 +1,5 @@
 [package]
-name = "commonwl_salad"
+name = "cwl_salad"
 description = "schema salad types"
 version.workspace = true
 edition.workspace = true
@@ -7,7 +7,7 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-commonwl_salad_derive = { version = "0", path = "../salad_derive", optional = true }
+cwl_salad_derive = { version = "0", path = "../salad_derive", optional = true }
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
@@ -17,4 +17,4 @@ path = "lib.rs"
 
 [features]
 default = []
-derive = ["commonwl_salad_derive"]
+derive = ["cwl_salad_derive"]
