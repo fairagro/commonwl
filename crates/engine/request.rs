@@ -189,16 +189,21 @@ pub fn load_input_file_from_file(
     path: impl AsRef<Path> + std::fmt::Debug,
     base_path: impl AsRef<Path>,
 ) -> anyhow::Result<InputObject> {
-    let content = std::fs::read_to_string(path.as_ref())
+    //if not absolute it should be relative to the current working directory
+    let path = if path.as_ref().is_absolute() {
+        path.as_ref().canonicalize()?
+    } else {
+        env::current_dir()?.join(path)
+    };
+
+    let content = std::fs::read_to_string(&path)
         .with_context(|| format!("Could not read input file {path:?}"))?;
     let mut values: HashMap<String, serde_json::Value> = serde_saphyr::from_str(&content)?;
 
     //calculate path relativity
-    let diff_path = pathdiff::diff_paths(
-        path.as_ref().parent().unwrap_or(Path::new(".")),
-        base_path.as_ref(),
-    )
-    .unwrap_or(PathBuf::from(path.as_ref()));
+    let diff_path =
+        pathdiff::diff_paths(path.parent().unwrap_or(Path::new(".")), base_path.as_ref())
+            .unwrap_or(path);
 
     for item in values.values_mut() {
         adjust_path_to_base(item, &diff_path, &mut HashSet::new());
@@ -303,7 +308,10 @@ mod tests {
 
         let ctx = ctx.unwrap();
         assert_eq!(ctx.inputs.len(), 1);
-        assert_eq!(ctx.working_dir, spec_path.parent().unwrap());
+        assert_eq!(
+            ctx.working_dir,
+            spec_path.parent().unwrap().canonicalize().unwrap()
+        );
     }
 
     #[test]
