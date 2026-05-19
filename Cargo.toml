@@ -38,3 +38,4 @@ url = "2.5.8"
 uuid = { version = "1.23.1", features = ["v4"] }
 thiserror = "2.0.18"
 validator = { version = "0.20.0", features = ["derive"] }
+reqwest = "0.13.3"

@@ -1,4 +1,4 @@
-use crate::{local_storage::LocalStorage, s3_storage::S3Storage};
+use crate::{local_storage::LocalStorage, s3_storage::S3Storage, web_storage::WebStorage};
 use async_trait::async_trait;
 use std::{
     collections::HashMap,
@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 pub mod local_storage;
 pub mod s3_storage;
+pub mod web_storage;
 
 #[async_trait]
 pub trait Storage: Send + Sync + std::fmt::Debug {
@@ -37,6 +38,8 @@ impl StorageBackend {
         let mut backends: HashMap<String, Box<dyn Storage>> = HashMap::new();
         backends.insert("file".to_string(), Box::new(LocalStorage {}));
         backends.insert("s3".to_string(), Box::new(S3Storage::new()));
+        backends.insert("http".to_string(), Box::new(WebStorage::new()));
+        backends.insert("https".to_string(), Box::new(WebStorage::new()));
         Self { inner: backends }
     }
 

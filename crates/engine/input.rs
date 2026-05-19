@@ -205,7 +205,6 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
 #[cfg(test)]
 mod tests {
     use crate::request::load_input_file_from_file;
-
     use super::*;
     use cwl_core::{documents::CommandLineTool, load_cwl_file};
     use std::collections::HashMap;

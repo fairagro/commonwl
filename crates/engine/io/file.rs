@@ -85,7 +85,6 @@ pub(crate) fn locate_file(
             }
         }
     }
-
     if let Some(contents) = &file.contents
         && file.location.is_none()
     {

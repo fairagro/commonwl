@@ -46,7 +46,7 @@ impl LocalBackend {
         storage: Arc<StorageBackend>,
         data_store: StoragePath,
     ) -> Self {
-        let backend = Arc::new(CommandBackend {});
+        let backend = Arc::new(CommandBackend::new(storage.clone()));
 
         Self {
             uuid: Uuid::new_v4().to_string()[..8].to_string(),
@@ -136,7 +136,7 @@ impl TaskBackend for LocalBackend {
             } else {
                 None
             };
- 
+
             let options = ContainerBuildOptions::builder()
                 .docker_image_id(image_id)
                 .network(request.network)
@@ -150,7 +150,7 @@ impl TaskBackend for LocalBackend {
                 .build();
             args = build_container_command(args, &inputs, options, request.specificationdir)?;
         }
-       
+
         //build crankshaft task object
         #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
@@ -218,7 +218,7 @@ impl TaskBackend for LocalBackend {
                 .read_only(false)
                 .build(),
         );
- 
+
         //handle stderr output
         let stderr_out_file = if let Some(stderr) = request.stderr_file {
             let stderr = do_eval_to_string(stderr, request.eval_context);
@@ -320,5 +320,60 @@ impl TaskBackend for LocalBackend {
 
     fn data_store(&self) -> &StoragePath {
         &self.data_store
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        ContainerEngine, InputObject, LocalBackend, create_execution_request_with_inputs,
+        execute_commandline_tool,
+    };
+    use cwl_core::{
+        files::{File, FileOrDirectory},
+        inputs::DefaultValue,
+    };
+    use cwl_engine_storage::{StorageBackend, StoragePath};
+    use std::{path::Path, sync::Arc};
+    use tempfile::tempdir;
+    use tokio_util::sync::CancellationToken;
+
+    #[tokio::test]
+    async fn test_url_in_inputs() {
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests")
+            .canonicalize()
+            .unwrap();
+        let specification_path = base_dir.join("cat-tool.cwl");
+
+        let mut inputs = InputObject::default();
+        inputs.inputs.insert(
+            "file1".to_string(),
+            DefaultValue::FileOrDirectory(FileOrDirectory::File(
+                File::builder()
+                    .location("https://raw.githubusercontent.com/JensKrumsieck/PorphyStruct/refs/heads/master/README.md")
+                    .build(),
+            )),
+        );
+
+        let storage = Arc::new(StorageBackend::new());
+        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            data_store,
+        ));
+
+        let tmpdir = tempdir().unwrap();
+        let request = create_execution_request_with_inputs(
+            specification_path,
+            inputs,
+            Some(tmpdir.path()),
+            None,
+        )
+        .unwrap();
+        let cancellation_token = CancellationToken::new();
+        let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        assert!(result.is_ok());
     }
 }

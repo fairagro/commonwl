@@ -12,11 +12,16 @@ pub(crate) mod directory;
 pub(crate) mod file;
 pub(crate) mod json;
 
+const KNOWN_SCHEMES: [&str; 5] = ["file", "http", "https", "ftp", "s3"];
+
 fn get_location(path: &str, work_dir: &Path) -> String {
     let path = urlencoding::decode(path)
         .unwrap_or(std::borrow::Cow::Borrowed(path))
         .to_string();
-    if path.starts_with("file://") {
+    if KNOWN_SCHEMES
+        .iter()
+        .any(|scheme| path.starts_with(&format!("{}://", scheme)))
+    {
         return path;
     }
 

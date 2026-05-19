@@ -8,12 +8,14 @@ use crankshaft::engine::{
         output,
     },
 };
+use cwl_engine_storage::{Storage, StorageBackend};
 use dircpy::{CopyBuilder, copy_dir};
 use futures_util::{FutureExt, future::BoxFuture};
 use nonempty::NonEmpty;
 use std::{
     path::Path,
     process::{ExitStatus, Stdio},
+    sync::Arc,
 };
 use tokio::{
     fs::{self, File},
@@ -25,7 +27,16 @@ use tracing::debug;
 use url::Url;
 
 #[derive(Debug, Clone)]
-pub struct CommandBackend;
+pub struct CommandBackend {
+    storage: Arc<StorageBackend>,
+}
+
+impl CommandBackend {
+    pub fn new(storage: Arc<StorageBackend>) -> Self {
+        Self { storage }
+    }
+}
+
 impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
     fn default_name(&self) -> &'static str {
         "command"
@@ -36,9 +47,10 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
         task: Task,
         token: CancellationToken,
     ) -> anyhow::Result<BoxFuture<'static, Result<NonEmpty<ExitStatus>, TaskRunError>>> {
+        let storage = self.storage.clone();
         Ok(async move {
             let mut statuses = Vec::new();
-            stage_inputs(task.inputs()).await?;
+            stage_inputs(storage, task.inputs()).await?;
 
             for execution in task.executions() {
                 if token.is_cancelled() {
@@ -114,7 +126,10 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
     }
 }
 
-async fn stage_inputs(inputs: impl Iterator<Item = &Input>) -> anyhow::Result<()> {
+async fn stage_inputs(
+    storage: Arc<StorageBackend>,
+    inputs: impl Iterator<Item = &Input>,
+) -> anyhow::Result<()> {
     for input in inputs {
         let dest = Path::new(input.path());
         if let Some(parent) = dest.parent() {
@@ -153,7 +168,11 @@ async fn stage_inputs(inputs: impl Iterator<Item = &Input>) -> anyhow::Result<()
                 }
             },
             Contents::Url(url) => {
-                anyhow::bail!("URL inputs are not yet supported: {url}");
+                let dest = Path::new(input.path());
+                storage
+                    .download(url, dest)
+                    .await
+                    .with_context(|| format!("Could not download {url} to {dest:?}"))?;
             }
         }
     }
