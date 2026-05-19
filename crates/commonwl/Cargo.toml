@@ -12,10 +12,11 @@ all-features = true
 [dependencies]
 cwl_core = { version = "0", path = "../core" }
 cwl_engine = { version = "0", path = "../engine", optional = true }
+cwl_engine_storage = { version = "0", path = "../storage", optional = true }
 
 [features]
 default = []
-engine = ["dep:cwl_engine"]
+engine = ["dep:cwl_engine", "dep:cwl_engine_storage"]
 tes = ["engine", "cwl_engine/tes"]
 
 [lib]

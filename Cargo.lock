@@ -1050,6 +1050,7 @@ version = "0.3.0"
 dependencies = [
  "cwl_core",
  "cwl_engine",
+ "cwl_engine_storage",
 ]
 
 [[package]]
