@@ -20,7 +20,7 @@ fn get_location(path: &str, work_dir: &Path) -> String {
         .to_string();
     if KNOWN_SCHEMES
         .iter()
-        .any(|scheme| path.starts_with(&format!("{}://", scheme)))
+        .any(|scheme| path.starts_with(&format!("{scheme}://")))
     {
         return path;
     }

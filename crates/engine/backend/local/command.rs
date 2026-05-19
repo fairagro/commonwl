@@ -32,6 +32,7 @@ pub struct CommandBackend {
 }
 
 impl CommandBackend {
+    #[must_use] 
     pub fn new(storage: Arc<StorageBackend>) -> Self {
         Self { storage }
     }
