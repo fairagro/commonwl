@@ -169,13 +169,15 @@ pub fn create_execution_request_from_document(
 
     replace_schema_definitions(&mut specification, &requirements)?;
 
+    let cwd = env::current_dir()?;
+
     let ctx = ExecutionRequest {
         requirements,
         hints,
         specification,
         inputs: inputs.inputs,
         working_dir: base_path.as_ref().to_path_buf(),
-        out_dir: outputs_path.unwrap_or(base_path.as_ref()).to_path_buf(),
+        out_dir: outputs_path.unwrap_or(&cwd).to_path_buf(),
         environment,
     };
 
