@@ -334,9 +334,13 @@ mod tests {
     #[test]
     fn test_load_input_file_different_base() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
-        let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl")
+            .canonicalize()
+            .unwrap();
+        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/cwl/tests/cat-job.json")
+            .canonicalize()
+            .unwrap();
 
         let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
         assert!(inputs.is_ok());
