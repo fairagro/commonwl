@@ -441,7 +441,6 @@ fn execute_step(
     request: &ExecutionRequest,
 ) -> anyhow::Result<JoinHandle<anyhow::Result<(String, ExecutionResult)>>> {
     let step_id_clone = step.id.clone().unwrap();
-    dbg!(&request);
     match &step.run {
         StringOrDocument::String(s) => {
             let specification_path = working_dir.join(s);
