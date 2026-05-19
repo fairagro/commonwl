@@ -119,7 +119,7 @@ pub fn create_execution_request(
     outputs_path: Option<&Path>,
 ) -> anyhow::Result<ExecutionRequest> {
     let working_dir = env::current_dir()?;
-    let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
+    let base_path = base_path(&specification_path, working_dir)?;
 
     let inputs = load_input_file_from_file(inputs_path, base_path)?;
     create_execution_request_with_inputs(specification_path, inputs, outputs_path, None)
@@ -137,7 +137,7 @@ pub fn create_execution_request_with_inputs(
     let doc = load_cwl_file(&specification_path, true)?;
 
     let working_dir = env::current_dir()?;
-    let base_path = specification_path.as_ref().parent().unwrap_or(&working_dir);
+    let base_path = base_path(&specification_path, working_dir)?;
 
     create_execution_request_from_document(doc, inputs, base_path, outputs_path, parent)
 }
@@ -270,6 +270,21 @@ fn adjust_path_to_base(
         }
         _ => {}
     }
+}
+
+fn base_path(
+    specification_path: impl AsRef<Path> + std::fmt::Debug,
+    working_dir: impl AsRef<Path>,
+) -> anyhow::Result<PathBuf> {
+    let p = specification_path
+        .as_ref()
+        .parent()
+        .unwrap_or(working_dir.as_ref());
+    Ok(if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        working_dir.as_ref().join(p)
+    })
 }
 
 #[cfg(test)]
