@@ -199,7 +199,7 @@ pub fn load_input_file_from_file(
     };
 
     let content = std::fs::read_to_string(&path)
-        .with_context(|| format!("Could not read input file {path:?}"))?;
+        .with_context(|| format!("Could not read input file {}", path.display()))?;
     let mut values: HashMap<String, serde_json::Value> = serde_saphyr::from_str(&content)?;
 
     //calculate path relativity
