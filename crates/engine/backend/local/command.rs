@@ -32,7 +32,7 @@ pub struct CommandBackend {
 }
 
 impl CommandBackend {
-    #[must_use] 
+    #[must_use]
     pub fn new(storage: Arc<StorageBackend>) -> Self {
         Self { storage }
     }
@@ -173,7 +173,7 @@ async fn stage_inputs(
                 storage
                     .download(url, dest)
                     .await
-                    .with_context(|| format!("Could not download {url} to {dest:?}"))?;
+                    .with_context(|| format!("Could not download {url} to {dest}"))?;
             }
         }
     }
