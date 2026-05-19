@@ -281,7 +281,7 @@ fn base_path(
         .parent()
         .unwrap_or(working_dir.as_ref());
     Ok(if p.is_absolute() {
-        p.to_path_buf()
+        p.canonicalize()?
     } else {
         working_dir.as_ref().join(p)
     })
