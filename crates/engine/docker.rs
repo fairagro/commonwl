@@ -136,9 +136,11 @@ pub fn build_container_command(
     };
 
     for input in inputs {
-        let loc = input.location().unwrap().strip_prefix("file://").unwrap();
+        let loc = Path::new(input.location().unwrap().strip_prefix("file://").unwrap());
+        let loc = loc.canonicalize()?; //resolve `..` to have an absolute path that can be safely mounted
         let mount = format!(
-            "--mount=type=bind,source={loc},target={}",
+            "--mount=type=bind,source={},target={}",
+            loc.display(),
             input.path().unwrap()
         );
         args.push(mount);
