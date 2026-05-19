@@ -173,7 +173,7 @@ async fn stage_inputs(
                 storage
                     .download(url, dest)
                     .await
-                    .with_context(|| format!("Could not download {url} to {dest}"))?;
+                    .with_context(|| format!("Could not download {url} to {}", dest.display()))?;
             }
         }
     }
