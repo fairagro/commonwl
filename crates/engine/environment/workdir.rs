@@ -170,8 +170,8 @@ fn stage_dirent(
         if !path.is_absolute() {
             path = workdir.join(path);
         }
-        let url = Url::from_file_path(path)
-            .map_err(|()| anyhow::anyhow!("Could not create URL from path"))?;
+        let url = Url::from_file_path(&path)
+            .map_err(|()| anyhow::anyhow!("Could not create URL from path {}", path.display()))?;
 
         let entryname = get_entryname(dirent, context)?;
         let staged_path = stagedir.join(&entryname)?;
