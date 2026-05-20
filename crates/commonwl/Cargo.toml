@@ -1,13 +1,17 @@
 [package]
 name = "commonwl"
 description = "Rust implementation of the CommonWorkflowLanguage (CWL) standard"
+readme = "../../README.md"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
 cwl_core = { version = "0", path = "../core" }
