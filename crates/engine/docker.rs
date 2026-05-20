@@ -11,7 +11,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::environment::workdir::{self, WorkDirMount};
+use crate::{environment::workdir::{self, WorkDirMount}, string_url_to_file_path};
 
 /// builds a Docker container using the bollard Docker client
 pub(crate) async fn build_container(
@@ -136,7 +136,7 @@ pub fn build_container_command(
     };
 
     for input in inputs {
-        let loc = Path::new(input.location().unwrap().strip_prefix("file://").unwrap());
+        let loc = string_url_to_file_path(input.location().unwrap())?;
         let loc = loc.canonicalize()?; //resolve `..` to have an absolute path that can be safely mounted
         let mount = format!(
             "--mount=type=bind,source={},target={}",

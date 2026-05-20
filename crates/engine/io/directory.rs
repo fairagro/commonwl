@@ -1,4 +1,7 @@
-use crate::io::{file::locate_file, get_location, get_relative_path};
+use crate::{
+    io::{file::locate_file, get_location, get_relative_path},
+    string_url_to_file_path,
+};
 use anyhow::Context;
 use cwl_core::{
     FilePathMetaData,
@@ -55,15 +58,14 @@ pub(crate) fn locate_dir(
 
         //try getting checksum and size (currently for local files only). Ignores failure (which usually means the file does not exist!)
         if url.scheme() == "file" {
-            let path = Path::new(location.strip_prefix("file://").unwrap());
-
+            let path = string_url_to_file_path(&location)?;
             let listing = match load_listing {
                 Some(LoadListingEnum::NoListing) | None => None,
                 Some(LoadListingEnum::ShallowListing) => {
-                    Some(read_dir(path, false, work_dir, stage_dir)?)
+                    Some(read_dir(&path, false, work_dir, stage_dir)?)
                 }
                 Some(LoadListingEnum::DeepListing) => {
-                    Some(read_dir(path, true, work_dir, stage_dir)?)
+                    Some(read_dir(&path, true, work_dir, stage_dir)?)
                 }
             };
             dir.listing = listing;

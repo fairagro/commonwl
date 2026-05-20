@@ -1,6 +1,7 @@
 #![deny(unused_crate_dependencies)]
 use cwl_core::documents::CWLDocument;
 use semver::Version;
+use std::path::PathBuf;
 
 pub(crate) mod backend;
 pub(crate) mod command;
@@ -47,3 +48,18 @@ pub use request::{
     create_execution_request_from_document, create_execution_request_with_inputs,
     load_input_file_from_file,
 };
+use url::Url;
+
+pub(crate) fn string_url_to_file_path(url: &str) -> anyhow::Result<PathBuf> {
+    let url = Url::parse(url)?;
+    if url.scheme() != "file" {
+        anyhow::bail!("URL scheme is not 'file'");
+    }
+    url.to_file_path()
+        .map_err(|()| anyhow::anyhow!("Invalid file URL"))
+}
+
+pub(crate) fn string_url_to_path_string(url: &str) -> anyhow::Result<String> {
+    let path = string_url_to_file_path(url)?;
+    Ok(path.to_string_lossy().to_string())
+}

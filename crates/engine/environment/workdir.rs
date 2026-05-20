@@ -1,7 +1,7 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string, extract_input_name},
-    io::json::to_string_dump,
-    io::{directory::move_dir, file::move_file},
+    io::{directory::move_dir, file::move_file, json::to_string_dump},
+    string_url_to_path_string,
 };
 use cwl_core::{
     OneOrMany,
@@ -236,7 +236,7 @@ fn stage_dirent(
             } else {
                 let mut path = file.location.clone().unwrap();
                 if path.starts_with("file://") {
-                    path.drain(..7);
+                    path = string_url_to_path_string(&path)?;
                 }
 
                 let absolute_path = if Path::new(&path).is_absolute() {
@@ -302,7 +302,7 @@ fn stage_files(
     };
 
     if let Some(path) = item.location() {
-        let path = path.strip_prefix("file://").unwrap_or(path); //TODO: check scheme
+        let path = string_url_to_path_string(path).unwrap_or(path.clone()); //TODO: check scheme
         let mut path = PathBuf::from(path);
         if !path.is_absolute() {
             path = workdir.join(path);

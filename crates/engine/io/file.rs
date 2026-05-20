@@ -1,7 +1,7 @@
 use crate::{
     expression::{EvaluationContext, do_eval},
-    io::checksum,
-    io::{directory::locate_dir, get_location, get_relative_path},
+    io::{checksum, directory::locate_dir, get_location, get_relative_path},
+    string_url_to_file_path,
 };
 use cwl_core::{
     BoolOrExpression, FileMetaData, FilePathMetaData, Integer, OneOrMany,
@@ -69,14 +69,12 @@ pub(crate) fn locate_file(
         //try getting checksum and size (currently for local files only). Ignores failure (which usually means the file does not exist!)
         if url.scheme() == "file"
             && let Ok(FileMetaData { size, checksum }) =
-                get_file_metadata(Path::new(location.strip_prefix("file://").unwrap()))
+                get_file_metadata(&string_url_to_file_path(&location)?)
         {
             file.checksum = checksum;
             file.size = Some(Integer::Long(size.cast_signed()));
             if load_contents && size < 64 * 1024 {
-                file.contents = Some(fs::read_to_string(
-                    location.strip_prefix("file://").unwrap(),
-                )?);
+                file.contents = Some(fs::read_to_string(&string_url_to_file_path(&location)?)?);
             } else if load_contents {
                 anyhow::bail!(
                     "Can not load file contents if file is larger than {} bytes.",

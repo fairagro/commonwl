@@ -1,6 +1,6 @@
 use crate::{
     environment::workdir::{MountType, Source, WorkDirMount},
-    io::normalize_url,
+    io::normalize_url, string_url_to_path_string,
 };
 use anyhow::{Context, ensure};
 use crankshaft::engine::{
@@ -33,7 +33,7 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
             location.clone()
         };
         let contents = if location.starts_with("file://") {
-            let location = location.strip_prefix("file://").unwrap();
+            let location = string_url_to_path_string(&location)?;
             Contents::Path(PathBuf::from(location))
         } else {
             Contents::Url(Url::parse(&location)?)

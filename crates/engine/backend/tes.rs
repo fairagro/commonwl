@@ -3,7 +3,7 @@ use crate::{
         TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
-    expression::{do_eval, do_eval_to_string},
+    expression::{do_eval, do_eval_to_string}, string_url_to_path_string,
 };
 use async_trait::async_trait;
 use crankshaft::{
@@ -294,7 +294,7 @@ impl TesBackend {
             .enumerate()
             .filter_map(|(i, input)| {
                 let location = input.location()?;
-                let path = location.strip_prefix("file://")?.to_owned();
+                let path = string_url_to_path_string(location).ok()?;
                 let dest = outdir
                     .join(&format!(
                         "inputs/{}{}",

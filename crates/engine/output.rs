@@ -5,6 +5,7 @@ use crate::{
         unique_path,
     },
     schema::{format_validation::FormatValidator, validation::validate_type},
+    string_url_to_path_string,
     workflow::{handle_link_merge, handle_pick_value},
 };
 use anyhow::Context;
@@ -58,14 +59,14 @@ pub(crate) async fn collect_command_outputs(
             match value {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                     let path = f.path.clone().or(f.location.clone()).unwrap();
-                    let path = path.strip_prefix("file://").unwrap_or(&path);
+                    let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
                     *value = handle_file(&path, None, context, storage.clone()).await?;
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     let path = d.path.clone().or(d.location.clone()).unwrap();
-                    let path = path.strip_prefix("file://").unwrap_or(&path);
+                    let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
                     *value = handle_dir(&path, context, storage.clone()).await?;
                 }
@@ -360,13 +361,7 @@ async fn validate_dir(
         let mut source_path = source_path.to_owned();
         if !Path::new(&source_path).exists() {
             debug!("Path field contains container path. Trying to use location: {dir:?}");
-            source_path = dir
-                .location
-                .as_ref()
-                .unwrap()
-                .strip_prefix("file://")
-                .unwrap()
-                .to_string();
+            source_path = string_url_to_path_string(dir.location.as_ref().unwrap())?;
         }
 
         let parent = dest_path.parent().unwrap();

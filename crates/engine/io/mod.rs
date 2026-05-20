@@ -8,6 +8,8 @@ use std::{
 };
 use url::Url;
 
+use crate::string_url_to_file_path;
+
 pub(crate) mod directory;
 pub(crate) mod file;
 pub(crate) mod json;
@@ -65,9 +67,7 @@ pub fn load_file_contents(dv: &mut DefaultValue) -> anyhow::Result<()> {
             if let Some(size) = &file.size
                 && size.as_i64() < 64 * 1024
             {
-                file.contents = Some(fs::read_to_string(
-                    location.strip_prefix("file://").unwrap(),
-                )?);
+                file.contents = Some(fs::read_to_string(&string_url_to_file_path(location)?)?);
             } else {
                 anyhow::bail!(
                     "Can not load file contents if file is larger than {} bytes.",
