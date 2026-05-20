@@ -69,6 +69,7 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
     Ok(())
 }
 
+#[allow(unused)]
 pub enum MountStrategy {
     Local,
     Remote {

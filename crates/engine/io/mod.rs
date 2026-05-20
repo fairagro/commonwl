@@ -2,6 +2,7 @@ use base16ct::HexDisplay;
 use cwl_core::{files::FileOrDirectory, inputs::DefaultValue};
 use sha1::{Digest, Sha1};
 use std::{
+    env::current_dir,
     fs,
     io::{BufReader, Read},
     path::{Path, PathBuf},
@@ -17,6 +18,13 @@ pub(crate) mod json;
 const KNOWN_SCHEMES: [&str; 5] = ["file", "http", "https", "ftp", "s3"];
 
 fn get_location(path: &str, work_dir: &Path) -> String {
+    let work_dir = if !work_dir.is_absolute() {
+        let current_dir = current_dir().unwrap();
+        current_dir.join(work_dir)
+    } else {
+        work_dir.to_path_buf()
+    };
+
     let path = urlencoding::decode(path)
         .unwrap_or(std::borrow::Cow::Borrowed(path))
         .to_string();
