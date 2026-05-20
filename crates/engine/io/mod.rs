@@ -18,11 +18,11 @@ pub(crate) mod json;
 const KNOWN_SCHEMES: [&str; 5] = ["file", "http", "https", "ftp", "s3"];
 
 fn get_location(path: &str, work_dir: &Path) -> String {
-    let work_dir = if !work_dir.is_absolute() {
+    let work_dir = if work_dir.is_absolute() {
+        work_dir.to_path_buf()
+    } else {
         let current_dir = current_dir().unwrap();
         current_dir.join(work_dir)
-    } else {
-        work_dir.to_path_buf()
     };
 
     let path = urlencoding::decode(path)
