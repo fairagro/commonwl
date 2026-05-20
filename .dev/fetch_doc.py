@@ -28,8 +28,8 @@ document_loader: Final = Loader(
 
 i = cast(list[dict[str, Any]], schema_doc)
 j = schema.extend_and_specialize(i, document_loader)
-
-os.makedirs("docs/gen", exist_ok=True)
+root = "crates/core/docs"
+os.makedirs(root, exist_ok=True)
 
 known_types = []
 
@@ -99,9 +99,8 @@ def process_item(rec: dict[str, Any], parent: Optional[str]):
 
     if parent:
         name = f"{parent}_{name}"
-
     if doc and name:
-        with open(f"docs/gen/{name}.md", "w") as f:
+        with open(f"{root}/{name}.md", "w") as f:
             if isinstance(doc, list):
                 content = "\n".join(doc)
             else:

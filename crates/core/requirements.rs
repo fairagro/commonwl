@@ -148,16 +148,16 @@ pub struct Include {
     pub include: String,
 }
 
-#[doc = include_str!("../../docs/gen/SchemaDefRequirement.md")]
+#[doc = include_str!("docs/SchemaDefRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, Default, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#SchemaDefRequirement>
 pub struct SchemaDefRequirement {
-    #[doc = include_str!("../../docs/gen/SchemaDefRequirement_types.md")]
+    #[doc = include_str!("docs/SchemaDefRequirement_types.md")]
     pub types: Value,
 }
 
-#[doc = include_str!("../../docs/gen/LoadListingRequirement.md")]
+#[doc = include_str!("docs/LoadListingRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#LoadListingRequirement>
@@ -165,43 +165,43 @@ pub struct LoadListingRequirement {
     pub load_listing: LoadListingEnum,
 }
 
-#[doc = include_str!("../../docs/gen/DockerRequirement.md")]
+#[doc = include_str!("docs/DockerRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#DockerRequirement>
 pub struct DockerRequirement {
-    #[doc = include_str!("../../docs/gen/DockerRequirement_dockerPull.md")]
+    #[doc = include_str!("docs/DockerRequirement_dockerPull.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_pull: Option<String>,
-    #[doc = include_str!("../../docs/gen/DockerRequirement_dockerLoad.md")]
+    #[doc = include_str!("docs/DockerRequirement_dockerLoad.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_load: Option<String>,
-    #[doc = include_str!("../../docs/gen/DockerRequirement_dockerFile.md")]
+    #[doc = include_str!("docs/DockerRequirement_dockerFile.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_file: Option<StringOrInclude>,
-    #[doc = include_str!("../../docs/gen/DockerRequirement_dockerImport.md")]
+    #[doc = include_str!("docs/DockerRequirement_dockerImport.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_import: Option<String>,
-    #[doc = include_str!("../../docs/gen/DockerRequirement_dockerImageId.md")]
+    #[doc = include_str!("docs/DockerRequirement_dockerImageId.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_image_id: Option<String>,
-    #[doc = include_str!("../../docs/gen/DockerRequirement_dockerOutputDirectory.md")]
+    #[doc = include_str!("docs/DockerRequirement_dockerOutputDirectory.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub docker_output_directory: Option<String>,
 }
 
-#[doc = include_str!("../../docs/gen/SoftwareRequirement.md")]
+#[doc = include_str!("docs/SoftwareRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#SoftwareRequirement>
 pub struct SoftwareRequirement {
-    #[doc = include_str!("../../docs/gen/SoftwareRequirement_packages.md")]
+    #[doc = include_str!("docs/SoftwareRequirement_packages.md")]
     #[serde(deserialize_with = "deserialize_map_list_package")]
     pub packages: Vec<SoftwarePackage>,
 }
@@ -210,12 +210,12 @@ pub struct SoftwareRequirement {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#SoftwarePackage>
 pub struct SoftwarePackage {
-    #[doc = include_str!("../../docs/gen/SoftwarePackage_package.md")]
+    #[doc = include_str!("docs/SoftwarePackage_package.md")]
     pub package: String,
-    #[doc = include_str!("../../docs/gen/SoftwarePackage_version.md")]
+    #[doc = include_str!("docs/SoftwarePackage_version.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<Vec<String>>,
-    #[doc = include_str!("../../docs/gen/SoftwarePackage_specs.md")]
+    #[doc = include_str!("docs/SoftwarePackage_specs.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub specs: Option<Vec<String>>,
 }
@@ -238,21 +238,21 @@ pub enum WorkDirItems {
     ListingItems(Box<OneOrMany<ListingItems>>),
 }
 
-#[doc = include_str!("../../docs/gen/InitialWorkDirRequirement.md")]
+#[doc = include_str!("docs/InitialWorkDirRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#InitialWorkDirRequirement>
 pub struct InitialWorkDirRequirement {
-    #[doc = include_str!("../../docs/gen/InitialWorkDirRequirement_listing.md")]
+    #[doc = include_str!("docs/InitialWorkDirRequirement_listing.md")]
     pub listing: WorkDirItems,
 }
 
-#[doc = include_str!("../../docs/gen/EnvVarRequirement.md")]
+#[doc = include_str!("docs/EnvVarRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#EnvVarRequirement>
 pub struct EnvVarRequirement {
-    #[doc = include_str!("../../docs/gen/EnvVarRequirement_envDef.md")]
+    #[doc = include_str!("docs/EnvVarRequirement_envDef.md")]
     #[serde(deserialize_with = "deserialize_map_list_envname", rename = "envDef")]
     pub env_def: Vec<EnvironmentDef>,
 }
@@ -267,65 +267,65 @@ impl EnvVarRequirement {
     }
 }
 
-#[doc = include_str!("../../docs/gen/EnvironmentDef.md")]
+#[doc = include_str!("docs/EnvironmentDef.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#EnvironmentDef>
 pub struct EnvironmentDef {
-    #[doc = include_str!("../../docs/gen/EnvironmentDef_envName.md")]
+    #[doc = include_str!("docs/EnvironmentDef_envName.md")]
     #[builder(into)]
     pub env_name: String,
-    #[doc = include_str!("../../docs/gen/EnvironmentDef_envValue.md")]
+    #[doc = include_str!("docs/EnvironmentDef_envValue.md")]
     #[builder(into)]
     pub env_value: String,
 }
 make_shorthand_impl!(EnvironmentDef, "envName", "envValue");
 
-#[doc = include_str!("../../docs/gen/ShellCommandRequirement.md")]
+#[doc = include_str!("docs/ShellCommandRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#ShellCommandRequirement>
 pub struct ShellCommandRequirement;
 
-#[doc = include_str!("../../docs/gen/ResourceRequirement.md")]
+#[doc = include_str!("docs/ResourceRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone, Default, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#ResourceRequirement>
 pub struct ResourceRequirement {
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_coresMin.md")]
+    #[doc = include_str!("docs/ResourceRequirement_coresMin.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cores_min: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_coresMax.md")]
+    #[doc = include_str!("docs/ResourceRequirement_coresMax.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub cores_max: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_ramMin.md")]
+    #[doc = include_str!("docs/ResourceRequirement_ramMin.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub ram_min: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_ramMax.md")]
+    #[doc = include_str!("docs/ResourceRequirement_ramMax.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub ram_max: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_tmpdirMin.md")]
+    #[doc = include_str!("docs/ResourceRequirement_tmpdirMin.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub tmpdir_min: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_tmpdirMax.md")]
+    #[doc = include_str!("docs/ResourceRequirement_tmpdirMax.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub tmpdir_max: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_outdirMin.md")]
+    #[doc = include_str!("docs/ResourceRequirement_outdirMin.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub outdir_min: Option<NumberOrExpression>,
-    #[doc = include_str!("../../docs/gen/ResourceRequirement_outdirMax.md")]
+    #[doc = include_str!("docs/ResourceRequirement_outdirMax.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub outdir_max: Option<NumberOrExpression>,
 }
 
-#[doc = include_str!("../../docs/gen/WorkReuse.md")]
+#[doc = include_str!("docs/WorkReuse.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkReuse>
@@ -333,7 +333,7 @@ pub struct WorkReuse {
     pub enable_reuse: BoolOrExpression,
 }
 
-#[doc = include_str!("../../docs/gen/NetworkAccess.md")]
+#[doc = include_str!("docs/NetworkAccess.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#NetworkAccess>
@@ -341,7 +341,7 @@ pub struct NetworkAccess {
     pub network_access: BoolOrExpression,
 }
 
-#[doc = include_str!("../../docs/gen/InplaceUpdateRequirement.md")]
+#[doc = include_str!("docs/InplaceUpdateRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#InplaceUpdateRequirement>
@@ -349,31 +349,31 @@ pub struct InplaceUpdateRequirement {
     pub inplace_update: bool,
 }
 
-#[doc = include_str!("../../docs/gen/ToolTimeLimit.md")]
+#[doc = include_str!("docs/ToolTimeLimit.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#ToolTimeLimit>
 pub struct ToolTimeLimit {
-    #[doc = include_str!("../../docs/gen/ToolTimeLimit_timelimit.md")]
+    #[doc = include_str!("docs/ToolTimeLimit_timelimit.md")]
     pub timelimit: IntegerOrExpression,
 }
 
-#[doc = include_str!("../../docs/gen/SubworkflowFeatureRequirement.md")]
+#[doc = include_str!("docs/SubworkflowFeatureRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#SubworkflowFeatureRequirement>
 pub struct SubworkflowFeatureRequirement;
 
-#[doc = include_str!("../../docs/gen/ScatterFeatureRequirement.md")]
+#[doc = include_str!("docs/ScatterFeatureRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#ScatterFeatureRequirement>
 pub struct ScatterFeatureRequirement;
 
-#[doc = include_str!("../../docs/gen/MultipleInputFeatureRequirement.md")]
+#[doc = include_str!("docs/MultipleInputFeatureRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#MultipleInputFeatureRequirement>
 pub struct MultipleInputFeatureRequirement;
 
-#[doc = include_str!("../../docs/gen/StepInputExpressionRequirement.md")]
+#[doc = include_str!("docs/StepInputExpressionRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#StepInputExpressionRequirement>
 pub struct StepInputExpressionRequirement;

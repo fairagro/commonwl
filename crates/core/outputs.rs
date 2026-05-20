@@ -13,10 +13,10 @@ use serde_json::Value;
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandOutputParameterType {
-    #[doc = include_str!("../../docs/gen/stdout.md")]
+    #[doc = include_str!("docs/stdout.md")]
     #[serde(rename = "stdout")]
     Stdout,
-    #[doc = include_str!("../../docs/gen/stderr.md")]
+    #[doc = include_str!("docs/stderr.md")]
     #[serde(rename = "stderr")]
     Stderr,
     CommandOutputType(OneOrMany<CommandOutputType>),
@@ -72,43 +72,43 @@ impl From<OneOrMany<OutputType>> for CommandOutputParameterType {
     }
 }
 
-#[doc = include_str!("../../docs/gen/CommandOutputParameter.md")]
+#[doc = include_str!("docs/CommandOutputParameter.md")]
 #[derive(
     Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputParameter>
 pub struct CommandOutputParameter {
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_type.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: CommandOutputParameterType,
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_label.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_streamable.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_doc.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_doc.md")]
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_format.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputParameter_outputBinding.md")]
+    #[doc = include_str!("docs/CommandOutputParameter_outputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub output_binding: Option<CommandOutputBinding>,
@@ -116,52 +116,52 @@ pub struct CommandOutputParameter {
 
 make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
-#[doc = include_str!("../../docs/gen/WorkflowOutputParameter.md")]
+#[doc = include_str!("docs/WorkflowOutputParameter.md")]
 #[derive(
     Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowOutputParameter>
 pub struct WorkflowOutputParameter {
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_type.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: CommandOutputParameterType,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_label.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_streamable.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_doc.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_id.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_format.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_outputSource.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_outputSource.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub output_source: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_linkMerge.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_linkMerge.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub link_merge: Option<LinkMergeMethod>,
-    #[doc = include_str!("../../docs/gen/WorkflowOutputParameter_pickValue.md")]
+    #[doc = include_str!("docs/WorkflowOutputParameter_pickValue.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub pick_value: Option<PickValueMethod>,
@@ -169,40 +169,40 @@ pub struct WorkflowOutputParameter {
 
 make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
-#[doc = include_str!("../../docs/gen/OperationOutputParameter.md")]
+#[doc = include_str!("docs/OperationOutputParameter.md")]
 #[derive(
     Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OperationOutputParameter>
 pub struct OperationOutputParameter {
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_type.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: OneOrMany<OutputType>,
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_label.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_streamable.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_doc.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_id.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/OperationOutputParameter_format.md")]
+    #[doc = include_str!("docs/OperationOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
@@ -216,33 +216,33 @@ make_shorthand_impl!(OperationOutputParameter, "id", "type");
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#ExpressionTool>
 pub struct ExpressionToolOutputParameter {
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_type.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: OneOrMany<OutputType>,
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_label.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_streamable.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_doc.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_id.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/ExpressionToolOutputParameter_format.md")]
+    #[doc = include_str!("docs/ExpressionToolOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
@@ -374,18 +374,18 @@ impl From<OneOrMany<CommandOutputType>> for OneOrMany<OutputType> {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputRecordSchema>
 pub struct CommandOutputRecordSchema {
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordSchema_fields.md")]
+    #[doc = include_str!("docs/CommandOutputRecordSchema_fields.md")]
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<CommandOutputRecordField>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordSchema_label.md")]
+    #[doc = include_str!("docs/CommandOutputRecordSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordSchema_doc.md")]
+    #[doc = include_str!("docs/CommandOutputRecordSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordSchema_name.md")]
+    #[doc = include_str!("docs/CommandOutputRecordSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -407,18 +407,18 @@ impl From<OutputRecordSchema> for CommandOutputRecordSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OutputRecordSchema>
 pub struct OutputRecordSchema {
-    #[doc = include_str!("../../docs/gen/OutputRecordSchema_fields.md")]
+    #[doc = include_str!("docs/OutputRecordSchema_fields.md")]
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fields: Option<Vec<OutputRecordField>>,
-    #[doc = include_str!("../../docs/gen/OutputRecordSchema_label.md")]
+    #[doc = include_str!("docs/OutputRecordSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/OutputRecordSchema_doc.md")]
+    #[doc = include_str!("docs/OutputRecordSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/OutputRecordSchema_name.md")]
+    #[doc = include_str!("docs/OutputRecordSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -440,28 +440,28 @@ impl From<CommandOutputRecordSchema> for OutputRecordSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputRecordField>
 pub struct CommandOutputRecordField {
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_name.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_name.md")]
     pub name: String,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_type.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_type.md")]
     pub r#type: OneOrMany<CommandOutputType>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_doc.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_label.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_secondaryFiles.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_streamable.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_format.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputRecordField_outputBinding.md")]
+    #[doc = include_str!("docs/CommandOutputRecordField_outputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_binding: Option<CommandOutputBinding>,
 }
@@ -487,25 +487,25 @@ make_shorthand_impl!(CommandOutputRecordField, "name", "type");
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OutputRecordField>
 pub struct OutputRecordField {
-    #[doc = include_str!("../../docs/gen/OutputRecordField_name.md")]
+    #[doc = include_str!("docs/OutputRecordField_name.md")]
     pub name: String,
-    #[doc = include_str!("../../docs/gen/OutputRecordField_type.md")]
+    #[doc = include_str!("docs/OutputRecordField_type.md")]
     pub r#type: OneOrMany<OutputType>,
-    #[doc = include_str!("../../docs/gen/OutputRecordField_doc.md")]
+    #[doc = include_str!("docs/OutputRecordField_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/OutputRecordField_label.md")]
+    #[doc = include_str!("docs/OutputRecordField_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/OutputRecordField_secondaryFiles.md")]
+    #[doc = include_str!("docs/OutputRecordField_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/OutputRecordField_streamable.md")]
+    #[doc = include_str!("docs/OutputRecordField_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/OutputRecordField_format.md")]
+    #[doc = include_str!("docs/OutputRecordField_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<OneOrMany<String>>,
 }
@@ -530,15 +530,15 @@ impl From<CommandOutputRecordField> for OutputRecordField {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputEnumSchema>
 pub struct CommandOutputEnumSchema {
-    #[doc = include_str!("../../docs/gen/CommandOutputEnumSchema_symbols.md")]
+    #[doc = include_str!("docs/CommandOutputEnumSchema_symbols.md")]
     pub symbols: Vec<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputEnumSchema_name.md")]
+    #[doc = include_str!("docs/CommandOutputEnumSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputEnumSchema_label.md")]
+    #[doc = include_str!("docs/CommandOutputEnumSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputEnumSchema_doc.md")]
+    #[doc = include_str!("docs/CommandOutputEnumSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
 }
@@ -558,15 +558,15 @@ impl From<OutputEnumSchema> for CommandOutputEnumSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OutputEnumSchema>
 pub struct OutputEnumSchema {
-    #[doc = include_str!("../../docs/gen/OutputEnumSchema_symbols.md")]
+    #[doc = include_str!("docs/OutputEnumSchema_symbols.md")]
     pub symbols: Vec<String>,
-    #[doc = include_str!("../../docs/gen/OutputEnumSchema_name.md")]
+    #[doc = include_str!("docs/OutputEnumSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[doc = include_str!("../../docs/gen/OutputEnumSchema_label.md")]
+    #[doc = include_str!("docs/OutputEnumSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/OutputEnumSchema_doc.md")]
+    #[doc = include_str!("docs/OutputEnumSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
 }
@@ -586,15 +586,15 @@ impl From<CommandOutputEnumSchema> for OutputEnumSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputArraySchema>
 pub struct CommandOutputArraySchema {
-    #[doc = include_str!("../../docs/gen/CommandOutputArraySchema_items.md")]
+    #[doc = include_str!("docs/CommandOutputArraySchema_items.md")]
     pub items: OneOrMany<CommandOutputType>,
-    #[doc = include_str!("../../docs/gen/CommandOutputArraySchema_label.md")]
+    #[doc = include_str!("docs/CommandOutputArraySchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandOutputArraySchema_doc.md")]
+    #[doc = include_str!("docs/CommandOutputArraySchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputArraySchema_name.md")]
+    #[doc = include_str!("docs/CommandOutputArraySchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -614,15 +614,15 @@ impl From<OutputArraySchema> for CommandOutputArraySchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OutputArraySchema>
 pub struct OutputArraySchema {
-    #[doc = include_str!("../../docs/gen/OutputArraySchema_items.md")]
+    #[doc = include_str!("docs/OutputArraySchema_items.md")]
     pub items: OneOrMany<OutputType>,
-    #[doc = include_str!("../../docs/gen/OutputArraySchema_label.md")]
+    #[doc = include_str!("docs/OutputArraySchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/OutputArraySchema_doc.md")]
+    #[doc = include_str!("docs/OutputArraySchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/OutputArraySchema_name.md")]
+    #[doc = include_str!("docs/OutputArraySchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
 }
@@ -638,21 +638,21 @@ impl From<CommandOutputArraySchema> for OutputArraySchema {
     }
 }
 
-#[doc = include_str!("../../docs/gen/CommandOutputBinding.md")]
+#[doc = include_str!("docs/CommandOutputBinding.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputBinding>
 pub struct CommandOutputBinding {
-    #[doc = include_str!("../../docs/gen/CommandOutputBinding_loadContents.md")]
+    #[doc = include_str!("docs/CommandOutputBinding_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandOutputBinding_loadListing.md")]
+    #[doc = include_str!("docs/CommandOutputBinding_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_listing: Option<LoadListingEnum>,
-    #[doc = include_str!("../../docs/gen/CommandOutputBinding_glob.md")]
+    #[doc = include_str!("docs/CommandOutputBinding_glob.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub glob: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandOutputBinding_outputEval.md")]
+    #[doc = include_str!("docs/CommandOutputBinding_outputEval.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_eval: Option<String>,
 }
@@ -678,12 +678,12 @@ impl StringOrWorkflowStepOutput {
     }
 }
 
-#[doc = include_str!("../../docs/gen/WorkflowStepOutput.md")]
+#[doc = include_str!("docs/WorkflowStepOutput.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStepOutput>
 pub struct WorkflowStepOutput {
-    #[doc = include_str!("../../docs/gen/WorkflowStepOutput_id.md")]
+    #[doc = include_str!("docs/WorkflowStepOutput_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     id: Option<String>,
 }

@@ -260,83 +260,83 @@ impl_document_defaults!(ExpressionTool, WorkflowRequirements, WorkflowHints);
 impl_document_defaults!(Operation, WorkflowRequirements, WorkflowHints);
 impl_document_defaults!(Workflow, WorkflowRequirements, WorkflowHints);
 
-#[doc = include_str!("../../docs/gen/CommandLineTool.md")]
+#[doc = include_str!("docs/CommandLineTool.md")]
 #[derive(
     Serialize, Deserialize, Debug, Clone, Default, Builder, Identifiable, PartialEq, Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandLineTool>
 pub struct CommandLineTool {
-    #[doc = include_str!("../../docs/gen/CommandLineTool_inputs.md")]
+    #[doc = include_str!("docs/CommandLineTool_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub inputs: Vec<CommandInputParameter>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_outputs.md")]
+    #[doc = include_str!("docs/CommandLineTool_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub outputs: Vec<CommandOutputParameter>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_id.md")]
+    #[doc = include_str!("docs/CommandLineTool_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_label.md")]
+    #[doc = include_str!("docs/CommandLineTool_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_doc.md")]
+    #[doc = include_str!("docs/CommandLineTool_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_requirements.md")]
+    #[doc = include_str!("docs/CommandLineTool_requirements.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<ToolRequirements>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_hints.md")]
+    #[doc = include_str!("docs/CommandLineTool_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<ToolHints>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_cwlVersion.md")]
+    #[doc = include_str!("docs/CommandLineTool_cwlVersion.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_intent.md")]
+    #[doc = include_str!("docs/CommandLineTool_intent.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_baseCommand.md")]
+    #[doc = include_str!("docs/CommandLineTool_baseCommand.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub base_command: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_arguments.md")]
+    #[doc = include_str!("docs/CommandLineTool_arguments.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub arguments: Option<Vec<Argument>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_stdin.md")]
+    #[doc = include_str!("docs/CommandLineTool_stdin.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub stdin: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_stderr.md")]
+    #[doc = include_str!("docs/CommandLineTool_stderr.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub stderr: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_stdout.md")]
+    #[doc = include_str!("docs/CommandLineTool_stdout.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub stdout: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_successCodes.md")]
+    #[doc = include_str!("docs/CommandLineTool_successCodes.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub success_codes: Option<Vec<i32>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_temporaryFailCodes.md")]
+    #[doc = include_str!("docs/CommandLineTool_temporaryFailCodes.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub temporary_fail_codes: Option<Vec<i32>>,
-    #[doc = include_str!("../../docs/gen/CommandLineTool_permanentFailCodes.md")]
+    #[doc = include_str!("docs/CommandLineTool_permanentFailCodes.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub permanent_fail_codes: Option<Vec<i32>>,
@@ -346,55 +346,55 @@ pub struct CommandLineTool {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
-#[doc = include_str!("../../docs/gen/ExpressionTool.md")]
+#[doc = include_str!("docs/ExpressionTool.md")]
 #[derive(
     Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#ExpressionTool>
 pub struct ExpressionTool {
-    #[doc = include_str!("../../docs/gen/ExpressionTool_inputs.md")]
+    #[doc = include_str!("docs/ExpressionTool_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub inputs: Vec<WorkflowInputParameter>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_outputs.md")]
+    #[doc = include_str!("docs/ExpressionTool_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub outputs: Vec<ExpressionToolOutputParameter>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_expression.md")]
+    #[doc = include_str!("docs/ExpressionTool_expression.md")]
     #[builder(into)]
     #[validate(custom(function = "validate_expression"))]
     pub expression: String,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_id.md")]
+    #[doc = include_str!("docs/ExpressionTool_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_label.md")]
+    #[doc = include_str!("docs/ExpressionTool_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_doc.md")]
+    #[doc = include_str!("docs/ExpressionTool_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_requirements.md")]
+    #[doc = include_str!("docs/ExpressionTool_requirements.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_hints.md")]
+    #[doc = include_str!("docs/ExpressionTool_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_cwlVersion.md")]
+    #[doc = include_str!("docs/ExpressionTool_cwlVersion.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
-    #[doc = include_str!("../../docs/gen/ExpressionTool_intent.md")]
+    #[doc = include_str!("docs/ExpressionTool_intent.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
@@ -404,51 +404,51 @@ pub struct ExpressionTool {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
-#[doc = include_str!("../../docs/gen/Operation.md")]
+#[doc = include_str!("docs/Operation.md")]
 #[derive(
     Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#Operation>
 pub struct Operation {
-    #[doc = include_str!("../../docs/gen/Operation_inputs.md")]
+    #[doc = include_str!("docs/Operation_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub inputs: Vec<OperationInputParameter>,
-    #[doc = include_str!("../../docs/gen/Operation_outputs.md")]
+    #[doc = include_str!("docs/Operation_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub outputs: Vec<OperationOutputParameter>,
-    #[doc = include_str!("../../docs/gen/Operation_id.md")]
+    #[doc = include_str!("docs/Operation_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/Operation_label.md")]
+    #[doc = include_str!("docs/Operation_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/Operation_doc.md")]
+    #[doc = include_str!("docs/Operation_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/Operation_requirements.md")]
+    #[doc = include_str!("docs/Operation_requirements.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
-    #[doc = include_str!("../../docs/gen/Operation_hints.md")]
+    #[doc = include_str!("docs/Operation_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
-    #[doc = include_str!("../../docs/gen/Operation_cwlVersion.md")]
+    #[doc = include_str!("docs/Operation_cwlVersion.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
-    #[doc = include_str!("../../docs/gen/Operation_intent.md")]
+    #[doc = include_str!("docs/Operation_intent.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
@@ -458,55 +458,55 @@ pub struct Operation {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
-#[doc = include_str!("../../docs/gen/Workflow.md")]
+#[doc = include_str!("docs/Workflow.md")]
 #[derive(
     Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#Workflow>
 pub struct Workflow {
-    #[doc = include_str!("../../docs/gen/Workflow_inputs.md")]
+    #[doc = include_str!("docs/Workflow_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub inputs: Vec<WorkflowInputParameter>,
-    #[doc = include_str!("../../docs/gen/Workflow_outputs.md")]
+    #[doc = include_str!("docs/Workflow_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
     pub outputs: Vec<WorkflowOutputParameter>,
-    #[doc = include_str!("../../docs/gen/Workflow_steps.md")]
+    #[doc = include_str!("docs/Workflow_steps.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(into)]
     pub steps: Vec<WorkflowStep>,
-    #[doc = include_str!("../../docs/gen/Workflow_id.md")]
+    #[doc = include_str!("docs/Workflow_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/Workflow_label.md")]
+    #[doc = include_str!("docs/Workflow_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/Workflow_doc.md")]
+    #[doc = include_str!("docs/Workflow_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/Workflow_requirements.md")]
+    #[doc = include_str!("docs/Workflow_requirements.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
-    #[doc = include_str!("../../docs/gen/Workflow_hints.md")]
+    #[doc = include_str!("docs/Workflow_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
-    #[doc = include_str!("../../docs/gen/Workflow_cwlVersion.md")]
+    #[doc = include_str!("docs/Workflow_cwlVersion.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
-    #[doc = include_str!("../../docs/gen/Workflow_intent.md")]
+    #[doc = include_str!("docs/Workflow_intent.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub intent: Option<String>,
@@ -541,50 +541,49 @@ impl Workflow {
     }
 }
 
-#[doc = include_str!("../../docs/gen/WorkflowStep.md")]
+#[doc = include_str!("docs/WorkflowStep.md")]
 #[derive(Serialize, Deserialize, Debug, Clone, Identifiable, PartialEq, Builder, Validate)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStep>
 pub struct WorkflowStep {
-    #[doc = include_str!("../../docs/gen/WorkflowStep_in.md")]
+    #[doc = include_str!("docs/WorkflowStep_in.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     pub r#in: Vec<WorkflowStepInput>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_out.md")]
+    #[doc = include_str!("docs/WorkflowStep_out.md")]
     pub out: Vec<StringOrWorkflowStepOutput>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_run.md")]
+    #[doc = include_str!("docs/WorkflowStep_run.md")]
     pub run: StringOrDocument,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_id.md")]
+    #[doc = include_str!("docs/WorkflowStep_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_label.md")]
+    #[doc = include_str!("docs/WorkflowStep_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_doc.md")]
+    #[doc = include_str!("docs/WorkflowStep_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_requirements.md")]
+    #[doc = include_str!("docs/WorkflowStep_requirements.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub requirements: Option<Vec<WorkflowRequirements>>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_hints.md")]
+    #[doc = include_str!("docs/WorkflowStep_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     pub hints: Option<Vec<WorkflowHints>>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_when.md")]
+    #[doc = include_str!("docs/WorkflowStep_when.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub when: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_scatter.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scatter: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowStep_scatterMethod.md")]
+    #[doc = include_str!("docs/WorkflowStep_scatterMethod.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scatter_method: Option<ScatterMethod>,
 }
 impl FromShortHand for WorkflowStep {}
 
-#[doc = include_str!("../../docs/gen/ScatterMethod.md")]
+#[doc = include_str!("docs/ScatterMethod.md")]
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone)]
 #[serde(rename_all = "snake_case")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#ScatterMethod>

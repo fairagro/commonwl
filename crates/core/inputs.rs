@@ -21,7 +21,7 @@ use validator::Validate;
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandInputParameterType {
-    #[doc = include_str!("../../docs/gen/stdin.md")]
+    #[doc = include_str!("docs/stdin.md")]
     #[serde(rename = "stdin")]
     Stdin,
     CommandInputType(OneOrMany<CommandInputType>),
@@ -157,7 +157,7 @@ impl DefaultValue {
     }
 }
 
-#[doc = include_str!("../../docs/gen/CommandInputParameter.md")]
+#[doc = include_str!("docs/CommandInputParameter.md")]
 #[derive(
     Serialize,
     Deserialize,
@@ -174,50 +174,50 @@ impl DefaultValue {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandInputParameter>
 pub struct CommandInputParameter {
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_type.md")]
+    #[doc = include_str!("docs/CommandInputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: CommandInputParameterType,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_label.md")]
+    #[doc = include_str!("docs/CommandInputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/CommandInputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_streamable.md")]
+    #[doc = include_str!("docs/CommandInputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_doc.md")]
+    #[doc = include_str!("docs/CommandInputParameter_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_id.md")]
+    #[doc = include_str!("docs/CommandInputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(required)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_format.md")]
+    #[doc = include_str!("docs/CommandInputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_loadContents.md")]
+    #[doc = include_str!("docs/CommandInputParameter_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_loadListing.md")]
+    #[doc = include_str!("docs/CommandInputParameter_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_default.md")]
+    #[doc = include_str!("docs/CommandInputParameter_default.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub default: Option<DefaultValue>,
-    #[doc = include_str!("../../docs/gen/CommandInputParameter_inputBinding.md")]
+    #[doc = include_str!("docs/CommandInputParameter_inputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
@@ -241,50 +241,50 @@ make_shorthand_impl!(CommandInputParameter, "id", "type");
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowInputParameter>
 pub struct WorkflowInputParameter {
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_type.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: OneOrMany<InputType>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_label.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_streamable.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_doc.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_id.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(required)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_format.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_loadContents.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_loadListing.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_default.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_default.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub default: Option<DefaultValue>,
-    #[doc = include_str!("../../docs/gen/WorkflowInputParameter_inputBinding.md")]
+    #[doc = include_str!("docs/WorkflowInputParameter_inputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[deprecated(since = "1.2.0", note = "Will be removed in CWL 2.0")]
@@ -299,7 +299,7 @@ impl Default for OneOrMany<InputType> {
     }
 }
 
-#[doc = include_str!("../../docs/gen/OperationInputParameter.md")]
+#[doc = include_str!("docs/OperationInputParameter.md")]
 #[derive(
     Serialize,
     Deserialize,
@@ -316,46 +316,46 @@ impl Default for OneOrMany<InputType> {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OperationInputParameter>
 pub struct OperationInputParameter {
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_type.md")]
+    #[doc = include_str!("docs/OperationInputParameter_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: OneOrMany<InputType>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_label.md")]
+    #[doc = include_str!("docs/OperationInputParameter_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_secondaryFiles.md")]
+    #[doc = include_str!("docs/OperationInputParameter_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_streamable.md")]
+    #[doc = include_str!("docs/OperationInputParameter_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_doc.md")]
+    #[doc = include_str!("docs/OperationInputParameter_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_id.md")]
+    #[doc = include_str!("docs/OperationInputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     #[validate(required)]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_format.md")]
+    #[doc = include_str!("docs/OperationInputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_loadContents.md")]
+    #[doc = include_str!("docs/OperationInputParameter_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_loadListing.md")]
+    #[doc = include_str!("docs/OperationInputParameter_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
-    #[doc = include_str!("../../docs/gen/OperationInputParameter_default.md")]
+    #[doc = include_str!("docs/OperationInputParameter_default.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub default: Option<DefaultValue>,
@@ -518,25 +518,25 @@ impl From<CommandInputType> for InputType {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandInputRecordSchema>
 pub struct CommandInputRecordSchema {
-    #[doc = include_str!("../../docs/gen/CommandInputRecordSchema_fields.md")]
+    #[doc = include_str!("docs/CommandInputRecordSchema_fields.md")]
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[builder(into)]
     pub fields: Option<Vec<CommandInputRecordField>>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordSchema_label.md")]
+    #[doc = include_str!("docs/CommandInputRecordSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordSchema_doc.md")]
+    #[doc = include_str!("docs/CommandInputRecordSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordSchema_name.md")]
+    #[doc = include_str!("docs/CommandInputRecordSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub name: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordSchema_inputBinding.md")]
+    #[doc = include_str!("docs/CommandInputRecordSchema_inputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
@@ -546,21 +546,21 @@ pub struct CommandInputRecordSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#InputRecordSchema>
 pub struct InputRecordSchema {
-    #[doc = include_str!("../../docs/gen/InputRecordSchema_fields.md")]
+    #[doc = include_str!("docs/InputRecordSchema_fields.md")]
     #[serde(deserialize_with = "deserialize_map_list_option_name")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[builder(into)]
     pub fields: Option<Vec<InputRecordField>>,
-    #[doc = include_str!("../../docs/gen/InputRecordSchema_label.md")]
+    #[doc = include_str!("docs/InputRecordSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/InputRecordSchema_doc.md")]
+    #[doc = include_str!("docs/InputRecordSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/InputRecordSchema_name.md")]
+    #[doc = include_str!("docs/InputRecordSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub name: Option<String>,
@@ -583,44 +583,44 @@ impl From<CommandInputRecordSchema> for InputRecordSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandInputRecordField>
 pub struct CommandInputRecordField {
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_name.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_name.md")]
     #[builder(into)]
     pub name: String,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_type.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: OneOrMany<CommandInputType>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_doc.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_label.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_secondaryFiles.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     #[builder(into)]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_streamable.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_format.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_loadContents.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_loadListing.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
-    #[doc = include_str!("../../docs/gen/CommandInputRecordField_inputBinding.md")]
+    #[doc = include_str!("docs/CommandInputRecordField_inputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
@@ -632,40 +632,40 @@ make_shorthand_impl!(CommandInputRecordField, "name", "type");
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#InputRecordField>
 pub struct InputRecordField {
-    #[doc = include_str!("../../docs/gen/InputRecordField_name.md")]
+    #[doc = include_str!("docs/InputRecordField_name.md")]
     #[builder(into)]
     pub name: String,
-    #[doc = include_str!("../../docs/gen/InputRecordField_type.md")]
+    #[doc = include_str!("docs/InputRecordField_type.md")]
     #[serde(deserialize_with = "deserialize_with_type_dsl")]
     #[builder(into)]
     pub r#type: OneOrMany<InputType>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_doc.md")]
+    #[doc = include_str!("docs/InputRecordField_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_label.md")]
+    #[doc = include_str!("docs/InputRecordField_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_secondaryFiles.md")]
+    #[doc = include_str!("docs/InputRecordField_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_with_secondary_files_dsl")]
     #[builder(into)]
     pub secondary_files: Option<OneOrMany<SecondaryFileSchema>>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_streamable.md")]
+    #[doc = include_str!("docs/InputRecordField_streamable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub streamable: Option<bool>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_format.md")]
+    #[doc = include_str!("docs/InputRecordField_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_loadContents.md")]
+    #[doc = include_str!("docs/InputRecordField_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/InputRecordField_loadListing.md")]
+    #[doc = include_str!("docs/InputRecordField_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_listing: Option<LoadListingEnum>,
@@ -693,22 +693,22 @@ impl From<CommandInputRecordField> for InputRecordField {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandInputEnumSchema>
 pub struct CommandInputEnumSchema {
-    #[doc = include_str!("../../docs/gen/CommandInputEnumSchema_symbols.md")]
+    #[doc = include_str!("docs/CommandInputEnumSchema_symbols.md")]
     #[builder(into)]
     pub symbols: Vec<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputEnumSchema_name.md")]
+    #[doc = include_str!("docs/CommandInputEnumSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub name: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputEnumSchema_label.md")]
+    #[doc = include_str!("docs/CommandInputEnumSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputEnumSchema_doc.md")]
+    #[doc = include_str!("docs/CommandInputEnumSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputEnumSchema_inputBinding.md")]
+    #[doc = include_str!("docs/CommandInputEnumSchema_inputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
@@ -718,18 +718,18 @@ pub struct CommandInputEnumSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#InputEnumSchema>
 pub struct InputEnumSchema {
-    #[doc = include_str!("../../docs/gen/InputEnumSchema_symbols.md")]
+    #[doc = include_str!("docs/InputEnumSchema_symbols.md")]
     #[builder(into)]
     pub symbols: Vec<String>,
-    #[doc = include_str!("../../docs/gen/InputEnumSchema_name.md")]
+    #[doc = include_str!("docs/InputEnumSchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub name: Option<String>,
-    #[doc = include_str!("../../docs/gen/InputEnumSchema_label.md")]
+    #[doc = include_str!("docs/InputEnumSchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/InputEnumSchema_doc.md")]
+    #[doc = include_str!("docs/InputEnumSchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
@@ -750,22 +750,22 @@ impl From<CommandInputEnumSchema> for InputEnumSchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandInputArraySchema>
 pub struct CommandInputArraySchema {
-    #[doc = include_str!("../../docs/gen/CommandInputArraySchema_items.md")]
+    #[doc = include_str!("docs/CommandInputArraySchema_items.md")]
     #[builder(into)]
     pub items: OneOrMany<CommandInputType>,
-    #[doc = include_str!("../../docs/gen/CommandInputArraySchema_label.md")]
+    #[doc = include_str!("docs/CommandInputArraySchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputArraySchema_doc.md")]
+    #[doc = include_str!("docs/CommandInputArraySchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/CommandInputArraySchema_name.md")]
+    #[doc = include_str!("docs/CommandInputArraySchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub name: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandInputArraySchema_inputBinding.md")]
+    #[doc = include_str!("docs/CommandInputArraySchema_inputBinding.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub input_binding: Option<CommandLineBinding>,
@@ -775,18 +775,18 @@ pub struct CommandInputArraySchema {
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#InputArraySchema>
 pub struct InputArraySchema {
-    #[doc = include_str!("../../docs/gen/InputArraySchema_items.md")]
+    #[doc = include_str!("docs/InputArraySchema_items.md")]
     #[builder(into)]
     pub items: OneOrMany<InputType>,
-    #[doc = include_str!("../../docs/gen/InputArraySchema_label.md")]
+    #[doc = include_str!("docs/InputArraySchema_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/InputArraySchema_doc.md")]
+    #[doc = include_str!("docs/InputArraySchema_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/InputArraySchema_name.md")]
+    #[doc = include_str!("docs/InputArraySchema_name.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub name: Option<String>,
@@ -803,71 +803,71 @@ impl From<CommandInputArraySchema> for InputArraySchema {
     }
 }
 
-#[doc = include_str!("../../docs/gen/CommandLineBinding.md")]
+#[doc = include_str!("docs/CommandLineBinding.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandLineBinding>
 pub struct CommandLineBinding {
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_loadContents.md")]
+    #[doc = include_str!("docs/CommandLineBinding_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_position.md")]
+    #[doc = include_str!("docs/CommandLineBinding_position.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub position: Option<IntegerOrExpression>,
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_prefix.md")]
+    #[doc = include_str!("docs/CommandLineBinding_prefix.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub prefix: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_separate.md")]
+    #[doc = include_str!("docs/CommandLineBinding_separate.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub separate: Option<bool>,
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_itemSeparator.md")]
+    #[doc = include_str!("docs/CommandLineBinding_itemSeparator.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub item_separator: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_valueFrom.md")]
+    #[doc = include_str!("docs/CommandLineBinding_valueFrom.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub value_from: Option<String>,
-    #[doc = include_str!("../../docs/gen/CommandLineBinding_shellQuote.md")]
+    #[doc = include_str!("docs/CommandLineBinding_shellQuote.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub shell_quote: Option<bool>,
 }
 
-#[doc = include_str!("../../docs/gen/WorkflowStepInput.md")]
+#[doc = include_str!("docs/WorkflowStepInput.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Eq, Builder)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStepInput>
 pub struct WorkflowStepInput {
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_id.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub id: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_source.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_source.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<OneOrMany<String>>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_linkMerge.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_linkMerge.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub link_merge: Option<LinkMergeMethod>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_pickValue.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_pickValue.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pick_value: Option<PickValueMethod>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_loadContents.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_loadContents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_contents: Option<bool>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_loadListing.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_loadListing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub load_listing: Option<LoadListingEnum>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_label.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_default.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_default.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<DefaultValue>,
-    #[doc = include_str!("../../docs/gen/WorkflowStepInput_valueFrom.md")]
+    #[doc = include_str!("docs/WorkflowStepInput_valueFrom.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value_from: Option<String>,
 }
