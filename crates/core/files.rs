@@ -80,39 +80,52 @@ impl FileOrDirectory {
     }
 }
 
+#[doc = include_str!("../../docs/gen/File.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
+/// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#File>
 pub struct File {
+    #[doc = include_str!("../../docs/gen/File_location.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub location: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_path.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub path: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_basename.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub basename: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_dirname.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub dirname: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_nameroot.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub nameroot: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_nameext.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub nameext: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_checksum.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub checksum: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_size.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub size: Option<Integer>,
+    #[doc = include_str!("../../docs/gen/File_secondaryFiles.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub secondary_files: Option<Vec<FileOrDirectory>>,
+    #[doc = include_str!("../../docs/gen/File_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub format: Option<String>,
+    #[doc = include_str!("../../docs/gen/File_contents.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub contents: Option<String>,
@@ -147,18 +160,24 @@ impl File {
     }
 }
 
+#[doc = include_str!("../../docs/gen/Directory.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Eq)]
 #[serde(rename_all = "camelCase")]
+/// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#Directory>
 pub struct Directory {
+    #[doc = include_str!("../../docs/gen/Directory_location.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub location: Option<String>,
+    #[doc = include_str!("../../docs/gen/Directory_path.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub path: Option<String>,
+    #[doc = include_str!("../../docs/gen/Directory_basename.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub basename: Option<String>,
+    #[doc = include_str!("../../docs/gen/Directory_listing.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub listing: Option<Vec<FileOrDirectory>>,
@@ -232,14 +251,19 @@ impl Directory {
     }
 }
 
+#[doc = include_str!("../../docs/gen/Dirent.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
+/// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#Dirent>
 pub struct Dirent {
+    #[doc = include_str!("../../docs/gen/Dirent_entry.md")]
     #[builder(into)]
     pub entry: StringOrInclude,
+    #[doc = include_str!("../../docs/gen/Dirent_entryname.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub entryname: Option<String>,
+    #[doc = include_str!("../../docs/gen/Dirent_writable.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
     pub writable: Option<bool>,

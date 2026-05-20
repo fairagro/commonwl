@@ -1,0 +1,1 @@
+Must be `File` to indicate this object describes a file.

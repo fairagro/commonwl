@@ -1,0 +1,1 @@
+Define an enumerated type.

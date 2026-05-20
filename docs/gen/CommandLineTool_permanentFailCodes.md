@@ -1,0 +1,2 @@
+Exit codes that indicate the process failed due to a permanent logic error, where executing the process with the same runtime environment and same inputs is expected to always fail.
+If not specified, all exit codes except 0 are considered permanent failure.
