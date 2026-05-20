@@ -2,6 +2,7 @@ use crate::BoolOrExpression;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 
+#[doc = include_str!("../../docs/gen/CWLType.md")]
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum CWLType {
@@ -16,6 +17,7 @@ pub enum CWLType {
     File,
     #[serde(rename = "Directory")]
     Directory,
+    #[doc = include_str!("../../docs/gen/Any.md")]
     #[serde(rename = "Any")]
     Any,
 }
@@ -38,10 +40,13 @@ impl Display for CWLType {
     }
 }
 
+#[doc = include_str!("../../docs/gen/SecondaryFileSchema.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SecondaryFileSchema {
+    #[doc = include_str!("../../docs/gen/SecondaryFileSchema_pattern.md")]
     pub pattern: String,
+    #[doc = include_str!("../../docs/gen/SecondaryFileSchema_required.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub required: Option<BoolOrExpression>,
 }

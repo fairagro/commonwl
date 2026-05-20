@@ -13,8 +13,10 @@ use serde_json::Value;
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandOutputParameterType {
+    #[doc = include_str!("../../docs/gen/stdout.md")]
     #[serde(rename = "stdout")]
     Stdout,
+    #[doc = include_str!("../../docs/gen/stderr.md")]
     #[serde(rename = "stderr")]
     Stderr,
     CommandOutputType(OneOrMany<CommandOutputType>),

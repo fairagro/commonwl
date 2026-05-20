@@ -21,6 +21,7 @@ use validator::Validate;
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
 pub enum CommandInputParameterType {
+    #[doc = include_str!("../../docs/gen/stdin.md")]
     #[serde(rename = "stdin")]
     Stdin,
     CommandInputType(OneOrMany<CommandInputType>),
