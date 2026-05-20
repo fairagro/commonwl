@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 use anyhow::Context;
 use base16ct::HexDisplay;
 use serde::{Deserialize, Serialize};

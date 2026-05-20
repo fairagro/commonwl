@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 use cwl_core::documents::CWLDocument;
 use semver::Version;
 

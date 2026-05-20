@@ -1,3 +1,4 @@
+#![deny(unused_crate_dependencies)]
 use crate::{local_storage::LocalStorage, s3_storage::S3Storage, web_storage::WebStorage};
 use async_trait::async_trait;
 use std::{
