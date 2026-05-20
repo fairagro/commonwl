@@ -1,1 +1,1 @@
-Always 'InlineJavascriptRequirement'
+Always '`InlineJavascriptRequirement`'

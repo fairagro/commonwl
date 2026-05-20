@@ -1,1 +1,1 @@
-An output parameter for a CommandLineTool.
+An output parameter for a `CommandLineTool`.

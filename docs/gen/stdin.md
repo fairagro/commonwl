@@ -3,12 +3,15 @@ Only valid as a `type` for a `CommandLineTool` input with no
 level.
 
 The following
+
 ```
 inputs:
    an_input_name:
    type: stdin
 ```
+
 is equivalent to
+
 ```
 inputs:
   an_input_name:

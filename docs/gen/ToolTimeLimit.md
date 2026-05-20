@@ -1,5 +1,5 @@
-Set an upper limit on the execution time of a CommandLineTool.
-A CommandLineTool whose execution duration exceeds the time
+Set an upper limit on the execution time of a `CommandLineTool`.
+A `CommandLineTool` whose execution duration exceeds the time
 limit may be preemptively terminated and considered failed.
 May also be used by batch systems to make scheduling decisions.
 The execution duration excludes external operations, such as

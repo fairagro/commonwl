@@ -1,1 +1,1 @@
-Always 'ShellCommandRequirement'
+Always '`ShellCommandRequirement`'

@@ -1,5 +1,5 @@
 Define a file or subdirectory that must be staged to a particular
-place prior to executing the command line tool.  May be the result
+place prior to executing the command line tool. May be the result
 of executing an expression, such as building a configuration file
 from a template.
 

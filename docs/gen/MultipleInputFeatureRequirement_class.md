@@ -1,1 +1,1 @@
-Always 'MultipleInputFeatureRequirement'
+Always '`MultipleInputFeatureRequirement`'

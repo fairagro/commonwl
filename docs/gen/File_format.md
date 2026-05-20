@@ -9,6 +9,6 @@ input file format is the same, `owl:equivalentClass` or
 `<B> owl:equivalentClass <C>` and `<B> owl:subclassOf <A>` then infer
 `<C> owl:subclassOf <A>`.
 
-File format ontologies may be provided in the "$schemas" metadata at the
-root of the document.  If no ontologies are specified in `$schemas`, the
+`File` format ontologies may be provided in the "$schemas" metadata at the
+root of the document. If no ontologies are specified in `$schemas`, the
 runtime may perform exact file format matches.

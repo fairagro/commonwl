@@ -1,7 +1,7 @@
-The local host path where the File is available when a CommandLineTool is
-executed.  This field must be set by the implementation.  The final
-path component must match the value of `basename`.  This field
-must not be used in any other context.  The command line tool being
+The local host path where the `File` is available when a `CommandLineTool` is
+executed. This field must be set by the implementation. The final
+path component must match the value of `basename`. This field
+must not be used in any other context. The command line tool being
 executed must be able to access the file at `path` using the POSIX
 `open(2)` syscall.
 

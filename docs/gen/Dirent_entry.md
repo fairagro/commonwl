@@ -14,7 +14,7 @@ has no effect.
 If the value is an expression that evaluates to some other
 array, number, or object not consisting of `File` or
 `Directory` objects, a new file must be created with the value
-serialized to JSON text as the file contents.  The JSON
+serialized to JSON text as the file contents. The JSON
 serialization behavior should match the behavior of string
 interpolation of [Parameter
 references](#Parameter_references).

@@ -3,9 +3,9 @@ apply the binding rules above.
 
 If `valueFrom` is an expression, evaluate the expression to yield the
 actual value to use to build the command line and apply the binding
-rules above.  If the inputBinding is associated with an input
+rules above. If the inputBinding is associated with an input
 parameter, the value of `self` in the expression will be the value of
-the input parameter.  Input parameter defaults (as specified by the
+the input parameter. Input parameter defaults (as specified by the
 `InputParameter.default` field) must be applied before evaluating the
 expression.
 

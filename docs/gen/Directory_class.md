@@ -1,1 +1,1 @@
-Must be `Directory` to indicate this object describes a Directory.
+Must be `Directory` to indicate this object describes a `Directory`.
