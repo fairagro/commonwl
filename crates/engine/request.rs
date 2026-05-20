@@ -198,14 +198,19 @@ pub fn load_input_file_from_file(
         env::current_dir()?.join(path)
     };
 
+    let base_path = if base_path.as_ref().is_absolute() {
+        base_path.as_ref().canonicalize()?
+    } else {
+        env::current_dir()?.join(base_path)
+    };
+
     let content = std::fs::read_to_string(&path)
         .with_context(|| format!("Could not read input file {}", path.display()))?;
     let mut values: HashMap<String, serde_json::Value> = serde_saphyr::from_str(&content)?;
 
     //calculate path relativity
     let diff_path =
-        pathdiff::diff_paths(path.parent().unwrap_or(Path::new(".")), base_path.as_ref())
-            .unwrap_or(path);
+        pathdiff::diff_paths(path.parent().unwrap_or(Path::new(".")), base_path).unwrap_or(path);
 
     for item in values.values_mut() {
         adjust_path_to_base(item, &diff_path, &mut HashSet::new());
@@ -334,13 +339,9 @@ mod tests {
     #[test]
     fn test_load_input_file_different_base() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl")
-            .canonicalize()
-            .unwrap();
-        let inputs_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests/cat-job.json")
-            .canonicalize()
-            .unwrap();
+            .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
+        let inputs_path =
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
 
         let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
         assert!(inputs.is_ok());
