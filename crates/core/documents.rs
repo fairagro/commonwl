@@ -468,7 +468,10 @@ impl Workflow {
 
     #[must_use]
     pub fn get_step(&self, id: &str) -> Option<WorkflowStep> {
-        self.steps.iter().find(|s| s.id == Some(id.to_owned())).cloned()
+        self.steps
+            .iter()
+            .find(|s| s.id == Some(id.to_owned()))
+            .cloned()
     }
 
     #[must_use]
