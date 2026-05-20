@@ -19,7 +19,6 @@ repository = "https://github.com/fairagro/commonwl"
 license = "MIT OR Apache-2.0"
 keywords = [
     "cwl",
-    "common workflow language",
     "commonwl",
     "workflow",
     "fairagro",
