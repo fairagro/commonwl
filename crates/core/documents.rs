@@ -1,3 +1,4 @@
+#[doc = "Defines the CWL Document Types - `CommandLineTool`, `ExpressionTool`, `Operation`, and `Workflow`"]
 use crate::ExtractFromEnum;
 use crate::OneOrMany;
 use crate::inputs::{
@@ -22,6 +23,7 @@ use validator::Validate;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "class")]
+/// `CWLDocument` represents any of the top level CWL classes: `CommandLineTool`, `ExpressionTool`, `Operation`, and `Workflow`
 pub enum CWLDocument {
     CommandLineTool(CommandLineTool),
     ExpressionTool(ExpressionTool),
