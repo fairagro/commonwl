@@ -13,9 +13,11 @@ pub struct LocalStorage;
 impl Storage for LocalStorage {
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()> {
         ensure!(dest.scheme() == "file");
-        let dest = Path::new(dest.path());
+        let dest = dest
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
         if local.is_file() {
-            tokio::fs::copy(local, dest).await.with_context(|| {
+            tokio::fs::copy(local, &dest).await.with_context(|| {
                 format!(
                     "Could not copy from {} to {}",
                     local.display(),
@@ -23,7 +25,7 @@ impl Storage for LocalStorage {
                 )
             })?;
         } else {
-            copy_dir(local, dest).with_context(|| {
+            copy_dir(local, &dest).with_context(|| {
                 format!(
                     "Could not copy from {} to {}",
                     local.display(),
@@ -36,9 +38,11 @@ impl Storage for LocalStorage {
 
     async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()> {
         ensure!(src.scheme() == "file");
-        let src = Path::new(src.path());
+        let src = src
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
         if src.is_file() {
-            tokio::fs::copy(src, local).await.with_context(|| {
+            tokio::fs::copy(&src, local).await.with_context(|| {
                 format!(
                     "Could not copy from {} to {}",
                     src.display(),
@@ -46,7 +50,7 @@ impl Storage for LocalStorage {
                 )
             })?;
         } else {
-            copy_dir(src, local).with_context(|| {
+            copy_dir(&src, local).with_context(|| {
                 format!(
                     "Could not copy from {} to {}",
                     src.display(),
@@ -58,23 +62,29 @@ impl Storage for LocalStorage {
     }
 
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool> {
-        let uri = Path::new(uri.path());
+        let uri = uri
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
         Ok(tokio::fs::try_exists(uri).await?)
     }
 
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
         ensure!(uri.scheme() == "file");
-        let uri = Path::new(uri.path());
+        let uri = uri
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
 
-        tokio::fs::remove_dir_all(uri)
+        tokio::fs::remove_dir_all(&uri)
             .await
             .with_context(|| format!("Can not remove directory: {}", uri.display()))
     }
 
     async fn read_file(&self, uri: &Url) -> anyhow::Result<String> {
         ensure!(uri.scheme() == "file");
-        let uri = Path::new(uri.path());
-        tokio::fs::read_to_string(uri)
+        let uri = uri
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        tokio::fs::read_to_string(&uri)
             .await
             .with_context(|| format!("Can not read file: {}", uri.display()))
     }
