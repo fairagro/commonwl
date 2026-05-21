@@ -104,7 +104,13 @@ impl TaskBackend for LocalBackend {
             fs::write(&location, file.contents.as_ref().unwrap()).with_context(|| {
                 format!("Could not lock in File Literal at {}", location.display())
             })?;
-            file.location = Some(format!("file://{}", location.to_string_lossy()));
+            file.location = Some(
+                Url::from_file_path(&location)
+                    .map_err(|()| {
+                        anyhow::anyhow!("Could not create URL from {}", location.display())
+                    })?
+                    .to_string(),
+            );
         }
 
         let mut args = request

@@ -7,6 +7,7 @@ use anyhow::Context;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
+use url::Url;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -147,7 +148,11 @@ impl File {
         let FileMetaData { size, checksum } = get_file_metadata(path)?;
 
         let file = File::builder()
-            .location(format!("file://{}", &path_as_str))
+            .location(
+                Url::from_file_path(path)
+                    .map_err(|()| anyhow::anyhow!("Could not create URL from {path_as_str}"))?
+                    .to_string(),
+            )
             .path(path_as_str)
             .maybe_basename(basename)
             .maybe_nameroot(nameroot)
@@ -197,7 +202,11 @@ impl Directory {
         } = get_path_metadata(path);
 
         let dir = Directory::builder()
-            .location(format!("file://{}", &path_as_str))
+            .location(
+                Url::from_file_path(path)
+                    .map_err(|()| anyhow::anyhow!("Could not create URL from {path_as_str}"))?
+                    .to_string(),
+            )
             .path(path_as_str)
             .maybe_basename(basename)
             .build();
@@ -234,7 +243,10 @@ impl Directory {
                     basename: Some(name),
                     ..Default::default()
                 };
-                dir.location = dir.path.as_ref().map(|s| format!("file://{s}"));
+                dir.location = dir
+                    .path
+                    .as_ref()
+                    .map(|s| Url::from_file_path(s).unwrap().to_string());
 
                 if recursive {
                     dir.load_listing(LoadListingEnum::DeepListing)?;

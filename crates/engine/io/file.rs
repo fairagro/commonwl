@@ -341,7 +341,15 @@ pub(crate) fn handle_secondary_file_schema(
         && is_required
         && !sec_files.iter().any(|f| {
             **f.location().as_ref().unwrap()
-                == format!("file://{}", secondary_path.to_string_lossy())
+                == Url::from_file_path(secondary_path)
+                    .map_err(|()| {
+                        anyhow::anyhow!(
+                            "Could not create URL from {}",
+                            secondary_path.to_string_lossy()
+                        )
+                    })
+                    .unwrap()
+                    .to_string()
         })
     {
         anyhow::bail!("required secondary file not found {pattern} for {file:?}");

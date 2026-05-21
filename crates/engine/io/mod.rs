@@ -37,9 +37,20 @@ fn get_location(path: &str, work_dir: &Path) -> String {
 
     let path = Path::new(&path);
     if path.is_absolute() {
-        format!("file://{}", path.to_string_lossy())
+        Url::from_file_path(path)
+            .map_err(|()| anyhow::anyhow!("Could not create URL from {}", path.display()))
+            .unwrap()
+            .to_string()
     } else {
-        format!("file://{}", work_dir.join(path).to_string_lossy())
+        Url::from_file_path(work_dir.join(path))
+            .map_err(|()| {
+                anyhow::anyhow!(
+                    "Could not create URL from {}",
+                    work_dir.join(path).to_string_lossy()
+                )
+            })
+            .unwrap()
+            .to_string()
     }
 }
 

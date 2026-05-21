@@ -324,10 +324,13 @@ async fn validate_file(
 
     file.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
     file.dirname = dirname.as_ref().map(|p| p.to_string_lossy().into_owned());
-    file.location = file
-        .path
-        .as_ref()
-        .and_then(|p| format!("file://{p}").into());
+    file.location = file.path.as_ref().and_then(|p| {
+        Url::from_file_path(p)
+            .map_err(|()| anyhow::anyhow!("Could not create URL from {p}"))
+            .unwrap()
+            .to_string()
+            .into()
+    });
 
     if file.basename.is_none() {
         file.basename = path
@@ -380,7 +383,13 @@ async fn validate_dir(
 
     let copy = dir.path.is_none();
     dir.path = path.as_ref().map(|p| p.to_string_lossy().into_owned());
-    dir.location = dir.path.as_ref().and_then(|p| format!("file://{p}").into());
+    dir.location = dir.path.as_ref().and_then(|p| {
+        Url::from_file_path(p)
+            .map_err(|()| anyhow::anyhow!("Could not create URL from {p}"))
+            .unwrap()
+            .to_string()
+            .into()
+    });
 
     let base_path = path.unwrap();
     if let Some(listing) = &mut dir.listing {
@@ -653,7 +662,11 @@ async fn handle_dir(
         .map(|f| f.to_string_lossy().into_owned());
 
     let mut dir = Directory::builder()
-        .location(format!("file://{}", &dest_path_as_str))
+        .location(
+            Url::from_file_path(&dest_path)
+                .map_err(|()| anyhow::anyhow!("Could not create URL from {}", dest_path_as_str))?
+                .to_string(),
+        )
         .path(dest_path_as_str)
         .maybe_basename(basename)
         .build();
