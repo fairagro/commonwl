@@ -95,7 +95,9 @@ impl Storage for LocalStorage {
         pattern: &str,
     ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
         ensure!(base.scheme() == "file");
-        let base = Path::new(base.path());
+        let base = base
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
 
         let full_glob = if pattern.starts_with('/') {
             if !pattern.starts_with(&base.to_string_lossy().into_owned()) {
