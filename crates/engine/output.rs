@@ -664,7 +664,7 @@ async fn handle_dir(
     let mut dir = Directory::builder()
         .location(
             Url::from_file_path(&dest_path)
-                .map_err(|()| anyhow::anyhow!("Could not create URL from {}", dest_path_as_str))?
+                .map_err(|()| anyhow::anyhow!("Could not create URL from {dest_path_as_str}"))?
                 .to_string(),
         )
         .path(dest_path_as_str)
