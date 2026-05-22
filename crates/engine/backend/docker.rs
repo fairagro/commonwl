@@ -365,6 +365,7 @@ mod tests {
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        dbg!(&result);
         assert!(result.is_ok());
 
         //check if output file exists

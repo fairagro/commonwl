@@ -213,7 +213,7 @@ mod tests {
     fn test_collect_inputs() {
         use cwl_core::documents::CommandLineTool;
         use std::collections::HashMap;
-        
+
         let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
             "../../testdata/cwl/tests/anon_enum_inside_array.cwl"
         ))
@@ -243,6 +243,8 @@ mod tests {
 
     #[test]
     fn test_get_stdin() {
+        use std::path::MAIN_SEPARATOR_STR;
+
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata")
             .canonicalize()
@@ -266,6 +268,9 @@ mod tests {
             panic!("Oh no!")
         };
         let stdin = get_stdin(&tool, &inputs).unwrap();
-        assert_eq!(strip_ids(&stdin), "./file1-<ID>/hello.txt");
+        assert_eq!(
+            strip_ids(&stdin),
+            format!(".{MAIN_SEPARATOR_STR}file1-<ID>{MAIN_SEPARATOR_STR}hello.txt")
+        );
     }
 }
