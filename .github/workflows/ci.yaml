@@ -12,11 +12,27 @@ jobs:
       contents: read
       pull-requests: write
       actions: read
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: "windows-2025"
+          - os: "ubuntu-latest"
+          - os: "macos-latest"
+    runs-on: ${{matrix.os}}
     steps:
       - uses: actions/checkout@v5
         with:
           submodules: "true"
+      - name: Setup podman (because docker is shitty on windows runner)
+        if: runner.os == 'windows'
+        shell: powershell
+        run: |
+          Stop-Service docker
+          choco install podman-cli
+          podman machine init
+          $Env:DOCKER_HOST = 'npipe:////./pipe/podman-machine-default'
+          podman machine start
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install cargo-nextest
         uses: baptiste0928/cargo-install@v3

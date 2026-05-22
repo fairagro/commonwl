@@ -327,18 +327,17 @@ impl DockerBackend {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use super::*;
     use crate::{backend::execute_commandline_tool, request::create_execution_request};
     use cwl_engine_storage::StorageBackend;
+    use std::{env, path::Path};
     use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_docker_backend_creation() {
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = DockerBackend::new(config, storage, data_store).await;
         assert!(backend.is_ok());
     }
@@ -354,7 +353,7 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = Arc::new(
             DockerBackend::new(config, storage, data_store)
                 .await
@@ -383,7 +382,7 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = Arc::new(
             DockerBackend::new(config, storage, data_store)
                 .await
@@ -408,7 +407,7 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = Arc::new(
             DockerBackend::new(config, storage, data_store)
                 .await

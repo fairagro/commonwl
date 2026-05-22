@@ -16,6 +16,7 @@ use tempfile::tempdir;
 use tokio_util::sync::CancellationToken;
 
 #[tokio::test]
+#[cfg(target_os = "linux")]
 async fn test_conformance_docker_clt() {
     //implementation limit
     let limit = 178;
@@ -47,6 +48,7 @@ async fn test_conformance_docker_clt() {
 }
 
 #[tokio::test]
+#[cfg(target_os = "linux")]
 async fn test_conformance_local_clt() {
     //load and select tests
     let tests = load_conformance_tests().unwrap();
@@ -68,6 +70,7 @@ async fn test_conformance_local_clt() {
 }
 
 #[tokio::test]
+#[cfg(target_os = "linux")]
 async fn test_conformance_docker_et() {
     //load and select tests
     let tests = load_conformance_tests().unwrap();
@@ -90,6 +93,7 @@ async fn test_conformance_docker_et() {
 }
 
 #[tokio::test]
+#[cfg(target_os = "linux")]
 async fn test_conformance_docker_wf() {
     //load and select tests
     let tests = load_conformance_tests().unwrap();
