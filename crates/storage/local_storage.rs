@@ -27,7 +27,7 @@ impl Storage for LocalStorage {
         } else {
             copy_dir(local, &dest).with_context(|| {
                 format!(
-                    "Could not copy from {} to {}",
+                    "[upload] Could not copy from {} to {}",
                     local.display(),
                     dest.display()
                 )
@@ -44,7 +44,7 @@ impl Storage for LocalStorage {
         if src.is_file() {
             tokio::fs::copy(&src, local).await.with_context(|| {
                 format!(
-                    "Could not copy from {} to {}",
+                    "[download] Could not copy from {} to {}",
                     src.display(),
                     local.display()
                 )
@@ -52,7 +52,7 @@ impl Storage for LocalStorage {
         } else {
             copy_dir(&src, local).with_context(|| {
                 format!(
-                    "Could not copy from {} to {}",
+                    "[download] Could not copy from {} to {}",
                     src.display(),
                     local.display()
                 )
