@@ -22,6 +22,11 @@ jobs:
     runs-on: ${{matrix.os}}
     steps:
       - uses: actions/checkout@v5
+        if: runner.os == 'windows'
+        with:
+          submodules: "false" # Windows does not support : (colon) in file paths but there is a file like this in cwl_v1.2
+      - uses: actions/checkout@v5
+        if: runner.os != 'windows'
         with:
           submodules: "true"
       - name: Setup podman (because docker is shitty on windows runner)
