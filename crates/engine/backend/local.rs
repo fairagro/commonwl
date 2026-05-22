@@ -21,7 +21,7 @@ use crankshaft::engine::{
 use cwl_core::{IntegerOrExpression, files::FileOrDirectory, requirements::StringOrInclude};
 use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
-use std::{fs, sync::Arc, time::Duration};
+use std::{env, fs, sync::Arc, time::Duration};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 use url::Url;
@@ -315,13 +315,13 @@ impl TaskBackend for LocalBackend {
     }
 
     fn container_input_dir(&self) -> String {
-        format!("/tmp/{}/inputs", self.uuid)
+        format!("{}/{}/inputs", env::temp_dir().to_string_lossy(), self.uuid)
     }
     fn container_work_dir(&self) -> String {
-        format!("/tmp/{}/work", self.uuid)
+        format!("{}/{}/work", env::temp_dir().to_string_lossy(), self.uuid)
     }
     fn container_tmp_dir(&self) -> String {
-        format!("/tmp/{}/tmp", self.uuid)
+        format!("{}/{}/tmp", env::temp_dir().to_string_lossy(), self.uuid)
     }
 
     fn data_store(&self) -> &StoragePath {
