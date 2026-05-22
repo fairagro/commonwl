@@ -56,6 +56,7 @@ jobs:
       - name: Run coverage
         run: cargo tarpaulin --workspace --out Xml --exclude-files tests/* tests/**/* crates/**/tests/**/* crates/**/tests/* examples/* examples/**/* crates/**/examples/**/* crates/**/examples/*
       - name: Code Coverage Summary Report
+        if: runner.os == 'linux'
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: "cobertura.xml"
@@ -66,11 +67,12 @@ jobs:
           output: "both"
 
       - name: Add Coverage PR Comment
-        if: github.event_name == 'pull_request'
+        if: runner.os == 'linux' && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
           path: code-coverage-results.md
 
       - name: Write to Job Summary
+        if: runner.os == 'linux'
         run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY
