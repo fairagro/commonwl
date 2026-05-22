@@ -326,6 +326,7 @@ impl DockerBackend {
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
 mod tests {
     use super::*;
     use crate::{backend::execute_commandline_tool, request::create_execution_request};
@@ -334,7 +335,6 @@ mod tests {
     use tempfile::tempdir;
 
     #[tokio::test]
-    #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_docker_backend_creation() {
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
@@ -344,7 +344,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_docker_backend_run_simple() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")
@@ -374,7 +373,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_docker_backend_run_simple_with_dir() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")
@@ -400,7 +398,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_docker_backend_run_simple_with_value_from() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")
