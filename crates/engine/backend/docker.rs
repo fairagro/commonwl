@@ -346,7 +346,7 @@ mod tests {
     #[tokio::test]
     async fn test_docker_backend_run_simple() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata")
+            .join("../../testdata/")
             .canonicalize()
             .unwrap();
         let specification_path = base_dir.join("cat-tool-shortcut.cwl");
