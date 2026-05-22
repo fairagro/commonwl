@@ -51,13 +51,15 @@ anyhow.workspace = true
 bon.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
-nix = { version = "0.31.2", features = ["user"] }
 nonempty = "0.12.0"
 sysinfo = "0.39.1"
 semver = "1.0.27"
 urlencoding = "2.1.3"
 indexmap = "2.13.0"
 uuid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31.2", features = ["user"] }
 
 [dev-dependencies]
 regex = "1.12.2"
