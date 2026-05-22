@@ -1,5 +1,4 @@
-#[cfg(target_os = "linux")]
-
+#![cfg(target_os = "linux")]
 use crankshaft::config::backend::docker::Config;
 use cwl_core::{Integer, files::FileOrDirectory, inputs::DefaultValue};
 use cwl_engine::{
