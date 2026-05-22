@@ -182,7 +182,6 @@ async fn stage_inputs(
 
 async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result<()> {
     for output in outputs {
-        dbg!(&output);
         let src = Path::new(output.path());
         if let Some(parent) = src.parent() {
             fs::create_dir_all(parent)
@@ -199,20 +198,22 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
             );
         }
 
-        let dest_path = dest_url.path();
+        let dest_path = dest_url
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not convert output url to file path: {dest}"))?;
         match output.ty() {
             output::Type::File => {
-                fs::copy(src, dest_path).await.with_context(|| {
-                    format!("Could not copy from {} to {dest_path}", src.display())
+                fs::copy(src, &dest_path).await.with_context(|| {
+                    format!("Could not copy from {} to {}", src.display(), dest_path.display())
                 })?;
             }
             output::Type::Directory => {
                 //we need overwrite options here!
-                CopyBuilder::new(src, dest_path)
+                CopyBuilder::new(src, &dest_path)
                     .overwrite(true)
                     .run()
                     .with_context(|| {
-                        format!("Could not copy from {} to {dest_path}", src.display())
+                        format!("Could not copy from {} to {}", src.display(), dest_path.display())
                     })?;
             }
         }
