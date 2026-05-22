@@ -294,13 +294,13 @@ fn same_variant<T>(a: &T, b: &T) -> bool {
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
 mod tests {
     use super::*;
     use crate::request::load_input_file_from_file;
     use std::path::Path;
 
     #[test]
-    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_collect_requirements() {
         let yaml = include_str!("../../testdata/cwl/tests/env-tool4.cwl");
         let tool: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
