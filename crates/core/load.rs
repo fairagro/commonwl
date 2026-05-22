@@ -55,11 +55,13 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
     let url = Url::parse(&path_url)?;
 
     if let Some(fragment) = url.fragment() {
-        let path = Path::new(url.path());
+        let path = url
+            .to_file_path()
+            .map_err(|_| anyhow::anyhow!("Could not convert URL to file path: {url}"))?;
         let contents = if preprocess {
-            preprocess_cwl_file(path)?
+            preprocess_cwl_file(&path)?
         } else {
-            fs::read_to_string(path).with_context(|| format!("CWL File {}", path.display()))?
+            fs::read_to_string(&path).with_context(|| format!("CWL File {}", path.display()))?
         };
         let pack =
             serde_saphyr::from_str_with_options_validate::<PackedCWL>(&contents, saphyr_options())?;

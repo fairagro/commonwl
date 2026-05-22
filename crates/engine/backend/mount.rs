@@ -1,6 +1,7 @@
 use crate::{
     environment::workdir::{MountType, Source, WorkDirMount},
-    io::normalize_url, string_url_to_path_string,
+    io::normalize_url,
+    string_url_to_path_string,
 };
 use anyhow::{Context, ensure};
 use crankshaft::engine::{
@@ -12,11 +13,7 @@ use crankshaft::engine::{
 };
 use cwl_core::files::FileOrDirectory;
 use cwl_engine_storage::{Storage, StorageBackend};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fs, path::PathBuf, sync::Arc};
 use url::Url;
 
 pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
@@ -72,9 +69,7 @@ pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::R
 #[allow(unused)]
 pub enum MountStrategy {
     Local,
-    Remote {
-        base_url: Url,
-    },
+    Remote { base_url: Url },
 }
 
 pub(crate) async fn mount_workdir_item(
@@ -187,9 +182,11 @@ async fn mount_workdir_item_remote(
     match (mount.ty, mount.source) {
         (MountType::File, Source::Url(url)) => {
             let dest = if url.scheme() == "file" {
-                let local = Path::new(url.path());
+                let local = url
+                    .to_file_path()
+                    .map_err(|()| anyhow::anyhow!("Url of mount source not local!"))?;
                 let dest = base_url.join(rel)?;
-                backend.upload(local, &dest).await?;
+                backend.upload(&local, &dest).await?;
                 dest
             } else {
                 url // already remote, use directly
@@ -217,9 +214,11 @@ async fn mount_workdir_item_remote(
         }
         (MountType::Directory, Source::Url(url)) => {
             let dest = if url.scheme() == "file" {
-                let local = Path::new(url.path());
+                let local = url
+                    .to_file_path()
+                    .map_err(|()| anyhow::anyhow!("Url of mount source not local!"))?;
                 let dest = base_url.join(&format!("{rel}/"))?;
-                backend.upload(local, &dest).await?;
+                backend.upload(&local, &dest).await?;
                 dest
             } else {
                 url
