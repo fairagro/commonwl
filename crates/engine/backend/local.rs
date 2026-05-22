@@ -340,15 +340,14 @@ mod tests {
         inputs::DefaultValue,
     };
     use cwl_engine_storage::{StorageBackend, StoragePath};
-    use std::{path::Path, sync::Arc};
+    use std::{env, path::Path, sync::Arc};
     use tempfile::tempdir;
     use tokio_util::sync::CancellationToken;
 
     #[tokio::test]
-    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     async fn test_url_in_inputs() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
+            .join("../../testdata")
             .canonicalize()
             .unwrap();
         let specification_path = base_dir.join("cat-tool.cwl");
@@ -364,7 +363,7 @@ mod tests {
         );
 
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(Path::new(&env::temp_dir()));
         let backend = Arc::new(LocalBackend::new(
             ContainerEngine::Docker,
             storage,
