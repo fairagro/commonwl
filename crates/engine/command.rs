@@ -585,6 +585,7 @@ mod tests {
         load_cwl_file,
         types::CWLType,
     };
+    use std::path::MAIN_SEPARATOR_STR;
     use std::path::{Path, PathBuf};
 
     fn strip_ids(val: &str) -> String {
@@ -637,7 +638,10 @@ stdout: output.txt";
 
         let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         let cmdline = cmd.join(" ");
-        assert_eq!(strip_ids(&cmdline), "cat ./file1-<ID>/hello.txt");
+        assert_eq!(
+            strip_ids(&cmdline),
+            format!("cat .{MAIN_SEPARATOR_STR}file1-<ID>{MAIN_SEPARATOR_STR}hello.txt")
+        );
     }
 
     #[test]
@@ -687,7 +691,9 @@ stdout: output.txt"#;
             vec![
                 shell_cmd[0].clone(),
                 shell_cmd[1].clone(),
-                "'cd' './indir-<ID>/testdir' && 'find' '.' | 'sort'".to_string()
+                format!(
+                    "'cd' '.{MAIN_SEPARATOR_STR}indir-<ID>{MAIN_SEPARATOR_STR}testdir' && 'find' '.' | 'sort'"
+                )
             ]
         );
     }

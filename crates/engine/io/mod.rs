@@ -202,6 +202,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(unix)]
     fn test_get_location() {
         let path = "/mnt/my_file.txt";
         let workdir = Path::new("/mnt");
@@ -210,6 +211,18 @@ mod tests {
 
         let path = "my_file.txt";
         assert_eq!(get_location(path, workdir), "file:///mnt/my_file.txt");
+    }
+
+    #[test]
+    #[cfg(windows)]
+    fn test_get_location() {
+        let path = "C:/mnt/my_file.txt";
+        let workdir = Path::new("C:/mnt");
+
+        assert_eq!(get_location(path, workdir), "file:///C:/mnt/my_file.txt");
+
+        let path = "my_file.txt";
+        assert_eq!(get_location(path, workdir), "file:///C:/mnt/my_file.txt");
     }
 
     #[test]

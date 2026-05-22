@@ -398,6 +398,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(unix)]
     fn test_locate_file() {
         let path = "my_file.txt";
         let workdir = Path::new("/mnt/mydir");
@@ -414,7 +415,27 @@ mod tests {
             .build();
 
         locate_file(&mut file, workdir, stagedir, false).unwrap();
+        assert_eq!(file, expected);
+    }
 
+    #[test]
+    #[cfg(windows)]
+    fn test_locate_file() {
+        let path = "my_file.txt";
+        let workdir = Path::new(r"C:\mnt\mydir");
+        let stagedir = Path::new(r"C:\mnt\task\inputs");
+
+        let mut file = File::builder().location(path).build();
+        let expected = File::builder()
+            .location("file:///C:/mnt/mydir/my_file.txt")
+            .path(r"C:\mnt\task\inputs\my_file.txt")
+            .basename("my_file.txt")
+            .nameext(".txt")
+            .nameroot("my_file")
+            .dirname(r"C:\mnt\task\inputs")
+            .build();
+
+        locate_file(&mut file, workdir, stagedir, false).unwrap();
         assert_eq!(file, expected);
     }
 }
