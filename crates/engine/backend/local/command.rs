@@ -182,6 +182,7 @@ async fn stage_inputs(
 
 async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result<()> {
     for output in outputs {
+        dbg!(&output);
         let src = Path::new(output.path());
         if let Some(parent) = src.parent() {
             fs::create_dir_all(parent)
