@@ -115,12 +115,12 @@ fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
 mod tests {
-    use validator::Validate;
-
     use super::*;
     use crate::{documents::CommandLineTool, error::Error};
     use std::path::PathBuf;
+    use validator::Validate;
 
     #[test]
     fn load_test() {
