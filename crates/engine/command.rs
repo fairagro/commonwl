@@ -693,6 +693,32 @@ stdout: output.txt"#;
     }
 
     #[test]
+    fn test_build_command_with_file() {
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata");
+        let tool_path = base_dir.join("cat-tool.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
+
+        let inputs = include_str!("../../testdata/cat-job.json");
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
+        assert_eq!(normalize(&cmd), vec!["cat"]);
+    }
+
+    #[test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_difficult() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
