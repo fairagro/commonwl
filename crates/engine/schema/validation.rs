@@ -197,11 +197,12 @@ fn validate_enum_schema(schema: &ValidationEnumSchema, value: &DefaultValue) -> 
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use cwl_core::{documents::CommandLineTool, files::File};
     use std::collections::HashMap;
 
-    use super::*;
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_input_validation_complex() {
         let tool: CommandLineTool =
             serde_saphyr::from_str(include_str!("../../../testdata/cwl/tests/binding-test.cwl"))
@@ -227,6 +228,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_input_validation_enum() {
         let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
             "../../../testdata/cwl/tests/anon_enum_inside_array.cwl"

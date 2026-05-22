@@ -693,6 +693,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_difficult() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/bwa-mem-tool.cwl");
@@ -740,6 +741,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_difficult_2() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/binding-test.cwl");
@@ -780,6 +782,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_record_bindings() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/record-order.cwl");
@@ -811,6 +814,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_empty_array() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/empty-array-input.cwl");
@@ -839,6 +843,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_optional_missing() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/cat1-testcli.cwl");
@@ -867,6 +872,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_empty_binding() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/bool-empty-inputbinding.cwl");

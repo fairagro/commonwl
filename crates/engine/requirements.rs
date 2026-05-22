@@ -300,6 +300,7 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_collect_requirements() {
         let yaml = include_str!("../../testdata/cwl/tests/env-tool4.cwl");
         let tool: CWLDocument = serde_saphyr::from_str(yaml).unwrap();

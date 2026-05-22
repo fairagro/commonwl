@@ -304,6 +304,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_load_execution_context() {
         let spec_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
@@ -322,6 +323,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_load_input_file_same_base() {
         let tool_path =
             PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
@@ -337,6 +339,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_load_input_file_different_base() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
@@ -352,6 +355,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_load_input_file_requirements() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");

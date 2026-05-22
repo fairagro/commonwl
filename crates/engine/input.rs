@@ -204,12 +204,13 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
 
 #[cfg(test)]
 mod tests {
-    use crate::request::load_input_file_from_file;
     use super::*;
+    use crate::request::load_input_file_from_file;
     use cwl_core::{documents::CommandLineTool, load_cwl_file};
     use std::collections::HashMap;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_collect_inputs() {
         let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
             "../../testdata/cwl/tests/anon_enum_inside_array.cwl"
@@ -238,6 +239,7 @@ mod tests {
         re.replace_all(val, "-<ID>").to_string()
     }
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_get_stdin() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")

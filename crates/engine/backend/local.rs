@@ -345,6 +345,7 @@ mod tests {
     use tokio_util::sync::CancellationToken;
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     async fn test_url_in_inputs() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")

@@ -253,6 +253,7 @@ mod tests {
     use std::path::Path;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_validate_format() {
         let namespaces = HashMap::new();
         let fv = FormatValidator::new(
