@@ -238,11 +238,11 @@ mod tests {
         let re = regex::Regex::new(r"-[a-z0-9]{8,}").unwrap();
         re.replace_all(val, "-<ID>").to_string()
     }
+
     #[test]
-    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_get_stdin() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
+            .join("../../testdata")
             .canonicalize()
             .unwrap();
         let specification_path = base_dir.join("cat-tool-shortcut.cwl");
@@ -253,7 +253,7 @@ mod tests {
         let inputs = collect_inputs(
             &doc,
             &inputs.inputs,
-            Path::new("../../testdata/cwl/tests"),
+            Path::new("../../testdata"),
             Path::new("."),
             None,
             None,
