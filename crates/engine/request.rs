@@ -306,9 +306,9 @@ mod tests {
     #[test]
     fn test_load_execution_context() {
         let spec_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-tool.cwl");
         let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-job.json");
 
         let ctx = create_execution_request(&spec_path, inputs_path, None);
         assert!(ctx.is_ok());
@@ -324,9 +324,9 @@ mod tests {
     #[test]
     fn test_load_input_file_same_base() {
         let tool_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-tool.cwl");
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-tool.cwl");
         let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/cat-job.json");
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-job.json");
 
         let inputs = load_input_file_from_file(&inputs_path, tool_path.parent().unwrap());
         assert!(inputs.is_ok());
@@ -337,6 +337,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_load_input_file_different_base() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");
@@ -352,6 +353,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_load_input_file_requirements() {
         let tool_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests/secondaryfiles/rename-inputs.cwl");

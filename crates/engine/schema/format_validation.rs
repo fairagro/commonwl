@@ -248,6 +248,7 @@ pub(crate) fn get_format_validator(
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
 mod tests {
     use super::*;
     use std::path::Path;

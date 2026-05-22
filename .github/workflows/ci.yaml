@@ -12,11 +12,32 @@ jobs:
       contents: read
       pull-requests: write
       actions: read
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: "windows-2025"
+          - os: "ubuntu-latest"
+          - os: "macos-latest"
+    runs-on: ${{matrix.os}}
     steps:
       - uses: actions/checkout@v5
+        if: runner.os == 'windows'
+        with:
+          submodules: "false" # Windows does not support : (colon) in file paths but there is a file like this in cwl_v1.2
+      - uses: actions/checkout@v5
+        if: runner.os != 'windows'
         with:
           submodules: "true"
+      - name: Setup podman (because docker is shitty on windows runner)
+        if: runner.os == 'windows'
+        shell: powershell
+        run: |
+          Stop-Service docker
+          choco install podman-cli
+          podman machine init
+          $Env:DOCKER_HOST = 'npipe:////./pipe/podman-machine-default'
+          podman machine start
       - uses: actions-rust-lang/setup-rust-toolchain@v1
       - name: Install cargo-nextest
         uses: baptiste0928/cargo-install@v3
@@ -26,7 +47,7 @@ jobs:
       - name: 📎Linting
         run: cargo clippy --workspace -- -W clippy::pedantic
       - name: Run tests
-        run: cargo nextest run --workspace
+        run: cargo nextest run --workspace --no-fail-fast
       - name: Install cargo-tarpaulin
         uses: baptiste0928/cargo-install@v3
         with:
@@ -35,6 +56,7 @@ jobs:
       - name: Run coverage
         run: cargo tarpaulin --workspace --out Xml --exclude-files tests/* tests/**/* crates/**/tests/**/* crates/**/tests/* examples/* examples/**/* crates/**/examples/**/* crates/**/examples/*
       - name: Code Coverage Summary Report
+        if: runner.os == 'linux'
         uses: irongut/CodeCoverageSummary@v1.3.0
         with:
           filename: "cobertura.xml"
@@ -45,11 +67,12 @@ jobs:
           output: "both"
 
       - name: Add Coverage PR Comment
-        if: github.event_name == 'pull_request'
+        if: runner.os == 'linux' && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@v2
         with:
           recreate: true
           path: code-coverage-results.md
 
       - name: Write to Job Summary
+        if: runner.os == 'linux'
         run: cat code-coverage-results.md >> $GITHUB_STEP_SUMMARY

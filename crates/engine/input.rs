@@ -204,13 +204,16 @@ fn flatten_inputs_impl(dv: &DefaultValue, flattened: &mut Vec<FileOrDirectory>) 
 
 #[cfg(test)]
 mod tests {
-    use crate::request::load_input_file_from_file;
     use super::*;
-    use cwl_core::{documents::CommandLineTool, load_cwl_file};
-    use std::collections::HashMap;
+    use crate::request::load_input_file_from_file;
+    use cwl_core::load_cwl_file;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_collect_inputs() {
+        use cwl_core::documents::CommandLineTool;
+        use std::collections::HashMap;
+
         let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
             "../../testdata/cwl/tests/anon_enum_inside_array.cwl"
         ))
@@ -237,10 +240,13 @@ mod tests {
         let re = regex::Regex::new(r"-[a-z0-9]{8,}").unwrap();
         re.replace_all(val, "-<ID>").to_string()
     }
+
     #[test]
     fn test_get_stdin() {
+        use std::path::MAIN_SEPARATOR_STR;
+
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
+            .join("../../testdata")
             .canonicalize()
             .unwrap();
         let specification_path = base_dir.join("cat-tool-shortcut.cwl");
@@ -251,7 +257,7 @@ mod tests {
         let inputs = collect_inputs(
             &doc,
             &inputs.inputs,
-            Path::new("../../testdata/cwl/tests"),
+            Path::new("../../testdata"),
             Path::new("."),
             None,
             None,
@@ -262,6 +268,9 @@ mod tests {
             panic!("Oh no!")
         };
         let stdin = get_stdin(&tool, &inputs).unwrap();
-        assert_eq!(strip_ids(&stdin), "./file1-<ID>/hello.txt");
+        assert_eq!(
+            strip_ids(&stdin),
+            format!(".{MAIN_SEPARATOR_STR}file1-<ID>{MAIN_SEPARATOR_STR}hello.txt")
+        );
     }
 }

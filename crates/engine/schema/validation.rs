@@ -196,11 +196,12 @@ fn validate_enum_schema(schema: &ValidationEnumSchema, value: &DefaultValue) -> 
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
 mod tests {
+    use super::*;
     use cwl_core::{documents::CommandLineTool, files::File};
     use std::collections::HashMap;
 
-    use super::*;
     #[test]
     fn test_input_validation_complex() {
         let tool: CommandLineTool =

@@ -294,6 +294,7 @@ fn same_variant<T>(a: &T, b: &T) -> bool {
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
 mod tests {
     use super::*;
     use crate::request::load_input_file_from_file;

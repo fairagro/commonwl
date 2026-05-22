@@ -585,6 +585,7 @@ mod tests {
         load_cwl_file,
         types::CWLType,
     };
+    use std::path::MAIN_SEPARATOR_STR;
     use std::path::{Path, PathBuf};
 
     fn strip_ids(val: &str) -> String {
@@ -637,7 +638,10 @@ stdout: output.txt";
 
         let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
         let cmdline = cmd.join(" ");
-        assert_eq!(strip_ids(&cmdline), "cat ./file1-<ID>/hello.txt");
+        assert_eq!(
+            strip_ids(&cmdline),
+            format!("cat .{MAIN_SEPARATOR_STR}file1-<ID>{MAIN_SEPARATOR_STR}hello.txt")
+        );
     }
 
     #[test]
@@ -687,12 +691,41 @@ stdout: output.txt"#;
             vec![
                 shell_cmd[0].clone(),
                 shell_cmd[1].clone(),
-                "'cd' './indir-<ID>/testdir' && 'find' '.' | 'sort'".to_string()
+                format!(
+                    "'cd' '.{MAIN_SEPARATOR_STR}indir-<ID>{MAIN_SEPARATOR_STR}testdir' && 'find' '.' | 'sort'"
+                )
             ]
         );
     }
 
     #[test]
+    fn test_build_command_with_file() {
+        let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata");
+        let tool_path = base_dir.join("cat-tool.cwl");
+        let doc = load_cwl_file(tool_path, true).unwrap();
+
+        let inputs = include_str!("../../testdata/cat-job.json");
+        let input_values = serde_saphyr::from_str(inputs).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("../../testdata"),
+            Path::new("."),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+
+        let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
+        assert_eq!(normalize(&cmd), vec!["cat"]);
+    }
+
+    #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_difficult() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/bwa-mem-tool.cwl");
@@ -740,6 +773,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_difficult_2() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/binding-test.cwl");
@@ -780,6 +814,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_record_bindings() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/record-order.cwl");
@@ -811,6 +846,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_empty_array() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/empty-array-input.cwl");
@@ -839,6 +875,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_optional_missing() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/cat1-testcli.cwl");
@@ -867,6 +904,7 @@ stdout: output.txt"#;
     }
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn test_build_command_with_empty_binding() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/bool-empty-inputbinding.cwl");

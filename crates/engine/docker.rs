@@ -114,7 +114,7 @@ pub fn build_container_command(
             "-H".to_string(),
             format!("{outdir}:{workdir}"),
             "-B".to_string(),
-            "/tmp/apptainer_t,p:/tmp".to_string(),
+            "/tmp/apptainer_tmp:/tmp".to_string(),
             "--pwd".to_string(),
             workdir.clone(),
             "--env".to_string(),

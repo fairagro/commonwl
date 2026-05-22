@@ -326,19 +326,19 @@ impl DockerBackend {
 }
 
 #[cfg(test)]
+#[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
 mod tests {
-    use std::path::Path;
-
     use super::*;
     use crate::{backend::execute_commandline_tool, request::create_execution_request};
     use cwl_engine_storage::StorageBackend;
+    use std::{env, path::Path};
     use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_docker_backend_creation() {
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = DockerBackend::new(config, storage, data_store).await;
         assert!(backend.is_ok());
     }
@@ -346,7 +346,7 @@ mod tests {
     #[tokio::test]
     async fn test_docker_backend_run_simple() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
+            .join("../../testdata/")
             .canonicalize()
             .unwrap();
         let specification_path = base_dir.join("cat-tool-shortcut.cwl");
@@ -354,7 +354,7 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = Arc::new(
             DockerBackend::new(config, storage, data_store)
                 .await
@@ -365,6 +365,7 @@ mod tests {
             create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
         let cancellation_token = CancellationToken::new();
         let result = execute_commandline_tool(backend, &request, cancellation_token).await;
+        dbg!(&result);
         assert!(result.is_ok());
 
         //check if output file exists
@@ -373,6 +374,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))] //submodule not available on windows
     async fn test_docker_backend_run_simple_with_dir() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")
@@ -383,7 +385,7 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = Arc::new(
             DockerBackend::new(config, storage, data_store)
                 .await
@@ -398,6 +400,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "windows"))] //submodule not available on windows
     async fn test_docker_backend_run_simple_with_value_from() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/cwl/tests")
@@ -408,7 +411,7 @@ mod tests {
 
         let config = Config::default();
         let storage = Arc::new(StorageBackend::new());
-        let data_store = StoragePath::from_local(Path::new("/tmp"));
+        let data_store = StoragePath::from_local(&env::temp_dir());
         let backend = Arc::new(
             DockerBackend::new(config, storage, data_store)
                 .await

@@ -18,9 +18,7 @@ pub fn derive_identifiable(input: TokenStream) -> TokenStream {
     };
 
     // Look for a field named `id: Option<String>`
-    let has_id = fields
-        .iter()
-        .any(|f| f.ident.as_ref().is_some_and(|i| i == "id"));
+    let has_id = find_id_field(&fields);
 
     assert!(has_id, "Identifiable requires a field named `id`");
 
@@ -37,4 +35,38 @@ pub fn derive_identifiable(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(expanded)
+}
+
+fn find_id_field(fields: &syn::Fields) -> bool {
+    fields
+        .iter()
+        .any(|f| f.ident.as_ref().is_some_and(|i| i == "id"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use syn::{DeriveInput, parse_quote};
+
+    #[test]
+    fn detects_id_field() {
+        let input: DeriveInput = parse_quote! {
+            struct Foo { id: Option<String>, name: String }
+        };
+        let syn::Data::Struct(data) = input.data else {
+            panic!()
+        };
+        assert!(find_id_field(&data.fields));
+    }
+
+    #[test]
+    fn missing_id_field() {
+        let input: DeriveInput = parse_quote! {
+            struct Bar { name: String }
+        };
+        let syn::Data::Struct(data) = input.data else {
+            panic!()
+        };
+        assert!(!find_id_field(&data.fields));
+    }
 }
