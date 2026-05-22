@@ -57,7 +57,7 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
     if let Some(fragment) = url.fragment() {
         let path = url
             .to_file_path()
-            .map_err(|_| anyhow::anyhow!("Could not convert URL to file path: {url}"))?;
+            .map_err(|()| anyhow::anyhow!("Could not convert URL to file path: {url}"))?;
         let contents = if preprocess {
             preprocess_cwl_file(&path)?
         } else {
