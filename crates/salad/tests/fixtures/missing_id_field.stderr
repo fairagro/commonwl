@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/fixtures/missing_id_field.rs:3:10
+  |
+3 | #[derive(Identifiable)]
+  |          ^^^^^^^^^^^^
+  |
+  = help: message: Identifiable requires a field named `id`

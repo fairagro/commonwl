@@ -6,15 +6,22 @@ edition.workspace = true
 repository.workspace = true
 license.workspace = true
 
-[dependencies]
-cwl_salad_derive = { version = "0", path = "../salad_derive", optional = true }
-serde.workspace = true
-serde-saphyr.workspace = true
-serde_json.workspace = true
-
 [lib]
 path = "lib.rs"
 
 [features]
 default = []
 derive = ["cwl_salad_derive"]
+
+[dependencies]
+cwl_salad_derive = { version = "0", path = "../salad_derive", optional = true }
+serde.workspace = true
+serde-saphyr.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+trybuild = "1.0.116"
+
+[[test]]
+name = "derive_identifiable"
+required-features = ["derive"]

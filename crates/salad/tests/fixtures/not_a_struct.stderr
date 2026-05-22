@@ -1,0 +1,7 @@
+error: proc-macro derive panicked
+ --> tests/fixtures/not_a_struct.rs:3:10
+  |
+3 | #[derive(Identifiable)]
+  |          ^^^^^^^^^^^^
+  |
+  = help: message: Identifiable can only be derived for structs
