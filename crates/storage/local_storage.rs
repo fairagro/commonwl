@@ -99,13 +99,16 @@ impl Storage for LocalStorage {
             .to_file_path()
             .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
 
-        let full_glob = if pattern.starts_with('/') {
+        // WINDOWS FIX: Cast pattern to a native path to run platform-agnostic checks
+        let pattern_path = Path::new(pattern);
+
+        let full_glob = if pattern_path.is_absolute() {
             if !pattern.starts_with(&base.to_string_lossy().into_owned()) {
                 anyhow::bail!("Can not access objects outside the working directory: {pattern}.");
             }
             pattern.to_string()
         } else {
-            format!("{}/{}", base.display(), pattern)
+            base.join(pattern).to_string_lossy().into_owned()
         };
 
         Ok(Box::new(

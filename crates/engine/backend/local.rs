@@ -344,8 +344,8 @@ impl TaskBackend for LocalBackend {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ContainerEngine, InputObject, LocalBackend, create_execution_request,
-        create_execution_request_with_inputs, execute, execute_commandline_tool,
+        ContainerEngine, InputObject, LocalBackend, create_execution_request_with_inputs,
+        execute_commandline_tool,
     };
     use cwl_core::{
         files::{File, FileOrDirectory},
@@ -418,9 +418,10 @@ mod tests {
         ));
         let tmpdir = tempdir().unwrap();
         let request =
-            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+            crate::create_execution_request(specification_path, inputs_path, Some(tmpdir.path()))
+                .unwrap();
         let cancellation_token = CancellationToken::new();
-        let result = execute(backend, &request, cancellation_token).await;
+        let result = crate::execute(backend, &request, cancellation_token).await;
         dbg!(&result);
         assert!(result.is_ok());
 
