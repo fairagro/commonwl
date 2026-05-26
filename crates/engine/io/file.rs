@@ -305,8 +305,9 @@ pub(crate) fn handle_secondary_file_schema(
     context: &EvaluationContext,
 ) -> anyhow::Result<Option<Vec<PathOrFile>>> {
     let location = file.location.as_ref().unwrap();
-    let loc_url = Url::parse(location)?;
-    let path = Path::new(loc_url.path());
+    let path = Url::parse(location)?
+        .to_file_path()
+        .map_err(|()| anyhow::anyhow!("Could not parse file URL {location}"))?;
 
     if let Ok(pattern_value) = do_eval(&item.pattern, context)
         && pattern_value != item.pattern

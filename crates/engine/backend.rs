@@ -674,7 +674,11 @@ pub async fn execute_commandline_tool(
         //update runtime
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
-        runtime.outdir = PathBuf::from(outdir.storage_path().as_url()?.path()); //is this smart?
+        runtime.outdir = outdir
+            .storage_path()
+            .as_url()?
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file path from URL for outdir"))?; //is this smart?
 
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
