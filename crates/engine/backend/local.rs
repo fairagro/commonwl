@@ -332,7 +332,8 @@ impl TaskBackend for LocalBackend {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ContainerEngine, InputObject, LocalBackend, create_execution_request, create_execution_request_with_inputs, execute, execute_commandline_tool
+        ContainerEngine, InputObject, LocalBackend, create_execution_request,
+        create_execution_request_with_inputs, execute, execute_commandline_tool,
     };
     use cwl_core::{
         files::{File, FileOrDirectory},
@@ -384,6 +385,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_local_backend_language_workflow() {
         let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../testdata/language_workflow/")
