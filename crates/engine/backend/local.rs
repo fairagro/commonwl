@@ -332,8 +332,7 @@ impl TaskBackend for LocalBackend {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ContainerEngine, InputObject, LocalBackend, create_execution_request_with_inputs,
-        execute_commandline_tool,
+        ContainerEngine, InputObject, LocalBackend, create_execution_request, create_execution_request_with_inputs, execute, execute_commandline_tool
     };
     use cwl_core::{
         files::{File, FileOrDirectory},
@@ -382,5 +381,37 @@ mod tests {
         let result = execute_commandline_tool(backend, &request, cancellation_token).await;
         dbg!(&result);
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_local_backend_language_workflow() {
+        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../testdata/language_workflow/")
+            .canonicalize()
+            .unwrap();
+        let specification_path = base_dir
+            .join("workflows/main/main.cwl")
+            .canonicalize()
+            .unwrap();
+        let inputs_path = base_dir.join("inputs.yml");
+
+        let storage = Arc::new(StorageBackend::new());
+        let data_store = StoragePath::from_local(&env::temp_dir());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            data_store,
+        ));
+        let tmpdir = tempdir().unwrap();
+        let request =
+            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+        let cancellation_token = CancellationToken::new();
+        let result = execute(backend, &request, cancellation_token).await;
+        dbg!(&result);
+        assert!(result.is_ok());
+
+        //check if output file exists
+        let out_file = tmpdir.path().join("results.svg");
+        assert!(out_file.exists());
     }
 }
