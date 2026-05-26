@@ -315,13 +315,25 @@ impl TaskBackend for LocalBackend {
     }
 
     fn container_input_dir(&self) -> String {
-        format!("{}/{}/inputs", env::temp_dir().to_string_lossy(), self.uuid)
+        env::temp_dir()
+            .join(&self.uuid)
+            .join("inputs")
+            .to_string_lossy()
+            .into_owned()
     }
     fn container_work_dir(&self) -> String {
-        format!("{}/{}/work", env::temp_dir().to_string_lossy(), self.uuid)
+        env::temp_dir()
+            .join(&self.uuid)
+            .join("work")
+            .to_string_lossy()
+            .into_owned()
     }
     fn container_tmp_dir(&self) -> String {
-        format!("{}/{}/tmp", env::temp_dir().to_string_lossy(), self.uuid)
+        env::temp_dir()
+            .join(&self.uuid)
+            .join("tmp")
+            .to_string_lossy()
+            .into_owned()
     }
 
     fn data_store(&self) -> &StoragePath {
