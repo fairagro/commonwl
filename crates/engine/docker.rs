@@ -111,6 +111,11 @@ pub fn build_container_command(
     let workdir = to_linux_path(&options.workdir);
     let tmpdir_mount = to_linux_path(&options.tmpdir);
 
+    let raw_command = raw_command
+        .into_iter()
+        .map(|arg| unixify_arg(&arg))
+        .collect::<Vec<_>>();
+
     let mut args = if options.engine == ContainerEngine::Singularity
         || options.engine == ContainerEngine::Apptainer
     {
@@ -304,5 +309,28 @@ fn to_linux_path(input: impl AsRef<Path>) -> String {
             return format!("/{}{}", drive, &after_drive[1..]);
         }
         with_slashes
+    }
+}
+
+fn unixify_arg(arg: &str) -> String {
+    #[cfg(not(windows))]
+    {
+        arg.to_string()
+    }
+    #[cfg(windows)]
+    {
+        let looks_windows_abs = arg.len() >= 3
+            && arg
+                .chars()
+                .next()
+                .map_or(false, |c| c.is_ascii_alphabetic())
+            && arg[1..].starts_with(":/")
+            || arg[1..].starts_with(":\\");
+
+        if looks_windows_abs {
+            to_linux_path(Path::new(arg))
+        } else {
+            arg.to_string()
+        }
     }
 }
