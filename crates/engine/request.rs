@@ -305,10 +305,9 @@ mod tests {
 
     #[test]
     fn test_load_execution_context() {
-        let spec_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-tool.cwl");
-        let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-job.json");
+        let manifest_dir = dunce::canonicalize(env!("CARGO_MANIFEST_DIR")).unwrap();
+        let spec_path = manifest_dir.join("../../testdata/cat-tool.cwl");
+        let inputs_path = manifest_dir.join("../../testdata/cat-job.json");
 
         let ctx = create_execution_request(&spec_path, inputs_path, None);
         assert!(ctx.is_ok());
