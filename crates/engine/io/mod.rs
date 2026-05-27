@@ -2,7 +2,6 @@ use base16ct::HexDisplay;
 use cwl_core::{files::FileOrDirectory, inputs::DefaultValue};
 use sha1::{Digest, Sha1};
 use std::{
-    env::current_dir,
     fs,
     io::{BufReader, Read},
     path::{Path, PathBuf},
@@ -21,8 +20,7 @@ fn get_location(path: &str, work_dir: &Path) -> String {
     let work_dir = if work_dir.is_absolute() {
         work_dir.to_path_buf()
     } else {
-        let current_dir = current_dir().unwrap();
-        current_dir.join(work_dir)
+        std::path::absolute(work_dir).unwrap_or_else(|_| PathBuf::new())
     };
 
     let path = urlencoding::decode(path)

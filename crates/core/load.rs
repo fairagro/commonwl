@@ -2,7 +2,7 @@ use crate::{Result, documents::CWLDocument, packed::PackedCWL};
 use anyhow::Context;
 use serde_json::Value;
 use serde_saphyr::Options;
-use std::{env, fs, path::Path};
+use std::{fs, path::Path};
 use url::Url;
 
 pub fn saphyr_options() -> Options {
@@ -44,11 +44,10 @@ pub fn from_str(contents: &str) -> Result<CWLDocument> {
 }
 
 fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
-    let working_dir = env::current_dir()?;
     let absolute_path = if path.is_absolute() {
         path
     } else {
-        &working_dir.join(path)
+        &std::path::absolute(path)?
     };
     let path_url = format!("file://{}", absolute_path.to_string_lossy());
 
