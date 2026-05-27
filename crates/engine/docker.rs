@@ -207,15 +207,22 @@ fn build_docker_file(
     options: &ContainerBuildOptions,
 ) -> anyhow::Result<()> {
     let path = specificationdir.join(df);
+    let dockerfile_path = safe_mount(&path)?;
+
+    let context_dir = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("Dockerfile path has no parent: {}", path.display()))?;
+    let context_path = safe_mount(context_dir)?;
+
     let mut build = Command::new(options.engine.to_string());
     let mut process = build
         .args([
             "build",
             "-f",
-            &path.to_string_lossy(),
+            &dockerfile_path,
             "-t",
             &options.docker_image_id,
-            ".",
+            &context_path,
         ])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -320,10 +327,7 @@ fn unixify_arg(arg: &str) -> String {
     #[cfg(windows)]
     {
         let looks_windows_abs = arg.len() >= 3
-            && arg
-                .chars()
-                .next()
-                .is_some_and(|c| c.is_ascii_alphabetic())
+            && arg.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
             && arg[1..].starts_with(":/")
             || arg[1..].starts_with(":\\");
 
