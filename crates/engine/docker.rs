@@ -173,7 +173,7 @@ pub fn build_container_command(
     }
 
     args.push(format!("--env=HOME={}", &workdir));
-    args.push(format!("--env=TMPDIR={}", &tmpdir));
+    args.push(format!("--env=TMPDIR={}", &tmpdir_mount));
 
     for (key, val) in options
         .env
