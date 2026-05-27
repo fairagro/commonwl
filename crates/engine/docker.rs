@@ -265,7 +265,14 @@ fn get_user_flag() -> String {
 }
 
 fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
-    let input = input.as_ref().canonicalize()?; //resolve `..` to have an absolute path that can be safely mounted
+    let path = input.as_ref();
+
+    let input = if path.exists() {
+        path.canonicalize()?
+    } else {
+        std::path::absolute(path)?
+    };
+
     #[cfg(unix)]
     {
         Ok(input.to_string_lossy().into_owned())
