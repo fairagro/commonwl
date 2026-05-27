@@ -295,7 +295,7 @@ fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
                 }
                 _ => None,
             })
-            .ok_or_else(|| anyhow::anyhow!("Path has no drive letter: {}", stripped))?;
+            .ok_or_else(|| anyhow::anyhow!("Path has no drive letter: {stripped}"))?;
 
         let rest: String = path
             .components()
