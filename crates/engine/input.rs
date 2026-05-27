@@ -245,10 +245,9 @@ mod tests {
     fn test_get_stdin() {
         use std::path::MAIN_SEPARATOR_STR;
 
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata"))
+                .unwrap();
         let specification_path = base_dir.join("cat-tool-shortcut.cwl");
         let inputs_path = base_dir.join("cat-job.json");
 

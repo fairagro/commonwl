@@ -236,10 +236,9 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
     tests: impl Iterator<Item = &ConformanceTest>,
 ) {
     for test in tests {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl"))
+                .unwrap();
         let specification_path = base_dir.join(&test.tool);
         let base = specification_path.parent().unwrap();
         let inputs = if let Some(job) = &test.job {

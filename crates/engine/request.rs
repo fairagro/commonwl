@@ -317,7 +317,7 @@ mod tests {
         assert_eq!(ctx.inputs.len(), 1);
         assert_eq!(
             ctx.working_dir,
-            spec_path.parent().unwrap().canonicalize().unwrap()
+            dunce::canonicalize(spec_path.parent().unwrap()).unwrap()
         );
     }
 
