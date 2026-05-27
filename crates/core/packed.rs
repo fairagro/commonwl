@@ -459,7 +459,10 @@ fn pack_command_input(
                     } else {
                         let p = doc_dir.as_ref().join(p);
                         let p = if p.exists() {
-                            p.canonicalize().unwrap_or(p).to_string_lossy().into_owned()
+                            dunce::canonicalize(&p)
+                                .unwrap_or(p)
+                                .to_string_lossy()
+                                .into_owned()
                         } else {
                             normalize_path(&p)
                                 .unwrap_or(p)
@@ -484,7 +487,10 @@ fn pack_command_input(
                     } else {
                         let p = doc_dir.as_ref().join(p);
                         let p = if p.exists() {
-                            p.canonicalize().unwrap_or(p).to_string_lossy().into_owned()
+                            dunce::canonicalize(&p)
+                                .unwrap_or(p)
+                                .to_string_lossy()
+                                .into_owned()
                         } else {
                             normalize_path(&p)
                                 .unwrap_or(p)
@@ -525,7 +531,10 @@ fn pack_workflow_input(
                     } else {
                         let p = doc_dir.as_ref().join(p);
                         let p = if p.exists() {
-                            p.canonicalize().unwrap_or(p).to_string_lossy().into_owned()
+                            dunce::canonicalize(&p)
+                                .unwrap_or(p)
+                                .to_string_lossy()
+                                .into_owned()
                         } else {
                             normalize_path(&p)
                                 .unwrap_or(p)
@@ -550,7 +559,10 @@ fn pack_workflow_input(
                     } else {
                         let p = doc_dir.as_ref().join(p);
                         let p = if p.exists() {
-                            p.canonicalize().unwrap_or(p).to_string_lossy().into_owned()
+                            dunce::canonicalize(&p)
+                                .unwrap_or(p)
+                                .to_string_lossy()
+                                .into_owned()
                         } else {
                             normalize_path(&p)
                                 .unwrap_or(p)
@@ -658,9 +670,7 @@ mod tests {
 
     #[test]
     fn test_pack_input() {
-        let path = Path::new("../../testdata/packed/data/population.csv")
-            .canonicalize()
-            .unwrap();
+        let path = dunce::canonicalize("../../testdata/packed/data/population.csv").unwrap();
         let mut input = CommandInputParameter::builder()
             .id("population")
             .r#type(CWLType::File)
@@ -672,10 +682,8 @@ mod tests {
             .input_binding(CommandLineBinding::builder().prefix("--population").build())
             .build();
 
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
 
         let file_path = base_dir.join("testdata/packed/workflows/calculation");
         pack_command_input(&mut input, "#calculation.cwl", file_path).unwrap();
@@ -695,8 +703,7 @@ mod tests {
         .replace(
             "XXX",
             &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
-        )
-        .replace("//?", "");
+        );
 
         let value: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
         assert_eq!(json, value);
@@ -708,18 +715,14 @@ mod tests {
         let tool = load_cwl_file(path, true).unwrap();
         let packed = &pack_cwl(&tool, path, Some("#main")).unwrap()[0];
 
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
 
         let mut json = serde_json::json!(packed);
-        let reference_json = include_str!("../../testdata/packed/calculation_packed.cwl")
-            .replace(
-                "/mnt/commonwl",
-                &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
-            )
-            .replace("//?", "");
+        let reference_json = include_str!("../../testdata/packed/calculation_packed.cwl").replace(
+            "/mnt/commonwl",
+            &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
+        );
 
         let mut reference: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
         normalize_json_newlines(&mut json);
@@ -737,17 +740,13 @@ mod tests {
         let packed = pack_workflow(&wf, path, None).unwrap();
         let mut json = serde_json::json!(&packed);
 
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
 
-        let reference_json = include_str!("../../testdata/packed/main_packed.cwl")
-            .replace(
-                "/mnt/commonwl",
-                &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
-            )
-            .replace("//?", "");
+        let reference_json = include_str!("../../testdata/packed/main_packed.cwl").replace(
+            "/mnt/commonwl",
+            &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
+        );
 
         let mut reference: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
         normalize_json_newlines(&mut json);

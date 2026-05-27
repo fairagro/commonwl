@@ -1431,6 +1431,7 @@ dependencies = [
  "base16ct 1.0.0",
  "bon",
  "cwl_salad",
+ "dunce",
  "miette",
  "regex",
  "serde",
