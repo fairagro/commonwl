@@ -3,6 +3,7 @@ name = "cwl_engine_storage"
 description = "Part of `CommonWL`. Storage impl"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 repository.workspace = true
 license.workspace = true
 
