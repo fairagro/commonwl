@@ -170,7 +170,7 @@ fn stage_dirent(
         if !path.is_absolute() {
             path = workdir.join(path);
         }
-        path = path.canonicalize()?; //resolve `..` to have a URL that can be safely parsed  
+        path = dunce::canonicalize(path)?;
         let url = Url::from_file_path(&path)
             .map_err(|()| anyhow::anyhow!("Could not create URL from path {}", path.display()))?;
 

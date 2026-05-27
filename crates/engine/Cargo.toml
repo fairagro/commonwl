@@ -33,6 +33,7 @@ tokio-util.workspace = true
 futures-util = "0.3.31"
 
 # io
+dunce.workspace = true
 sha1.workspace = true
 base16ct.workspace = true
 pathdiff = "0.2.3"

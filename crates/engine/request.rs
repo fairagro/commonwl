@@ -193,13 +193,13 @@ pub fn load_input_file_from_file(
 ) -> anyhow::Result<InputObject> {
     //if not absolute it should be relative to the current working directory
     let path = if path.as_ref().is_absolute() {
-        path.as_ref().canonicalize()?
+        dunce::canonicalize(path)?
     } else {
         std::path::absolute(path)?
     };
 
     let base_path = if base_path.as_ref().is_absolute() {
-        base_path.as_ref().canonicalize()?
+        dunce::canonicalize(base_path)?
     } else {
         std::path::absolute(base_path)?
     };
@@ -293,7 +293,7 @@ fn base_path(
         .parent()
         .unwrap_or(working_dir.as_ref());
     Ok(if p.is_absolute() {
-        p.canonicalize()?
+        dunce::canonicalize(p)?
     } else {
         working_dir.as_ref().join(p)
     })

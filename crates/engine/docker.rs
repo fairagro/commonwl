@@ -280,7 +280,7 @@ fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
     let path = input.as_ref();
 
     let input = if path.exists() {
-        path.canonicalize()?
+        dunce::canonicalize(path)?
     } else {
         std::path::absolute(path)?
     };
