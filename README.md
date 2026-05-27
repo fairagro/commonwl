@@ -18,7 +18,7 @@ cargo add commonwl
 ```
 To use the execution engine, the `engine` feature needs to be enabled!
 ```toml
-commonwl = { version = "0.5", features = ["engine"] }
+commonwl = { version = "0.7", features = ["engine"] }
 ```
 
 ## CWL Engine
