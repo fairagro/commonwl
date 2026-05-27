@@ -54,7 +54,7 @@ jobs:
           crate: cargo-tarpaulin
           locked: true
       - name: Run coverage
-        run: cargo tarpaulin --workspace --out Xml --exclude-files tests/* tests/**/* crates/**/tests/**/* crates/**/tests/* examples/* examples/**/* crates/**/examples/**/* crates/**/examples/*
+        run: cargo tarpaulin --workspace --out Xml --exclude-files tests/* tests/**/* crates/**/tests/**/* crates/**/tests/* examples/* examples/**/* crates/**/examples/**/* crates/**/examples/* crates/conformance/**/*
       - name: Code Coverage Summary Report
         if: runner.os == 'linux'
         uses: irongut/CodeCoverageSummary@v1.3.0
