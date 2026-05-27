@@ -323,7 +323,7 @@ fn unixify_arg(arg: &str) -> String {
             && arg
                 .chars()
                 .next()
-                .map_or(false, |c| c.is_ascii_alphabetic())
+                .is_some_and(|c| c.is_ascii_alphabetic())
             && arg[1..].starts_with(":/")
             || arg[1..].starts_with(":\\");
 
