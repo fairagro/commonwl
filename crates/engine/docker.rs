@@ -105,9 +105,11 @@ pub fn build_container_command(
         build_docker_file(df, specificationdir, &options)?;
     }
 
-    let outdir = options.outdir;
-    let workdir = options.workdir;
-    let tmpdir = options.tmpdir;
+    let outdir = safe_mount(&options.outdir)?;
+    let tmpdir = safe_mount(&options.tmpdir)?;
+
+    let workdir = to_linux_path(&options.workdir);
+    let tmpdir_mount = to_linux_path(&options.tmpdir);
 
     let mut args = if options.engine == ContainerEngine::Singularity
         || options.engine == ContainerEngine::Apptainer
@@ -125,7 +127,7 @@ pub fn build_container_command(
         ]
     } else {
         let workdir_mount = format!("--mount=type=bind,source={outdir},target={workdir}");
-        let tmpdir_mount = format!("--mount=type=bind,source={tmpdir},target={tmpdir}");
+        let tmpdir_mount = format!("--mount=type=bind,source={tmpdir},target={tmpdir_mount}");
         let workdir_arg = format!("--workdir={}", &workdir);
 
         vec![
@@ -140,11 +142,9 @@ pub fn build_container_command(
 
     for input in inputs {
         let loc = string_url_to_file_path(input.location().unwrap())?;
-        let loc = safe_mount(loc)?;
-        let mount = format!(
-            "--mount=type=bind,source={loc},target={}",
-            input.path().unwrap()
-        );
+        let loc = safe_mount(&loc)?;
+        let target = to_linux_path(input.path().unwrap());
+        let mount = format!("--mount=type=bind,source={loc},target={target}");
         args.push(mount);
     }
 
@@ -155,17 +155,15 @@ pub fn build_container_command(
         let loc = loc
             .to_file_path()
             .map_err(|()| anyhow::anyhow!("{loc} is not a path"))?;
-        let loc = safe_mount(loc)?;
+        let loc = safe_mount(&loc)?;
 
         ensure!(mount.target.scheme() == "file");
         let target = mount
             .target
             .to_file_path()
             .map_err(|()| anyhow::anyhow!("Not a local path!"))?;
-        let mount = format!(
-            "--mount=type=bind,source={loc},target={}",
-            target.to_string_lossy()
-        );
+        let target = to_linux_path(&target);
+        let mount = format!("--mount=type=bind,source={loc},target={target}");
         args.push(mount);
     }
 
@@ -277,5 +275,28 @@ fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
         let path_str = input.to_string_lossy();
         let stripped = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
         Ok(stripped.replace('\\', "/"))
+    }
+}
+
+fn to_linux_path(input: impl AsRef<Path>) -> String {
+    #[cfg(unix)]
+    {
+        input.as_ref().to_string_lossy().into_owned()
+    }
+    #[cfg(windows)]
+    {
+        let s = input.as_ref().to_string_lossy();
+        let stripped = s.strip_prefix(r"\\?\").unwrap_or(&s);
+        let with_slashes = stripped.replace('\\', "/");
+        // "C:/foo/bar" -> "/c/foo/bar"
+        if let Some(after_drive) = with_slashes.get(1..) {
+            if with_slashes.starts_with(|c: char| c.is_ascii_alphabetic())
+                && after_drive.starts_with(":/")
+            {
+                let drive = with_slashes.chars().next().unwrap().to_ascii_lowercase();
+                return format!("/{}{}", drive, &after_drive[1..]);
+            }
+        }
+        with_slashes
     }
 }
