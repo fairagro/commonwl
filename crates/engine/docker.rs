@@ -296,13 +296,12 @@ fn to_linux_path(input: impl AsRef<Path>) -> String {
         let stripped = s.strip_prefix(r"\\?\").unwrap_or(&s);
         let with_slashes = stripped.replace('\\', "/");
         // "C:/foo/bar" -> "/c/foo/bar"
-        if let Some(after_drive) = with_slashes.get(1..) {
-            if with_slashes.starts_with(|c: char| c.is_ascii_alphabetic())
-                && after_drive.starts_with(":/")
-            {
-                let drive = with_slashes.chars().next().unwrap().to_ascii_lowercase();
-                return format!("/{}{}", drive, &after_drive[1..]);
-            }
+        if let Some(after_drive) = with_slashes.get(1..)
+            && with_slashes.starts_with(|c: char| c.is_ascii_alphabetic())
+            && after_drive.starts_with(":/")
+        {
+            let drive = with_slashes.chars().next().unwrap().to_ascii_lowercase();
+            return format!("/{}{}", drive, &after_drive[1..]);
         }
         with_slashes
     }
