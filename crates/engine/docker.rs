@@ -154,7 +154,7 @@ pub fn build_container_command(
         };
         let loc = loc
             .to_file_path()
-            .map_err(|()| anyhow::anyhow!("{} is not a path", loc))?;
+            .map_err(|()| anyhow::anyhow!("{loc} is not a path"))?;
         let loc = safe_mount(loc)?;
 
         ensure!(mount.target.scheme() == "file");
