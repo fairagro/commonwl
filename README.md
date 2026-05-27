@@ -1,5 +1,6 @@
 # `CommonWL`
-[![🦆 Continuous Integration](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml/badge.svg)](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml)
+[![🦆 Continuous Integration](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml/badge.svg)](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml)![Crates.io Total Downloads](https://img.shields.io/crates/d/commonwl)
+
 
 A Rust-framework for the Common Workflow Language (CWL) that supports parsing and execution.
 
