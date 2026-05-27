@@ -345,10 +345,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_docker_backend_run_simple() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/"))
+                .unwrap();
         let specification_path = base_dir.join("cat-tool-shortcut.cwl");
         let inputs_path = base_dir.join("cat-job.json");
 
@@ -376,10 +375,10 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "windows"))] //submodule not available on windows
     async fn test_docker_backend_run_simple_with_dir() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
+        let base_dir = dunce::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests"),
+        )
+        .unwrap();
         let specification_path = base_dir.join("dir3.cwl");
         let inputs_path = base_dir.join("dir3-job.yml");
 
@@ -402,10 +401,10 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "windows"))] //submodule not available on windows
     async fn test_docker_backend_run_simple_with_value_from() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/cwl/tests")
-            .canonicalize()
-            .unwrap();
+        let base_dir = dunce::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests"),
+        )
+        .unwrap();
         let specification_path = base_dir.join("cat3-from-dir.cwl");
         let inputs_path = base_dir.join("cat-from-dir-job.yaml");
 

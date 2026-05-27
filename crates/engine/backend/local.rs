@@ -358,10 +358,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_url_in_inputs() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata")
-            .canonicalize()
-            .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata"))
+                .unwrap();
         let specification_path = base_dir.join("cat-tool.cwl");
 
         let mut inputs = InputObject::default();
@@ -399,14 +398,12 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_local_backend_language_workflow() {
-        let base_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../testdata/language_workflow/")
-            .canonicalize()
-            .unwrap();
-        let specification_path = base_dir
-            .join("workflows/main/main.cwl")
-            .canonicalize()
-            .unwrap();
+        let base_dir = dunce::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/language_workflow/"),
+        )
+        .unwrap();
+        let specification_path =
+            dunce::canonicalize(base_dir.join("workflows/main/main.cwl")).unwrap();
         let inputs_path = base_dir.join("inputs.yml");
 
         let storage = Arc::new(StorageBackend::new());

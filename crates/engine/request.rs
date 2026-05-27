@@ -193,13 +193,13 @@ pub fn load_input_file_from_file(
 ) -> anyhow::Result<InputObject> {
     //if not absolute it should be relative to the current working directory
     let path = if path.as_ref().is_absolute() {
-        path.as_ref().canonicalize()?
+        dunce::canonicalize(path)?
     } else {
         std::path::absolute(path)?
     };
 
     let base_path = if base_path.as_ref().is_absolute() {
-        base_path.as_ref().canonicalize()?
+        dunce::canonicalize(base_path)?
     } else {
         std::path::absolute(base_path)?
     };
@@ -293,7 +293,7 @@ fn base_path(
         .parent()
         .unwrap_or(working_dir.as_ref());
     Ok(if p.is_absolute() {
-        p.canonicalize()?
+        dunce::canonicalize(p)?
     } else {
         working_dir.as_ref().join(p)
     })
@@ -305,10 +305,9 @@ mod tests {
 
     #[test]
     fn test_load_execution_context() {
-        let spec_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-tool.cwl");
-        let inputs_path =
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cat-job.json");
+        let manifest_dir = dunce::canonicalize(env!("CARGO_MANIFEST_DIR")).unwrap();
+        let spec_path = manifest_dir.join("../../testdata/cat-tool.cwl");
+        let inputs_path = manifest_dir.join("../../testdata/cat-job.json");
 
         let ctx = create_execution_request(&spec_path, inputs_path, None);
         assert!(ctx.is_ok());
@@ -317,7 +316,7 @@ mod tests {
         assert_eq!(ctx.inputs.len(), 1);
         assert_eq!(
             ctx.working_dir,
-            spec_path.parent().unwrap().canonicalize().unwrap()
+            dunce::canonicalize(spec_path.parent().unwrap()).unwrap()
         );
     }
 
