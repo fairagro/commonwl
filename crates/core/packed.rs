@@ -689,6 +689,10 @@ mod tests {
         pack_command_input(&mut input, "#calculation.cwl", file_path).unwrap();
 
         let json = serde_json::json!(&input);
+        let mut base_dir_str = base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/");
+        if !base_dir_str.starts_with('/') {
+            base_dir_str = format!("/{}", base_dir_str);
+        }
         let reference_json = r##"{
                     "id": "#calculation.cwl/population",
                     "type": "File",
@@ -700,10 +704,7 @@ mod tests {
                         "prefix": "--population"
                     }
                 }"##
-        .replace(
-            "XXX",
-            &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
-        );
+        .replace("XXX", &base_dir_str);
 
         let value: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
         assert_eq!(json, value);
@@ -719,10 +720,12 @@ mod tests {
             dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
 
         let mut json = serde_json::json!(packed);
-        let reference_json = include_str!("../../testdata/packed/calculation_packed.cwl").replace(
-            "/mnt/commonwl",
-            &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
-        );
+        let mut base_dir_str = base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/");
+        if !base_dir_str.starts_with('/') {
+            base_dir_str = format!("/{}", base_dir_str);
+        }
+        let reference_json = include_str!("../../testdata/packed/calculation_packed.cwl")
+            .replace("/mnt/commonwl", &base_dir_str);
 
         let mut reference: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
         normalize_json_newlines(&mut json);
@@ -742,11 +745,12 @@ mod tests {
 
         let base_dir =
             dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap();
-
-        let reference_json = include_str!("../../testdata/packed/main_packed.cwl").replace(
-            "/mnt/commonwl",
-            &base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/"),
-        );
+        let mut base_dir_str = base_dir.to_string_lossy().replace(MAIN_SEPARATOR_STR, "/");
+        if !base_dir_str.starts_with('/') {
+            base_dir_str = format!("/{}", base_dir_str);
+        }
+        let reference_json = include_str!("../../testdata/packed/main_packed.cwl")
+            .replace("/mnt/commonwl", &base_dir_str);
 
         let mut reference: serde_json::Value = serde_json::from_str(&reference_json).unwrap();
         normalize_json_newlines(&mut json);
