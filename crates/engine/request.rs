@@ -195,13 +195,13 @@ pub fn load_input_file_from_file(
     let path = if path.as_ref().is_absolute() {
         path.as_ref().canonicalize()?
     } else {
-        env::current_dir()?.join(path)
+        std::path::absolute(path)?
     };
 
     let base_path = if base_path.as_ref().is_absolute() {
         base_path.as_ref().canonicalize()?
     } else {
-        env::current_dir()?.join(base_path)
+        std::path::absolute(base_path)?
     };
 
     let content = std::fs::read_to_string(&path)

@@ -4,7 +4,6 @@ use base16ct::HexDisplay;
 use serde::{Deserialize, Serialize};
 use sha1::Digest;
 use sha1::Sha1;
-use std::env;
 use std::fmt::Display;
 use std::fs;
 use std::hash::Hash;
@@ -311,8 +310,7 @@ pub fn get_file_metadata(path: &Path) -> Result<FileMetaData> {
 }
 
 pub(crate) fn normalize_path<P: AsRef<Path>>(input: P) -> std::io::Result<PathBuf> {
-    let current_dir = env::current_dir()?;
-    let full_path = current_dir.join(input);
+    let full_path = std::path::absolute(input)?;
     Ok(full_path
         .components()
         .fold(PathBuf::new(), |mut acc, comp| {
