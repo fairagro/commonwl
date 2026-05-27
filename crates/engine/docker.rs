@@ -11,7 +11,10 @@ use std::{
     process::{Command, Stdio},
 };
 
-use crate::{environment::workdir::{self, WorkDirMount}, string_url_to_file_path};
+use crate::{
+    environment::workdir::{self, WorkDirMount},
+    string_url_to_file_path,
+};
 
 /// builds a Docker container using the bollard Docker client
 pub(crate) async fn build_container(
@@ -137,10 +140,9 @@ pub fn build_container_command(
 
     for input in inputs {
         let loc = string_url_to_file_path(input.location().unwrap())?;
-        let loc = loc.canonicalize()?; //resolve `..` to have an absolute path that can be safely mounted
+        let loc = safe_mount(loc)?;
         let mount = format!(
-            "--mount=type=bind,source={},target={}",
-            loc.display(),
+            "--mount=type=bind,source={loc},target={}",
             input.path().unwrap()
         );
         args.push(mount);
@@ -150,14 +152,18 @@ pub fn build_container_command(
         let workdir::Source::Url(loc) = mount.source else {
             continue;
         };
+        let loc = loc
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("{} is not a path", loc))?;
+        let loc = safe_mount(loc)?;
+
         ensure!(mount.target.scheme() == "file");
         let target = mount
             .target
             .to_file_path()
             .map_err(|()| anyhow::anyhow!("Not a local path!"))?;
         let mount = format!(
-            "--mount=type=bind,source={},target={}",
-            loc.path(), //dangerous
+            "--mount=type=bind,source={loc},target={}",
             target.to_string_lossy()
         );
         args.push(mount);
@@ -258,4 +264,27 @@ fn build_docker_file(
 fn get_user_flag() -> String {
     use nix::unistd::{getgid, getuid};
     format!("--user={}:{}", getuid().as_raw(), getgid().as_raw())
+}
+
+fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
+    let input = input.as_ref().canonicalize()?; //resolve `..` to have an absolute path that can be safely mounted
+    #[cfg(unix)]
+    {
+        Ok(input.to_string_lossy().into_owned())
+    }
+    #[cfg(windows)]
+    {
+        // On Windows, Docker expects paths in the format /c/Users/...
+        let path = input;
+        let drive_letter = path
+            .components()
+            .next()
+            .unwrap()
+            .as_os_str()
+            .to_string_lossy();
+        let rest_of_path = path.components().skip(1).fold(String::new(), |acc, comp| {
+            acc + "/" + &comp.as_os_str().to_string_lossy()
+        });
+        Ok(format!("/{drive_letter}{rest_of_path}"))
+    }
 }
