@@ -275,16 +275,38 @@ fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
     #[cfg(windows)]
     {
         // On Windows, Docker expects paths in the format /c/Users/...
-        let path = input;
-        let drive_letter = path
+        use std::path::Component;
+
+        let path_str = input.to_string_lossy();
+        let stripped = path_str.strip_prefix(r"\\?\").unwrap_or(&path_str);
+
+        let path = Path::new(stripped);
+
+        let drive = path
             .components()
             .next()
-            .unwrap()
-            .as_os_str()
-            .to_string_lossy();
-        let rest_of_path = path.components().skip(1).fold(String::new(), |acc, comp| {
-            acc + "/" + &comp.as_os_str().to_string_lossy()
-        });
-        Ok(format!("/{drive_letter}{rest_of_path}"))
+            .and_then(|c| match c {
+                Component::Prefix(p) => {
+                    let raw = p.as_os_str().to_string_lossy();
+                    // raw is "C:" lowercase it
+                    raw.chars()
+                        .next()
+                        .map(|ch| ch.to_ascii_lowercase().to_string())
+                }
+                _ => None,
+            })
+            .ok_or_else(|| anyhow::anyhow!("Path has no drive letter: {}", stripped))?;
+
+        let rest: String = path
+            .components()
+            .skip(1) // skip the Prefix ("C:")
+            .filter(|c| !matches!(c, Component::RootDir)) // skip the leading `\`
+            .fold(String::new(), |mut acc, comp| {
+                acc.push('/');
+                acc.push_str(&comp.as_os_str().to_string_lossy());
+                acc
+            });
+
+        Ok(format!("/{drive}{rest}"))
     }
 }
