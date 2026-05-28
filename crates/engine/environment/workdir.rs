@@ -167,15 +167,18 @@ fn stage_dirent(
 ) -> anyhow::Result<Vec<WorkDirMount>> {
     if let StringOrInclude::Include(include) = &dirent.entry {
         let mut path = PathBuf::from(&include.include);
+
         if !path.is_absolute() {
             path = workdir.join(path);
         }
         path = dunce::canonicalize(path)?;
+
         let url = Url::from_file_path(&path)
             .map_err(|()| anyhow::anyhow!("Could not create URL from path {}", path.display()))?;
 
         let entryname = get_entryname(dirent, context)?;
         let staged_path = stagedir.join(&entryname)?;
+
         return Ok(vec![WorkDirMount {
             source: Source::Url(url),
             target: staged_path.as_url()?,
@@ -243,6 +246,8 @@ fn stage_dirent(
                 } else {
                     workdir.join(&path)
                 };
+                let absolute_path = dunce::canonicalize(&absolute_path).unwrap_or(absolute_path);
+
                 return Ok(vec![WorkDirMount {
                     source: Source::Url(Url::from_file_path(absolute_path).unwrap()),
                     target: staged_path.as_url()?,
@@ -304,9 +309,12 @@ fn stage_files(
         let path = get_location(path, workdir);
         let path = string_url_to_path_string(&path)?;
         let mut path = PathBuf::from(path);
+
         if !path.is_absolute() {
             path = workdir.join(path);
         }
+        let path = dunce::canonicalize(&path).unwrap_or(path);
+
         if item.is_file() {
             mounts.push(WorkDirMount {
                 source: Source::Url(Url::from_file_path(&path).unwrap()),

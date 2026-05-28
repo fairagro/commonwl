@@ -519,6 +519,39 @@ mod tests {
     }
 
     #[tokio::test]
+    #[cfg(not(target_os = "macos"))]
+    async fn test_local_backend_docker_iwdr_include() {
+        let base_dir = dunce::canonicalize(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata"),
+        )
+        .unwrap();
+
+        let specification_path = base_dir.join("load.cwl");
+
+        let storage = Arc::new(StorageBackend::new());
+        let data_store = StoragePath::from_local(&env::temp_dir());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            data_store,
+        ));
+
+        let tmpdir = tempdir().unwrap();
+        let request = crate::create_execution_request_with_inputs(
+            specification_path,
+            InputObject::default(),
+            Some(tmpdir.path()),
+            None,
+        )
+        .unwrap();
+
+        let cancellation_token = CancellationToken::new();
+        let result = crate::execute_commandline_tool(backend, &request, cancellation_token).await;
+        dbg!(&result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
     #[cfg(not(target_os = "macos"))] //ignore on macos because of CI issues with docker
     async fn test_local_backend_language_workflow() {
         let base_dir = dunce::canonicalize(
