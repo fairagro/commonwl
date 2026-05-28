@@ -3,7 +3,7 @@ use anyhow::{Context, ensure};
 use async_trait::async_trait;
 use dircpy::copy_dir;
 use glob::glob;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 #[derive(Default, Debug)]
@@ -38,9 +38,9 @@ impl Storage for LocalStorage {
 
     async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()> {
         ensure!(src.scheme() == "file");
-        let src = src
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        let src = url_to_path(src)?;
+        let src = dunce::canonicalize(&src).unwrap_or(src); //resolve simlinks and stuff
+
         if src.is_file() {
             tokio::fs::copy(&src, local).await.with_context(|| {
                 format!(
@@ -117,4 +117,27 @@ impl Storage for LocalStorage {
                 .map(StoragePath::Local),
         ))
     }
+}
+
+/// Converts a `file://` URL to a `PathBuf`, handling the Windows edge case
+/// where `url::Url::to_file_path` returns `/C:/...` instead of `C:/...`.
+fn url_to_path(url: &Url) -> anyhow::Result<PathBuf> {
+    let path = url
+        .to_file_path()
+        .map_err(|()| anyhow::anyhow!("Could not create file path from URL: {url}"))?;
+
+    #[cfg(windows)]
+    {
+        let s = path.to_string_lossy();
+        // Strip the spurious leading `/` before a Windows drive letter: /C:/... → C:/...
+        if let Some(rest) = s.strip_prefix('/')
+            && rest.len() >= 2
+            && rest.as_bytes()[0].is_ascii_alphabetic()
+            && rest.as_bytes()[1] == b':'
+        {
+            return Ok(PathBuf::from(rest));
+        }
+    }
+
+    Ok(path)
 }

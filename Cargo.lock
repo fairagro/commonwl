@@ -1480,6 +1480,7 @@ dependencies = [
  "aws-sdk-s3",
  "dircpy",
  "dotenvy",
+ "dunce",
  "glob",
  "reqwest",
  "tempfile",
