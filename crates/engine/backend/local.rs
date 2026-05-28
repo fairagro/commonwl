@@ -344,12 +344,23 @@ impl TaskBackend for LocalBackend {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ContainerEngine, InputObject, LocalBackend, create_execution_request_with_inputs,
-        execute_commandline_tool,
+        ContainerEngine, InputObject, LocalBackend, create_execution_request_from_document,
+        create_execution_request_with_inputs, execute, execute_commandline_tool,
     };
     use cwl_core::{
-        files::{File, FileOrDirectory},
+        OneOrMany,
+        documents::{CWLDocument, CommandLineTool},
+        files::{Dirent, File, FileOrDirectory},
         inputs::DefaultValue,
+        outputs::{
+            CommandOutputArraySchema, CommandOutputBinding, CommandOutputParameter,
+            CommandOutputSchema, CommandOutputType,
+        },
+        requirements::{
+            Include, InitialWorkDirRequirement, ListingItems, StringOrInclude, ToolRequirements,
+            WorkDirItems,
+        },
+        types::CWLType,
     };
     use cwl_engine_storage::{StorageBackend, StoragePath};
     use std::{env, path::Path, sync::Arc};
@@ -550,10 +561,9 @@ mod tests {
     #[tokio::test]
     #[cfg(not(target_os = "macos"))]
     async fn test_local_backend_docker_iwdr_include() {
-        let base_dir = dunce::canonicalize(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata"),
-        )
-        .unwrap();
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata"))
+                .unwrap();
 
         let specification_path = base_dir.join("load.cwl");
 
@@ -610,5 +620,72 @@ mod tests {
         //check if output file exists
         let out_file = tmpdir.path().join("results.svg");
         assert!(out_file.exists());
+    }
+
+    #[tokio::test]
+    async fn test_local_backend_inline() {
+        let storage = Arc::new(StorageBackend::new());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            StoragePath::from_local(&env::temp_dir()),
+        ));
+
+        let tool = CommandLineTool::builder()
+            .cwl_version("v1.2")
+            .base_command(&["python3", "workflows/temp/temp.py"])
+            .requirements(vec![ToolRequirements::InitialWorkDirRequirement(
+                InitialWorkDirRequirement::builder()
+                    .listing(WorkDirItems::ListingItems(vec![ListingItems::Dirent(
+                        Dirent::builder()
+                            .entryname("workflows/temp/temp.py")
+                            .entry(StringOrInclude::Include(
+                                Include::builder().include("workflows/temp/temp.py").build(),
+                            ))
+                            .build(),
+                    )]))
+                    .build(),
+            )])
+            .outputs(vec![
+                CommandOutputParameter::builder()
+                    .id("catch_all")
+                    .output_binding(
+                        CommandOutputBinding::builder()
+                            .glob(OneOrMany::One("*".to_string()))
+                            .build(),
+                    )
+                    .r#type(CommandOutputType::CommandOutputSchema(Box::new(
+                        CommandOutputSchema::Array(
+                            CommandOutputArraySchema::builder()
+                                .items(OneOrMany::Many(vec![
+                                    CommandOutputType::CWLType(CWLType::Null),
+                                    CommandOutputType::CWLType(CWLType::File),
+                                    CommandOutputType::CWLType(CWLType::Directory),
+                                ]))
+                                .build(),
+                        ),
+                    )))
+                    .build(),
+            ])
+            .build();
+
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/debug"))
+                .unwrap();
+
+        let job = create_execution_request_from_document(
+            CWLDocument::CommandLineTool(tool),
+            InputObject::default(),
+            base_dir,
+            Some(tempdir().unwrap().path()), //pumps halt irgendwoa hin
+            None,
+        )
+        .unwrap();
+
+        let cancellation_token = CancellationToken::new();
+        let result = execute(backend, &job, cancellation_token).await;
+
+        dbg!(&result);
+        assert!(result.is_ok());
     }
 }
