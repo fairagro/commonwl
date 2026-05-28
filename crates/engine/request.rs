@@ -170,13 +170,14 @@ pub fn create_execution_request_from_document(
     replace_schema_definitions(&mut specification, &requirements)?;
 
     let cwd = env::current_dir()?;
+    let working_dir = dunce::canonicalize(base_path.as_ref())?;
 
     let ctx = ExecutionRequest {
         requirements,
         hints,
         specification,
         inputs: inputs.inputs,
-        working_dir: base_path.as_ref().to_path_buf(),
+        working_dir,
         out_dir: outputs_path.unwrap_or(&cwd).to_path_buf(),
         environment,
     };
