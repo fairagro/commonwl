@@ -13,9 +13,7 @@ pub struct LocalStorage;
 impl Storage for LocalStorage {
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()> {
         ensure!(dest.scheme() == "file");
-        let dest = dest
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        let dest = url_to_path(dest)?;
         if local.is_file() {
             tokio::fs::copy(local, &dest).await.with_context(|| {
                 format!(
@@ -62,17 +60,13 @@ impl Storage for LocalStorage {
     }
 
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool> {
-        let uri = uri
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        let uri = url_to_path(uri)?;
         Ok(tokio::fs::try_exists(uri).await?)
     }
 
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
         ensure!(uri.scheme() == "file");
-        let uri = uri
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        let uri = url_to_path(uri)?;
 
         tokio::fs::remove_dir_all(&uri)
             .await
@@ -81,9 +75,7 @@ impl Storage for LocalStorage {
 
     async fn read_file(&self, uri: &Url) -> anyhow::Result<String> {
         ensure!(uri.scheme() == "file");
-        let uri = uri
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        let uri = url_to_path(uri)?;
         tokio::fs::read_to_string(&uri)
             .await
             .with_context(|| format!("Can not read file: {}", uri.display()))
@@ -95,9 +87,7 @@ impl Storage for LocalStorage {
         pattern: &str,
     ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
         ensure!(base.scheme() == "file");
-        let base = base
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        let base = url_to_path(base)?;
 
         // WINDOWS FIX: Cast pattern to a native path to run platform-agnostic checks
         let pattern_path = Path::new(pattern);
