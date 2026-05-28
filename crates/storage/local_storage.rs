@@ -145,7 +145,7 @@ mod tests {
     use url::Url;
 
     #[tokio::test]
-    async fn test_windows_path_handling_upload() {
+    async fn test_path_handling_upload() {
         let source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
 
@@ -169,7 +169,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_windows_path_handling_download() {
+    async fn test_path_handling_download() {
         let source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
 
@@ -193,7 +193,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_windows_path_handling_directory_upload() {
+    async fn test_path_handling_directory_upload() {
         let source_dir = tempdir().unwrap();
         let dest_base = tempdir().unwrap();
 
@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_windows_path_handling_read_file() {
+    async fn test_path_handling_read_file() {
         let source_dir = tempdir().unwrap();
         let source_file = source_dir.path().join("test_file.txt");
         std::fs::write(&source_file, b"content to read").unwrap();
@@ -240,7 +240,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_windows_path_handling_exists() {
+    async fn test_path_handling_exists() {
         let source_dir = tempdir().unwrap();
         let source_file = source_dir.path().join("test_file.txt");
         std::fs::write(&source_file, b"content").unwrap();
@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_windows_path_handling_delete() {
+    async fn test_path_handling_delete() {
         let _source_dir = tempdir().unwrap();
         let dest_dir = tempdir().unwrap();
         let file_to_delete = dest_dir.path().join("to_delete.txt");
