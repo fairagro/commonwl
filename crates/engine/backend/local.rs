@@ -425,6 +425,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_local_backend_raw() {
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/debug"))
+                .unwrap();
+        let specification_path = dunce::canonicalize(base_dir.join("debug.cwl")).unwrap();
+
+        let storage = Arc::new(StorageBackend::new());
+        let data_store = StoragePath::from_local(&env::temp_dir());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            data_store,
+        ));
+        let tmpdir = tempdir().unwrap();
+        let request = crate::create_execution_request_with_inputs(
+            specification_path,
+            InputObject::default(),
+            Some(tmpdir.path()),
+            None,
+        )
+        .unwrap();
+
+        let cancellation_token = CancellationToken::new();
+        let result = crate::execute(backend, &request, cancellation_token).await;
+        dbg!(&result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
     async fn test_local_backend_subfolder() {
         let base_dir =
             dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/"))
