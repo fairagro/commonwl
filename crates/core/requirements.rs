@@ -1,6 +1,6 @@
+use crate::ExtractFromEnum;
 use crate::files::{Dirent, FileOrDirectory, LoadListingEnum};
 use crate::{BoolOrExpression, IntegerOrExpression, NumberOrExpression};
-use crate::{ExtractFromEnum, OneOrMany};
 use bon::Builder;
 use cwl_salad::deserialize::{
     FromShortHand, deserialize_map_list_envname, deserialize_map_list_package,
@@ -235,7 +235,7 @@ pub enum ListingItems {
 #[serde(untagged)]
 pub enum WorkDirItems {
     Expression(String),
-    ListingItems(Box<OneOrMany<ListingItems>>),
+    ListingItems(Vec<ListingItems>),
 }
 
 #[doc = include_str!("docs/InitialWorkDirRequirement.md")]

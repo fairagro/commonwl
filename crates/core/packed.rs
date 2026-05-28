@@ -585,14 +585,11 @@ fn pack_workflow_input(
 fn pack_iwdr(iwdr: &mut InitialWorkDirRequirement, doc_dir: impl AsRef<Path>) -> Result<()> {
     match &mut iwdr.listing {
         WorkDirItems::Expression(_) => {}
-        WorkDirItems::ListingItems(items) => match &mut **items {
-            OneOrMany::One(item) => pack_iwdr_item(item, doc_dir)?,
-            OneOrMany::Many(items) => {
-                for item in items {
-                    pack_iwdr_item(item, &doc_dir)?;
-                }
+        WorkDirItems::ListingItems(items) => {
+            for item in items {
+                pack_iwdr_item(item, &doc_dir)?;
             }
-        },
+        }
     }
 
     Ok(())

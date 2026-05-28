@@ -61,32 +61,21 @@ pub(crate) fn stage_work_dir(
                 None,
             )
         }
-        WorkDirItems::ListingItems(items) => match &**items {
-            OneOrMany::One(item) => stage_item(
-                item,
-                workdir,
-                stagedir,
-                context,
-                container_workdir,
-                inputs,
-                None,
-            ),
-            OneOrMany::Many(items) => {
-                let mut mounts = vec![];
-                for item in items {
-                    mounts.extend(stage_item(
-                        item,
-                        workdir,
-                        stagedir,
-                        context,
-                        container_workdir,
-                        inputs,
-                        None,
-                    )?);
-                }
-                Ok(mounts)
+        WorkDirItems::ListingItems(items) => {
+            let mut mounts = vec![];
+            for item in items {
+                mounts.extend(stage_item(
+                    item,
+                    workdir,
+                    stagedir,
+                    context,
+                    container_workdir,
+                    inputs,
+                    None,
+                )?);
             }
-        },
+            Ok(mounts)
+        }
     }
 }
 
