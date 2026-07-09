@@ -14,4 +14,4 @@ tower-lsp-server = "0.23.0"
 dashmap = "6.2.1"
 ropey = "1.6.1"
 tracing-subscriber.workspace = true
-granit-parser = "0.0.3"
+granit-parser = "0.0.7"

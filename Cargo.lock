@@ -126,9 +126,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.102"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
+checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
 
 [[package]]
 name = "arraydeque"
@@ -904,9 +904,9 @@ dependencies = [
 
 [[package]]
 name = "bon"
-version = "3.9.1"
+version = "3.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f47dbe92550676ee653353c310dfb9cf6ba17ee70396e1f7cf0a2020ad49b2fe"
+checksum = "a602c73c7b0148ec6d12af6fd5cc7a46e2eacc8878271a999abac56eed12f561"
 dependencies = [
  "bon-macros",
  "rustversion",
@@ -914,9 +914,9 @@ dependencies = [
 
 [[package]]
 name = "bon-macros"
-version = "3.9.1"
+version = "3.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "519bd3116aeeb42d5372c29d982d16d0170d3d4a5ed85fc7dd91642ffff3c67c"
+checksum = "6dee98b0db6a962de883bf5d20362dee4d7ca0d12fe39a7c6c73c844e1cd7c1f"
 dependencies = [
  "darling 0.23.0",
  "ident_case",
@@ -1082,7 +1082,7 @@ dependencies = [
 
 [[package]]
 name = "commonwl"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "cwl_core",
  "cwl_engine",
@@ -1105,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "conformance"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1400,7 +1400,7 @@ dependencies = [
 
 [[package]]
 name = "cwl-lsp"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "cwl_core",
  "dashmap",
@@ -1413,7 +1413,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_core"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "base16ct 1.0.0",
@@ -1433,7 +1433,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1472,7 +1472,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine_storage"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1492,7 +1492,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_salad"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "cwl_salad_derive",
  "serde",
@@ -1503,7 +1503,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_salad_derive"
-version = "0.8.1"
+version = "0.8.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2119,9 +2119,9 @@ checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
 name = "granit-parser"
-version = "0.0.3"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f50ba32164f9e098d5da618776a32afbb32270adcbe3d3d006107dae11e37c91"
+checksum = "d03f81ad4732830d85cfd417a9f62cde6dadda4354d37d078a6084a19560aa2d"
 dependencies = [
  "arraydeque",
  "smallvec",
@@ -4231,9 +4231,9 @@ dependencies = [
 
 [[package]]
 name = "serde-saphyr"
-version = "0.0.27"
+version = "0.0.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5897b4c3faadadd35fdb6689f015641f3bc481d5adaaac56231ea15aeb243db3"
+checksum = "7bd22781911de0ca6debda95f073c8f18bec65d1a94f1fa9573f3102e514cea4"
 dependencies = [
  "ahash",
  "annotate-snippets",
@@ -4244,7 +4244,7 @@ dependencies = [
  "miette",
  "nohash-hasher",
  "num-traits",
- "serde",
+ "serde_core",
  "smallvec",
  "validator",
  "zmij",
@@ -5257,9 +5257,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 
 [[package]]
 name = "uuid"
-version = "1.23.1"
+version = "1.23.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ddd74a9687298c6858e9b88ec8935ec45d22e8fd5e6394fa1bd4e99a87789c76"
+checksum = "bf80a72845275afea99e7f2b434723d3bc7e38470fcd1c7ed39a599c73319a53"
 dependencies = [
  "getrandom 0.4.2",
  "js-sys",
