@@ -13,7 +13,7 @@ use cwl_core::{
 };
 use std::{collections::HashMap, path::Path};
 
-pub(crate) fn collect_inputs(
+pub fn collect_inputs(
     doc: &CWLDocument,
     inputs: &HashMap<String, DefaultValue>,
     work_dir: &Path,
@@ -164,7 +164,7 @@ pub(crate) fn get_stdin(
 }
 
 //flattens inputs of any type to a list of file or directory
-pub(crate) fn flatten_inputs(inputs: &HashMap<String, DefaultValue>) -> Vec<FileOrDirectory> {
+pub fn flatten_inputs(inputs: &HashMap<String, DefaultValue>) -> Vec<FileOrDirectory> {
     let mut flattened = vec![];
     for input in inputs.values() {
         flatten_inputs_impl(input, &mut flattened);
