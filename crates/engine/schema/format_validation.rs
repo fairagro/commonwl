@@ -25,13 +25,13 @@ use std::{
 };
 
 #[derive(Debug)]
-pub(crate) struct FormatValidator {
+pub struct FormatValidator {
     pub namespaces: HashMap<String, String>,
     pub ontologies: Vec<Ontology>,
 }
 
 #[derive(Debug)]
-pub(crate) enum Ontology {
+pub enum Ontology {
     Graph(Graph),
     SetOntology(SetOntology<ArcStr>),
 }

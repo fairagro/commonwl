@@ -164,6 +164,7 @@ pub(crate) fn get_stdin(
 }
 
 //flattens inputs of any type to a list of file or directory
+#[must_use]
 pub fn flatten_inputs(inputs: &HashMap<String, DefaultValue>) -> Vec<FileOrDirectory> {
     let mut flattened = vec![];
     for input in inputs.values() {
