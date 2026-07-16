@@ -14,8 +14,11 @@ use cwl_core::{
 use std::{collections::HashMap, path::Path};
 
 /// Collects all inputs for cwl file / job file combo
+/// # Errors
+/// Input is not given, or not valid for given slots
 /// # Panics
 /// input.id is None (should not be the case)
+#[allow(clippy::implicit_hasher)]
 pub fn collect_inputs(
     doc: &CWLDocument,
     inputs: &HashMap<String, DefaultValue>,
@@ -168,6 +171,7 @@ pub(crate) fn get_stdin(
 
 //flattens inputs of any type to a list of file or directory
 #[must_use]
+#[allow(clippy::implicit_hasher)]
 pub fn flatten_inputs(inputs: &HashMap<String, DefaultValue>) -> Vec<FileOrDirectory> {
     let mut flattened = vec![];
     for input in inputs.values() {
