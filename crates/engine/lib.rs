@@ -43,11 +43,13 @@ pub use backend::{
 pub use docker::{
     ContainerBuildOptions, ContainerBuildOptionsBuilder, ContainerEngine, build_container_command,
 };
+pub use input::{collect_inputs, flatten_inputs};
 pub use request::{
     ExecutionRequest, InputObject, create_execution_request,
     create_execution_request_from_document, create_execution_request_with_inputs,
     load_input_file_from_file,
 };
+
 use url::Url;
 
 pub(crate) fn string_url_to_file_path(url: &str) -> anyhow::Result<PathBuf> {
