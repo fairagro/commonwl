@@ -13,6 +13,9 @@ use cwl_core::{
 };
 use std::{collections::HashMap, path::Path};
 
+/// Collects all inputs for cwl file / job file combo
+/// # Panics
+/// input.id is None (should not be the case)
 pub fn collect_inputs(
     doc: &CWLDocument,
     inputs: &HashMap<String, DefaultValue>,
