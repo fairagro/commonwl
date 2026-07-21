@@ -391,7 +391,7 @@ fn pack_step(
             let step_hash = format!("#{step_id}.cwl");
             let graph = pack_cwl(
                 doc,
-                wf_dir.as_ref().join(step.id.as_ref().unwrap()),
+                wf_dir.as_ref().join("__inline_step__.cwl"),
                 Some(&step_hash),
             )?;
 
