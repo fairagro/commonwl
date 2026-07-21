@@ -18,11 +18,13 @@ edition = "2024"
 rust-version = "1.95"
 repository = "https://github.com/fairagro/commonwl"
 license = "MIT OR Apache-2.0"
-keywords = [
-    "cwl",
-    "commonwl",
-    "workflow",
-    "fairagro",
+keywords = ["cwl", "commonwl", "workflow", "fairagro"]
+authors = [
+    "Jens Krumsieck",
+    "Antonia Leidel",
+    "Harald von Waldow",
+    "Xaver Stiensmeier",
+    "FAIRagro"
 ]
 categories = ["science"]
 

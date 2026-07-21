@@ -9,6 +9,7 @@ repository.workspace = true
 license.workspace = true
 keywords.workspace = true
 categories.workspace = true
+authors.workspace = true
 
 [package.metadata.docs.rs]
 all-features = true
