@@ -46,7 +46,7 @@ cwl_engine_storage = { version = "0", path = "../storage" }
 
 # rdf
 rdf = "0.1.4"
-horned-owl = "1.4.0"
+horned-owl = "2.1.0"
 
 # util
 anyhow.workspace = true
