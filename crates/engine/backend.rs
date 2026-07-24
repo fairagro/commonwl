@@ -54,7 +54,7 @@ use std::{
 use tempfile::tempdir;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info};
+use tracing::{Instrument, debug, info};
 use uuid::Uuid;
 
 pub mod docker;
@@ -296,15 +296,19 @@ pub async fn execute_workflow(
                             debug!(
                                 "Scatter step skipped because when evaluated to false in {step_id_clone}"
                             );
-                            handles.push(tokio::spawn(async move {
-                                Ok((
-                                    step_id,
-                                    ExecutionResult {
-                                        outputs: null_outputs,
-                                        ..Default::default()
-                                    },
-                                ))
-                            }));
+                            let span = tracing::Span::current();
+                            handles.push(tokio::spawn(
+                                async move {
+                                    Ok((
+                                        step_id,
+                                        ExecutionResult {
+                                            outputs: null_outputs,
+                                            ..Default::default()
+                                        },
+                                    ))
+                                }
+                                .instrument(span),
+                            ));
                             continue;
                         }
                     }
@@ -313,6 +317,7 @@ pub async fn execute_workflow(
                     let job_outdir = collection_dir
                         .path()
                         .join(format!("{step_id_clone}_{job_index}"));
+
                     handles.push(execute_step(
                         step,
                         backend_clone.clone(),
@@ -346,20 +351,26 @@ pub async fn execute_workflow(
                         //spawn the "Null-Job"
                         let step_id = step_id_clone.clone();
                         debug!("Step skipped because when evaluated to false in {step_id_clone}");
-                        handles.push(tokio::spawn(async move {
-                            Ok((
-                                step_id,
-                                ExecutionResult {
-                                    outputs: null_outputs,
-                                    ..Default::default()
-                                },
-                            ))
-                        }));
+
+                        let span = tracing::Span::current();
+                        handles.push(tokio::spawn(
+                            async move {
+                                Ok((
+                                    step_id,
+                                    ExecutionResult {
+                                        outputs: null_outputs,
+                                        ..Default::default()
+                                    },
+                                ))
+                            }
+                            .instrument(span),
+                        ));
                         continue;
                     }
                 }
 
                 let backend_clone = backend.task_scoped();
+
                 handles.push(execute_step(
                     step,
                     backend_clone,
@@ -451,11 +462,16 @@ fn execute_step(
                 outdir,
                 Some(request),
             )?;
+
+            let span = tracing::Span::current();
             let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
-                tokio::spawn(async move {
-                    let result = execute(backend, &request, token).await?;
-                    Ok((step_id_clone, result))
-                });
+                tokio::spawn(
+                    async move {
+                        let result = execute(backend, &request, token).await?;
+                        Ok((step_id_clone, result))
+                    }
+                    .instrument(span),
+                );
             Ok(handle)
         }
         StringOrDocument::Document(cwldocument) => {
@@ -466,11 +482,16 @@ fn execute_step(
                 outdir,
                 Some(request),
             )?;
+
+            let span = tracing::Span::current();
             let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
-                tokio::spawn(async move {
-                    let result = execute(backend, &request, token).await?;
-                    Ok((step_id_clone, result))
-                });
+                tokio::spawn(
+                    async move {
+                        let result = execute(backend, &request, token).await?;
+                        Ok((step_id_clone, result))
+                    }
+                    .instrument(span),
+                );
             Ok(handle)
         }
     }
