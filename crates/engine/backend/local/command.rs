@@ -203,12 +203,20 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
         match output.ty() {
             output::Type::File => {
                 link_or_copy_file(src, &dest_path).await.with_context(|| {
-                    format!("Could not copy from {} to {}", src.display(), dest_path.display())
+                    format!(
+                        "Could not copy from {} to {}",
+                        src.display(),
+                        dest_path.display()
+                    )
                 })?;
             }
             output::Type::Directory => {
                 link_or_copy_dir(src, &dest_path).await.with_context(|| {
-                    format!("Could not copy from {} to {}", src.display(), dest_path.display())
+                    format!(
+                        "Could not copy from {} to {}",
+                        src.display(),
+                        dest_path.display()
+                    )
                 })?;
             }
         }
@@ -216,14 +224,21 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
     Ok(())
 }
 
-/// Hardlinks `src` to `dest` when possible, falling back to a real copy when
-/// linking isn't possible
+/// Sym- or Hardlinks `src` to `dest` when possible, falling back to a real copy when linking isn't possible
 async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
+    if is_same_file(src, dest).await {
+        return Ok(());
+    }
+
     if fs::hard_link(src, dest).await.is_ok() {
         return Ok(());
     }
 
-    // `dest` may already exist as a hardlink alias of `src` 
+    if create_symlink(src, dest).await.is_ok() {
+        return Ok(());
+    }
+
+    // If `dest` exists but wasnt the same file, clean vefore copy
     if fs::metadata(dest).await.is_ok() {
         let _ = fs::remove_file(dest).await;
         if fs::hard_link(src, dest).await.is_ok() {
@@ -231,10 +246,13 @@ async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
         }
     }
 
-    fs::copy(src, dest)
-        .await
-        .map(|_| ())
-        .with_context(|| format!("Could not copy from {} to {}", src.display(), dest.display()))
+    fs::copy(src, dest).await.map(|_| ()).with_context(|| {
+        format!(
+            "Could not copy from {} to {}",
+            src.display(),
+            dest.display()
+        )
+    })
 }
 
 /// Directory analogue of [`link_or_copy_file`]
@@ -264,4 +282,25 @@ fn link_or_copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::
         Ok(())
     }
     .boxed()
+}
+
+#[cfg(unix)]
+async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
+    tokio::fs::symlink(src, dest).await
+}
+
+#[cfg(windows)]
+async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
+    tokio::fs::symlink_file(src, dest).await
+}
+
+async fn is_same_file(src: &Path, dest: &Path) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if let (Ok(s), Ok(d)) = (fs::metadata(src).await, fs::metadata(dest).await) {
+            return s.dev() == d.dev() && s.ino() == d.ino();
+        }
+    }
+    false
 }
