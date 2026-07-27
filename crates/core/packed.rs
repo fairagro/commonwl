@@ -61,35 +61,52 @@ impl PackedCWL {
             CWLDocument::CommandLineTool(clt) => unpack_command_line_tool(clt),
             CWLDocument::ExpressionTool(et) => unpack_expression_tool(et),
             CWLDocument::Operation(op) => unpack_operation(op),
-            CWLDocument::Workflow(wf) => unpack_workflow(wf, &self.graph),
+            CWLDocument::Workflow(wf) => unpack_workflow(wf, &self.graph, &mut Vec::new())?,
         }
 
         Ok(main)
     }
 }
 
-fn unpack_workflow(wf: &mut Workflow, graph: &[CWLDocument]) {
+
+fn unpack_workflow(
+    wf: &mut Workflow,
+    graph: &[CWLDocument],
+    visited: &mut Vec<String>,
+) -> anyhow::Result<()> {
     let base_id = wf.id.clone().unwrap();
-
-    for input in &mut wf.inputs {
-        unpack_identifiable(input, &base_id);
+    if visited.contains(&base_id) {
+        anyhow::bail!(
+            "Cyclic 'run:' reference detected while unpacking packed CWL graph: '{base_id}' refers back to itself (directly or transitively)"
+        );
     }
+    visited.push(base_id.clone());
 
-    for step in &mut wf.steps {
-        unpack_workflow_step(step, &base_id, graph);
-    }
-
-    for output in &mut wf.outputs {
-        unpack_identifiable(output, &base_id);
-
-        if let Some(output_source) = &mut output.output_source {
-            *output_source = output_source.clone().map(|src| {
-                src.strip_prefix(&format!("{base_id}/"))
-                    .unwrap_or(&src)
-                    .to_string()
-            });
+    let result = (|| -> anyhow::Result<()> {
+        for input in &mut wf.inputs {
+            unpack_identifiable(input, &base_id);
         }
-    }
+
+        for step in &mut wf.steps {
+            unpack_workflow_step(step, &base_id, graph, visited)?;
+        }
+
+        for output in &mut wf.outputs {
+            unpack_identifiable(output, &base_id);
+
+            if let Some(output_source) = &mut output.output_source {
+                *output_source = output_source.clone().map(|src| {
+                    src.strip_prefix(&format!("{base_id}/"))
+                        .unwrap_or(&src)
+                        .to_string()
+                });
+            }
+        }
+        Ok(())
+    })();
+
+    visited.pop();
+    result
 }
 
 fn unpack_command_line_tool(clt: &mut CommandLineTool) {
@@ -140,7 +157,14 @@ fn unpack_identifiable(ident: &mut dyn Identifiable, base_id: &str) {
     }
 }
 
-fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocument]) {
+/// # Errors
+/// If the step's `run:` reference is (directly or transitively) cyclic - see `unpack_workflow`.
+fn unpack_workflow_step(
+    step: &mut WorkflowStep,
+    base_id: &str,
+    graph: &[CWLDocument],
+    visited: &mut Vec<String>,
+) -> anyhow::Result<()> {
     let step_id = step.id.clone().unwrap();
 
     if let StringOrDocument::String(run) = &step.run {
@@ -156,7 +180,7 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
                 CWLDocument::CommandLineTool(clt) => unpack_command_line_tool(clt),
                 CWLDocument::ExpressionTool(et) => unpack_expression_tool(et),
                 CWLDocument::Operation(op) => unpack_operation(op),
-                CWLDocument::Workflow(wf) => unpack_workflow(wf, graph),
+                CWLDocument::Workflow(wf) => unpack_workflow(wf, graph, visited)?,
             }
 
             step.run = StringOrDocument::Document(Box::new(op));
@@ -189,6 +213,7 @@ fn unpack_workflow_step(step: &mut WorkflowStep, base_id: &str, graph: &[CWLDocu
     }
 
     unpack_identifiable(step, base_id);
+    Ok(())
 }
 
 /// Generates a document graph from a given Document
@@ -645,6 +670,52 @@ mod tests {
         types::CWLType,
     };
     use std::path::{MAIN_SEPARATOR_STR, Path};
+
+    // A self-referential workflow (or a cycle of workflows) must be rejected
+    #[test]
+    fn test_unpack_self_referential_workflow_fails() {
+        let yaml = r##"
+cwlVersion: v1.2
+$graph:
+  - class: Workflow
+    id: main
+    inputs: []
+    outputs: []
+    steps:
+      - id: step1
+        in: []
+        out: []
+        run: "#main"
+"##;
+        crate::load::from_str(yaml).expect_err("self-referential workflow should be rejected");
+    }
+
+    #[test]
+    fn test_unpack_mutually_referential_workflows_fails() {
+        let yaml = r##"
+cwlVersion: v1.2
+$graph:
+  - class: Workflow
+    id: main
+    inputs: []
+    outputs: []
+    steps:
+      - id: step1
+        in: []
+        out: []
+        run: "#other"
+  - class: Workflow
+    id: other
+    inputs: []
+    outputs: []
+    steps:
+      - id: step1
+        in: []
+        out: []
+        run: "#main"
+"##;
+        crate::load::from_str(yaml).expect_err("mutually-referential workflows should be rejected");
+    }
 
     pub fn normalize_json_newlines(val: &mut serde_json::Value) {
         match val {

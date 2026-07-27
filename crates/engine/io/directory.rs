@@ -9,8 +9,9 @@ use cwl_core::{
     get_path_metadata,
 };
 use std::{
+    collections::HashSet,
     fs,
-    path::{MAIN_SEPARATOR_STR, Path},
+    path::{MAIN_SEPARATOR_STR, Path, PathBuf},
 };
 use url::Url;
 
@@ -20,6 +21,16 @@ pub(crate) fn locate_dir(
     work_dir: &Path,
     stage_dir: &Path,
     load_listing: Option<LoadListingEnum>,
+) -> anyhow::Result<()> {
+    locate_dir_impl(dir, work_dir, stage_dir, load_listing, &mut HashSet::new())
+}
+
+fn locate_dir_impl(
+    dir: &mut Directory,
+    work_dir: &Path,
+    stage_dir: &Path,
+    load_listing: Option<LoadListingEnum>,
+    visited: &mut HashSet<PathBuf>,
 ) -> anyhow::Result<()> {
     if let Some(path) = &dir.path
         && dir.location.is_none()
@@ -62,10 +73,10 @@ pub(crate) fn locate_dir(
             let listing = match load_listing {
                 Some(LoadListingEnum::NoListing) | None => None,
                 Some(LoadListingEnum::ShallowListing) => {
-                    Some(read_dir(&path, false, work_dir, stage_dir)?)
+                    Some(read_dir(&path, false, work_dir, stage_dir, visited)?)
                 }
                 Some(LoadListingEnum::DeepListing) => {
-                    Some(read_dir(&path, true, work_dir, stage_dir)?)
+                    Some(read_dir(&path, true, work_dir, stage_dir, visited)?)
                 }
             };
             dir.listing = listing;
@@ -80,7 +91,7 @@ pub(crate) fn locate_dir(
                 match item {
                     FileOrDirectory::File(file) => locate_file(file, work_dir, &path, false)?,
                     FileOrDirectory::Directory(dir) => {
-                        locate_dir(dir, work_dir, &path, load_listing)?;
+                        locate_dir_impl(dir, work_dir, &path, load_listing, visited)?;
                     }
                 }
             }
@@ -95,6 +106,7 @@ fn read_dir(
     recursive: bool,
     work_dir: &Path,
     stage_dir: &Path,
+    visited: &mut HashSet<PathBuf>,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     let mut entries = Vec::new();
     let read_dir = fs::read_dir(path)
@@ -109,13 +121,14 @@ fn read_dir(
                 ..Default::default()
             };
 
-            let load_listing = if recursive {
+            let canonical = fs::canonicalize(&path_buf).unwrap_or_else(|_| path_buf.clone());
+            let load_listing = if recursive && visited.insert(canonical) {
                 Some(LoadListingEnum::DeepListing)
             } else {
                 Some(LoadListingEnum::NoListing)
             };
 
-            locate_dir(&mut dir, work_dir, stage_dir, load_listing)?;
+            locate_dir_impl(&mut dir, work_dir, stage_dir, load_listing, visited)?;
 
             entries.push(FileOrDirectory::Directory(dir));
         } else {

@@ -6,7 +6,11 @@ use crate::{Result, guard};
 use anyhow::Context;
 use bon::Builder;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use std::{
+    collections::HashSet,
+    fs,
+    path::{Path, PathBuf},
+};
 use url::Url;
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
@@ -218,16 +222,28 @@ impl Directory {
     /// if a file or dir does not exist or path is not given
     pub fn load_listing(&mut self, load_listing: LoadListingEnum) -> Result<()> {
         guard!(let Some(path) = &self.path, "No path given");
+        let mut visited = HashSet::new();
+        if let Ok(canonical) = fs::canonicalize(path) {
+            visited.insert(canonical);
+        }
 
         match load_listing {
             LoadListingEnum::NoListing => self.listing = None,
-            LoadListingEnum::ShallowListing => self.listing = Some(Self::read_dir(path, false)?),
-            LoadListingEnum::DeepListing => self.listing = Some(Self::read_dir(path, true)?),
+            LoadListingEnum::ShallowListing => {
+                self.listing = Some(Self::read_dir(path, false, &mut visited)?);
+            }
+            LoadListingEnum::DeepListing => {
+                self.listing = Some(Self::read_dir(path, true, &mut visited)?);
+            }
         }
         Ok(())
     }
 
-    fn read_dir(path: &str, recursive: bool) -> Result<Vec<FileOrDirectory>> {
+    fn read_dir(
+        path: &str,
+        recursive: bool,
+        visited: &mut HashSet<PathBuf>,
+    ) -> Result<Vec<FileOrDirectory>> {
         let mut entries = Vec::new();
 
         let read_dir =
@@ -248,8 +264,9 @@ impl Directory {
                     .as_ref()
                     .map(|s| Url::from_file_path(s).unwrap().to_string());
 
-                if recursive {
-                    dir.load_listing(LoadListingEnum::DeepListing)?;
+                let canonical = fs::canonicalize(&path_buf).unwrap_or_else(|_| path_buf.clone());
+                if recursive && visited.insert(canonical) {
+                    dir.listing = Some(Self::read_dir(&path_buf.to_string_lossy(), true, visited)?);
                 }
 
                 entries.push(FileOrDirectory::Directory(dir));
@@ -295,5 +312,25 @@ mod tests {
         let contents = include_str!("../../testdata/listing.yaml");
         let res = serde_saphyr::from_str::<ListingBag>(contents);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_load_listing_symlink_loop() {
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink(dir.path(), dir.path().join("loop")).unwrap();
+
+        let mut directory = Directory::new_from_path(dir.path()).unwrap();
+        directory
+            .load_listing(LoadListingEnum::DeepListing)
+            .unwrap();
+
+        let listing = directory.listing.unwrap();
+        assert_eq!(listing.len(), 1);
+        // the looped entry is listed, but not descended into again
+        let FileOrDirectory::Directory(looped) = &listing[0] else {
+            panic!("expected a directory")
+        };
+        assert!(looped.listing.is_none());
     }
 }

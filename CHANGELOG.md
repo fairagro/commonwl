@@ -19,6 +19,9 @@
 - Local backend: output files are no longer left as broken/dangling references if the run's
   working directory and the requested output directory live on different filesystems or
   drives.
+- Documents that reference themselves in a cycle are now rejected with a clear error instead
+  of crashing: a workflow whose step (directly or transitively) runs itself, a packed CWL
+  file where `$import`s form a loop, or a `Directory` input containing a symlink loop.
 
 ### Performance
 - Local backend now hardlinks input/output files instead of always copying them when the

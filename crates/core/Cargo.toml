@@ -28,3 +28,6 @@ regex.workspace = true
 
 [lib]
 path = "lib.rs"
+
+[dev-dependencies]
+tempfile.workspace = true

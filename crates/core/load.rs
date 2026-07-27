@@ -2,7 +2,10 @@ use crate::{Result, documents::CWLDocument, packed::PackedCWL};
 use anyhow::Context;
 use serde_json::Value;
 use serde_saphyr::Options;
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 use url::Url;
 use validator::Validate;
 
@@ -78,41 +81,59 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
 
 /// Preprocesses the $import sections of CWL Files
 /// # Errors
-/// Throws if CWL File or some of the imports do not exist
+/// Throws if CWL File or some of the imports do not exist, or if `$import`s form a cycle
 pub fn preprocess_cwl_file<P: AsRef<Path> + std::fmt::Debug>(path: P) -> Result<String> {
     let contents =
         fs::read_to_string(&path).with_context(|| format!("Could not read CWL File {path:?}"))?;
     let mut yaml: Value = serde_saphyr::from_str_with_options(&contents, saphyr_options())?;
-    let path = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
 
-    resolve_imports(&mut yaml, path)?;
+    let mut visited = Vec::new();
+    if let Ok(canonical) = fs::canonicalize(&path) {
+        visited.push(canonical);
+    }
+
+    let path = path.as_ref().parent().unwrap_or_else(|| Path::new("."));
+    resolve_imports(&mut yaml, path, &mut visited)?;
 
     Ok(serde_saphyr::to_string(&yaml)?)
 }
 
-fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
+fn resolve_imports(value: &mut Value, base_path: &Path, visited: &mut Vec<PathBuf>) -> Result<()> {
     match value {
         Value::Object(map) => {
             if map.len() == 1
                 && let Some(Value::String(file)) = map.get("$import")
             {
                 let path = base_path.join(file);
+                let canonical = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+                if visited.contains(&canonical) {
+                    return Err(anyhow::anyhow!(
+                        "Cyclic $import detected: {} is imported (directly or transitively) from within itself",
+                        path.display()
+                    )
+                    .into());
+                }
+
                 let contents = fs::read_to_string(&path).with_context(|| {
                     format!("Could not read imported fragment {}", path.display())
                 })?;
                 let mut imported_value: Value =
                     serde_saphyr::from_str_with_options(&contents, saphyr_options())?;
-                resolve_imports(&mut imported_value, path.parent().unwrap_or(base_path))?;
+
+                visited.push(canonical);
+                resolve_imports(&mut imported_value, path.parent().unwrap_or(base_path), visited)?;
+                visited.pop();
+
                 *value = imported_value;
                 return Ok(());
             }
             for val in map.values_mut() {
-                resolve_imports(val, base_path)?;
+                resolve_imports(val, base_path, visited)?;
             }
         }
         Value::Array(seq) => {
             for val in seq.iter_mut() {
-                resolve_imports(val, base_path)?;
+                resolve_imports(val, base_path, visited)?;
             }
         }
         _ => {}
@@ -174,6 +195,17 @@ mod tests {
             let contents = fs::read_to_string(instruction_file).unwrap();
             serde_saphyr::from_str(&contents).unwrap()
         }
+    }
+
+    #[test]
+    fn cyclic_import_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let a = dir.path().join("a.cwl");
+        let b = dir.path().join("b.cwl");
+        fs::write(&a, "$import: b.cwl").unwrap();
+        fs::write(&b, "$import: a.cwl").unwrap();
+
+        preprocess_cwl_file(&a).expect_err("cyclic $import should be rejected");
     }
 
     #[test]
