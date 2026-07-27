@@ -224,17 +224,13 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
     Ok(())
 }
 
-/// Sym- or Hardlinks `src` to `dest` when possible, falling back to a real copy when linking isn't possible
+/// Hardlinks `src` to `dest` when possible, falling back to a real copy when linking isn't possibru
 async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
     if is_same_file(src, dest) {
         return Ok(());
     }
 
     if fs::hard_link(src, dest).await.is_ok() {
-        return Ok(());
-    }
-
-    if create_symlink(src, dest).await.is_ok() {
         return Ok(());
     }
 
@@ -284,16 +280,33 @@ fn link_or_copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::
     .boxed()
 }
 
-#[cfg(unix)]
-async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
-    tokio::fs::symlink(src, dest).await
-}
-
-#[cfg(windows)]
-async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
-    tokio::fs::symlink_file(src, dest).await
-}
-
 fn is_same_file(src: &Path, dest: &Path) -> bool {
     same_file::is_same_file(src, dest).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_link_or_copy_file_survives_source_removal() {
+        // `link_or_copy_file` must never leave `dest` as a symlink into `src`
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("src.txt");
+        let dest = dir.path().join("dest.txt");
+        fs::write(&src, b"hello").await.unwrap();
+
+        link_or_copy_file(&src, &dest).await.unwrap();
+        fs::remove_file(&src).await.unwrap();
+
+        assert!(
+            !fs::symlink_metadata(&dest)
+                .await
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "dest must not be a symlink"
+        );
+        assert_eq!(fs::read(&dest).await.unwrap(), b"hello");
+    }
 }
