@@ -139,9 +139,9 @@ fn get_entryname(dirent: &Dirent, context: &EvaluationContext) -> anyhow::Result
     //get entryname
     let entryname = dirent.clone().entryname.unwrap();
     let entryname = do_eval_to_string(&entryname, context);
-    if entryname.starts_with("../") {
+    if entryname.contains("..") {
         //illegal
-        anyhow::bail!("dirent.entryname must not start with ../")
+        anyhow::bail!("dirent.entryname must not contain ..")
     }
     Ok(entryname)
 }
