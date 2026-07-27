@@ -25,6 +25,8 @@ use crate::{
 };
 use anyhow::Context;
 use async_trait::async_trait;
+use crankshaft::engine::service::runner::backend::TaskRunError;
+use cwl_core::IntegerOrExpression;
 use cwl_core::{
     BoolOrExpression, docstring,
     documents::{CWLDocument, ScatterMethod, StringOrDocument, WorkflowStep},
@@ -44,6 +46,7 @@ use futures_util::{
 };
 use indexmap::IndexMap;
 use nonempty::NonEmpty;
+use std::time::Duration;
 use std::{
     collections::{HashMap, HashSet},
     fs,
@@ -54,7 +57,7 @@ use std::{
 use tempfile::tempdir;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{Instrument, debug, info};
+use tracing::{Instrument, debug, error, info};
 use uuid::Uuid;
 
 pub mod docker;
@@ -142,11 +145,6 @@ pub(crate) async fn run_with_timelimit(
     timelimit: Option<&ToolTimeLimit>,
     eval_context: &EvaluationContext<'_>,
 ) -> anyhow::Result<NonEmpty<ExitStatus>> {
-    use crankshaft::engine::service::runner::backend::TaskRunError;
-    use cwl_core::IntegerOrExpression;
-    use std::time::Duration;
-    use tracing::error;
-
     let timeout = timelimit.and_then(|ttl| match &ttl.timelimit {
         IntegerOrExpression::Int(i) => Some(i64::from(*i)),
         IntegerOrExpression::Long(i) => Some(*i),
