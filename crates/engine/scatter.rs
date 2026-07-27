@@ -10,6 +10,11 @@ pub(crate) fn gather_jobs(
 ) -> anyhow::Result<Vec<HashMap<String, serde_json::Value>>> {
     match method {
         ScatterMethod::Dotproduct => {
+            //return empty if no scatter
+            if scatter_inputs.is_empty() {
+                return Ok(vec![]);
+            }
+
             let len = scatter_inputs[0].len();
             if scatter_inputs.iter().any(|arr| arr.len() != len) {
                 return Err(anyhow::anyhow!(
