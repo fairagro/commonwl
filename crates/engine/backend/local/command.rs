@@ -294,6 +294,7 @@ async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
     tokio::fs::symlink_file(src, dest).await
 }
 
+#[allow(unused_variables)]
 async fn is_same_file(src: &Path, dest: &Path) -> bool {
     #[cfg(unix)]
     {
