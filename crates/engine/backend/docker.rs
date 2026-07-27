@@ -4,7 +4,6 @@ use crate::{
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     docker::build_container,
-    expression::do_eval_to_string,
 };
 use anyhow::ensure;
 use async_trait::async_trait;
@@ -29,8 +28,6 @@ use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
-use url::Url;
-use uuid::Uuid;
 
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
 const CONTAINER_TMPDIR: &str = "/mnt/task/tmp";
@@ -201,33 +198,35 @@ impl TaskBackend for DockerBackend {
         );
 
         //handle stderr output
-        let stderr_out_file = if let Some(stderr) = request.stderr_file {
-            let stderr = do_eval_to_string(stderr, request.eval_context);
-            outdir.join(stderr)
-        } else {
-            tmpdir.join(format!("stderr_{}", &Uuid::new_v4().to_string()[..8]))
-        };
+        let stderr_out = crate::backend::resolve_output_location(
+            request.stderr_file,
+            "stderr",
+            request.outdir,
+            request.tmpdir,
+            request.eval_context,
+        )?;
         task.add_output(
             Output::builder()
                 .name("stderr")
                 .path(stderr_file)
-                .url(Url::from_file_path(&stderr_out_file).unwrap())
+                .url(stderr_out.as_url()?)
                 .ty(output::Type::File)
                 .build(),
         );
 
         //handle stdout output
-        let stdout_out_file = if let Some(stdout) = request.stdout_file {
-            let stdout = do_eval_to_string(stdout, request.eval_context);
-            outdir.join(stdout)
-        } else {
-            tmpdir.join(format!("stdout_{}", &Uuid::new_v4().to_string()[..8]))
-        };
+        let stdout_out = crate::backend::resolve_output_location(
+            request.stdout_file,
+            "stdout",
+            request.outdir,
+            request.tmpdir,
+            request.eval_context,
+        )?;
         task.add_output(
             Output::builder()
                 .name("stdout")
                 .path(stdout_file)
-                .url(Url::from_file_path(&stdout_out_file).unwrap())
+                .url(stdout_out.as_url()?)
                 .ty(output::Type::File)
                 .build(),
         );
@@ -243,8 +242,8 @@ impl TaskBackend for DockerBackend {
 
         Ok(TaskExecutionResult {
             exit_status,
-            stdout_file: StoragePath::Local(stdout_out_file),
-            stderr_file: StoragePath::Local(stderr_out_file),
+            stdout_file: stdout_out,
+            stderr_file: stderr_out,
         })
     }
 

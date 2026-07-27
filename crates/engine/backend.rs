@@ -7,7 +7,7 @@ use crate::{
         runtime::{Runtime, build_runtime},
         workdir::{WorkDirMount, handle_inplace_update, stage_work_dir},
     },
-    expression::{EvaluationContext, do_eval},
+    expression::{EvaluationContext, do_eval, do_eval_to_string},
     input::{collect_inputs, flatten_inputs, get_stdin},
     io::file::collect_secondary_files_for_inputs,
     output::{
@@ -212,6 +212,23 @@ pub(crate) fn resolve_docker_requirement(
         };
     }
     default()
+}
+
+/// Resolves where an execution's stdout/stderr should end up
+pub(crate) fn resolve_output_location(
+    explicit_name: Option<&String>,
+    prefix: &str,
+    outdir: &StoragePath,
+    tmpdir: &StoragePath,
+    eval_context: &EvaluationContext<'_>,
+) -> anyhow::Result<StoragePath> {
+    if let Some(name) = explicit_name {
+        let name = do_eval_to_string(name, eval_context);
+        outdir.join(&name)
+    } else {
+        let name = format!("{prefix}_{}", &Uuid::new_v4().to_string()[..8]);
+        tmpdir.join(&name)
+    }
 }
 
 ///Executes a `CWLDocument`
@@ -951,5 +968,36 @@ mod tests {
         let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
         assert!(resolved.image_id.starts_with("cwl-build-"));
         assert!(resolved.dockerfile.is_some());
+    }
+
+    #[test]
+    fn test_resolve_output_location_generated_under_tmpdir() {
+        let outdir = StoragePath::from_local(Path::new("/out"));
+        let tmpdir = StoragePath::from_local(Path::new("/tmp"));
+        let eval_context = EvaluationContext::default();
+
+        let resolved = resolve_output_location(None, "stdout", &outdir, &tmpdir, &eval_context)
+            .unwrap();
+        let StoragePath::Local(path) = resolved else {
+            panic!("expected a local path")
+        };
+        assert_eq!(path.parent().unwrap(), Path::new("/tmp"));
+        assert!(
+            path.file_name().unwrap().to_str().unwrap().starts_with("stdout_"),
+            "expected a generated stdout_<uuid> name, got {path:?}"
+        );
+    }
+
+    #[test]
+    fn test_resolve_output_location_explicit_name_under_outdir() {
+        let outdir = StoragePath::from_local(Path::new("/out"));
+        let tmpdir = StoragePath::from_local(Path::new("/tmp"));
+        let eval_context = EvaluationContext::default();
+        let name = "my-output.log".to_string();
+
+        let resolved =
+            resolve_output_location(Some(&name), "stdout", &outdir, &tmpdir, &eval_context)
+                .unwrap();
+        assert_eq!(resolved, StoragePath::Local(PathBuf::from("/out/my-output.log")));
     }
 }

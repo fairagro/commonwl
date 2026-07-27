@@ -3,7 +3,7 @@ use crate::{
         TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
-    expression::do_eval_to_string, string_url_to_path_string,
+    string_url_to_path_string,
 };
 use async_trait::async_trait;
 use crankshaft::{
@@ -170,13 +170,13 @@ impl TaskBackend for TesBackend {
         }
 
         //handle stderr output
-        let stderr_path = if let Some(stderr) = request.stderr_file {
-            let filename = do_eval_to_string(stderr, request.eval_context);
-            request.outdir.join(&filename)?
-        } else {
-            let filename = format!("stderr_{}", &Uuid::new_v4().to_string()[..8]);
-            request.tmpdir.join(&filename)?
-        };
+        let stderr_path = crate::backend::resolve_output_location(
+            request.stderr_file,
+            "stderr",
+            request.outdir,
+            request.tmpdir,
+            request.eval_context,
+        )?;
         task.add_output(
             Output::builder()
                 .name("stderr")
@@ -196,13 +196,13 @@ impl TaskBackend for TesBackend {
         );
 
         //handle stdout output
-        let stdout_path = if let Some(stdout) = request.stdout_file {
-            let filename = do_eval_to_string(stdout, request.eval_context);
-            request.outdir.join(&filename)?
-        } else {
-            let filename = format!("stdout_{}", &Uuid::new_v4().to_string()[..8]);
-            request.tmpdir.join(&filename)?
-        };
+        let stdout_path = crate::backend::resolve_output_location(
+            request.stdout_file,
+            "stdout",
+            request.outdir,
+            request.tmpdir,
+            request.eval_context,
+        )?;
         task.add_output(
             Output::builder()
                 .name("stdout")
