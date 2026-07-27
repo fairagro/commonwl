@@ -226,7 +226,7 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
 
 /// Sym- or Hardlinks `src` to `dest` when possible, falling back to a real copy when linking isn't possible
 async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
-    if is_same_file(src, dest).await {
+    if is_same_file(src, dest) {
         return Ok(());
     }
 
@@ -294,6 +294,6 @@ async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
     tokio::fs::symlink_file(src, dest).await
 }
 
-async fn is_same_file(src: &Path, dest: &Path) -> bool {
+fn is_same_file(src: &Path, dest: &Path) -> bool {
     same_file::is_same_file(src, dest).unwrap_or_default()
 }

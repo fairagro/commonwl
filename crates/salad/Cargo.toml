@@ -16,13 +16,13 @@ default = []
 derive = ["cwl_salad_derive"]
 
 [dependencies]
-cwl_salad_derive = { version = "0", path = "../salad_derive", optional = true }
+cwl_salad_derive = { workspace = true, optional = true }
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
-trybuild = "1.0.116"
+trybuild.workspace = true
 
 [[test]]
 name = "derive_identifiable"

@@ -16,9 +16,9 @@ all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
 
 [dependencies]
-cwl_core = { version = "0.8", path = "../core" }
-cwl_engine = { version = "0.8", path = "../engine", optional = true }
-cwl_engine_storage = { version = "0.8", path = "../storage", optional = true }
+cwl_core.workspace = true
+cwl_engine = { workspace = true, optional = true }
+cwl_engine_storage = { workspace = true, optional = true }
 
 [features]
 default = []

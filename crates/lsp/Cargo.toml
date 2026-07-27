@@ -10,8 +10,8 @@ license.workspace = true
 [dependencies]
 tokio.workspace = true
 cwl_core.workspace = true
-tower-lsp-server = "0.23.0"
-dashmap = "6.2.1"
-ropey = "1.6.1"
+tower-lsp-server.workspace = true
+dashmap.workspace = true
+ropey.workspace = true
 tracing-subscriber.workspace = true
-granit-parser = "0.0.7"
+granit-parser.workspace = true
