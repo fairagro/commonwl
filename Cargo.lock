@@ -1480,7 +1480,6 @@ dependencies = [
  "crankshaft",
  "cwl_core",
  "cwl_engine_storage",
- "dircpy",
  "dunce",
  "futures-util",
  "horned-owl",

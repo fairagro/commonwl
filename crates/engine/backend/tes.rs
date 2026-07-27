@@ -117,7 +117,7 @@ impl TaskBackend for TesBackend {
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
-                    //.maybe_stdin(request.stdin_file)
+                    .maybe_stdin(request.stdin_file)
                     .build()
             ])
             .resources(

@@ -232,7 +232,21 @@ async fn mount_workdir_item_remote(
                     .build(),
             );
         }
-        (MountType::Directory, Source::Contents(_)) => {}
+        (MountType::Directory, Source::Contents(_)) => {
+            // no backing source; still need an (empty) directory present at guest_path so a
+            // synthesized IWDR directory literal without any listing items still exists.
+            let tmp = tempfile::tempdir()?;
+            let dest = base_url.join(&format!("{rel}/"))?;
+            backend.upload(tmp.path(), &dest).await?;
+            inputs.push(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::Directory)
+                    .read_only(mount.readonly)
+                    .build(),
+            );
+        }
     }
 
     Ok(inputs)

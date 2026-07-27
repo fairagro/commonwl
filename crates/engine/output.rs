@@ -23,7 +23,6 @@ use cwl_core::{
     types::{CWLType, SecondaryFileSchema},
 };
 use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
-use dircpy::copy_dir;
 use futures_util::{FutureExt, future::BoxFuture};
 use std::{
     collections::HashMap,
@@ -366,23 +365,25 @@ async fn validate_dir(
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
         .map(|p| if copy { unique_path(&p, None) } else { p });
 
-    if let Some(source_path) = &dir.path
+    let location = dir.location.as_ref().or(dir.path.as_ref());
+
+    if let Some(source_location) = &location
         && let Some(dest_path) = &path
     {
-        let mut source_path = source_path.to_owned();
-        if !Path::new(&source_path).exists() {
-            debug!("Path field contains container path. Trying to use location: {dir:?}");
-            source_path = string_url_to_path_string(dir.location.as_ref().unwrap())?;
-        }
+        let u_source_location = Url::parse(source_location)
+            .or_else(|_| Url::from_file_path(source_location))
+            .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))?;
 
-        let parent = dest_path.parent().unwrap();
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-        if copy {
-            copy_dir(&source_path, dest_path).with_context(|| {
-                format!("Could not copy {source_path} to {}", dest_path.display())
-            })?;
+        if storage.exists(&u_source_location).await? {
+            if copy {
+                let parent = dest_path.parent().unwrap();
+                if !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
+                storage.download(&u_source_location, dest_path).await?;
+            }
+        } else {
+            anyhow::bail!("Source location {source_location} does not exist for output directory");
         }
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory

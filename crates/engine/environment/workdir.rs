@@ -376,13 +376,29 @@ pub(crate) async fn handle_inplace_update(
     for mount in mounts {
         if !mount.readonly
             && let Source::Url(src_path) = &mount.source
-            && mount.target.scheme() == "file"
         {
-            let path = mount
-                .target
-                .to_file_path()
-                .map_err(|()| anyhow::anyhow!("Not a path"))?;
-            backend.upload(&path, src_path).await?;
+            if mount.target.scheme() == "file" {
+                let path = mount
+                    .target
+                    .to_file_path()
+                    .map_err(|()| anyhow::anyhow!("Not a path"))?;
+                backend.upload(&path, src_path).await?;
+            } else {
+                // target lives in remote storage (e.g. the TES backend's outdir); round-trip
+                // through a local temp path since `Storage` has no remote-to-remote copy.
+                match mount.ty {
+                    MountType::File => {
+                        let tmp = tempfile::NamedTempFile::new()?;
+                        backend.download(&mount.target, tmp.path()).await?;
+                        backend.upload(tmp.path(), src_path).await?;
+                    }
+                    MountType::Directory => {
+                        let tmp = tempfile::tempdir()?;
+                        backend.download(&mount.target, tmp.path()).await?;
+                        backend.upload(tmp.path(), src_path).await?;
+                    }
+                }
+            }
         }
     }
     Ok(())

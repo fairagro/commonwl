@@ -231,6 +231,14 @@ pub(crate) fn resolve_output_location(
     }
 }
 
+/// Resolves the path to expose as `runtime.outdir`/`runtime.tmpdir` to CWL expressions 
+pub(crate) fn resolve_runtime_path(storage_path: &StoragePath) -> PathBuf {
+    match storage_path {
+        StoragePath::Local(path) => path.clone(),
+        StoragePath::Remote(_) => PathBuf::from(storage_path.path()),
+    }
+}
+
 ///Executes a `CWLDocument`
 /// # Panics
 ///  Panics if `Operation` is used as this anstract type is not meant to be executed
@@ -792,11 +800,7 @@ pub async fn execute_commandline_tool(
         //update runtime
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
-        runtime.outdir = outdir
-            .storage_path()
-            .as_url()?
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file path from URL for outdir"))?; //is this smart?
+        runtime.outdir = resolve_runtime_path(outdir.storage_path());
 
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
@@ -999,5 +1003,19 @@ mod tests {
             resolve_output_location(Some(&name), "stdout", &outdir, &tmpdir, &eval_context)
                 .unwrap();
         assert_eq!(resolved, StoragePath::Local(PathBuf::from("/out/my-output.log")));
+    }
+
+    #[test]
+    fn test_resolve_runtime_path_local() {
+        let path = resolve_runtime_path(&StoragePath::from_local(Path::new("/out/workdir")));
+        assert_eq!(path, PathBuf::from("/out/workdir"));
+    }
+
+    #[test]
+    fn test_resolve_runtime_path_remote_does_not_error() {
+        let url = url::Url::parse("http://localhost:9000/commonwl-bucket/tmp/abcd1234/workdir")
+            .unwrap();
+        let path = resolve_runtime_path(&StoragePath::from_url(url));
+        assert_eq!(path, PathBuf::from("/commonwl-bucket/tmp/abcd1234/workdir"));
     }
 }
