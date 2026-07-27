@@ -4,7 +4,7 @@ use crate::{
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     docker::build_container,
-    expression::{do_eval, do_eval_to_string},
+    expression::do_eval_to_string,
 };
 use anyhow::ensure;
 use async_trait::async_trait;
@@ -15,10 +15,7 @@ use crankshaft::{
         Task,
         service::{
             name::{GeneratorIterator, UniqueAlphanumeric},
-            runner::{
-                Backend,
-                backend::{TaskRunError, docker},
-            },
+            runner::backend::docker,
         },
         task::{
             Execution, Input, Output, Resources,
@@ -27,15 +24,11 @@ use crankshaft::{
         },
     },
 };
-use cwl_core::{IntegerOrExpression, requirements::StringOrInclude};
+use cwl_core::requirements::StringOrInclude;
 use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::sync::{Arc, Mutex};
 use tokio_util::sync::CancellationToken;
-use tracing::error;
 use url::Url;
 use uuid::Uuid;
 
@@ -245,34 +238,14 @@ impl TaskBackend for DockerBackend {
                 .build(),
         );
 
-        let timelimit = request
-            .timelimit
-            .as_ref()
-            .and_then(|ttl| match &ttl.timelimit {
-                IntegerOrExpression::Int(i) => Some(i64::from(*i)),
-                IntegerOrExpression::Long(i) => Some(*i),
-                IntegerOrExpression::Expression(e) => {
-                    let value = do_eval(e, request.eval_context).ok()?;
-                    value.as_i64()
-                }
-            });
-        let exit_status = if let Some(timeout) = timelimit
-            && timeout != 0
-        {
-            let limit = Duration::from_secs(timeout.try_into()?); //this is intended to throw!
-            let token_clone = token.clone();
-            tokio::select! {
-                result = self.backend.run(task, token)? => result?,
-                () = tokio::time::sleep(limit) => {
-                    token_clone.cancel();
-                    error!("Timelimit reached: {timeout}");
-                    return Err(TaskRunError::Canceled.into());
-                }
-            }
-        } else {
-            //no time constraint
-            self.backend.run(task, token)?.await?
-        };
+        let exit_status = crate::backend::run_with_timelimit(
+            self.backend.as_ref(),
+            task,
+            token,
+            request.timelimit,
+            request.eval_context,
+        )
+        .await?;
 
         Ok(TaskExecutionResult {
             exit_status,

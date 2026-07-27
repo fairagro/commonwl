@@ -134,6 +134,47 @@ pub struct TaskExecutionResult {
     pub stderr_file: StoragePath,
 }
 
+/// Runs `task` on `backend`, enforcing `timelimit`
+pub(crate) async fn run_with_timelimit(
+    backend: &dyn crankshaft::engine::service::runner::Backend,
+    task: crankshaft::engine::Task,
+    token: CancellationToken,
+    timelimit: Option<&ToolTimeLimit>,
+    eval_context: &EvaluationContext<'_>,
+) -> anyhow::Result<NonEmpty<ExitStatus>> {
+    use crankshaft::engine::service::runner::backend::TaskRunError;
+    use cwl_core::IntegerOrExpression;
+    use std::time::Duration;
+    use tracing::error;
+
+    let timeout = timelimit.and_then(|ttl| match &ttl.timelimit {
+        IntegerOrExpression::Int(i) => Some(i64::from(*i)),
+        IntegerOrExpression::Long(i) => Some(*i),
+        IntegerOrExpression::Expression(e) => {
+            let value = do_eval(e, eval_context).ok()?;
+            value.as_i64()
+        }
+    });
+
+    if let Some(timeout) = timeout
+        && timeout != 0
+    {
+        let limit = Duration::from_secs(timeout.try_into()?); //this is intended to throw!
+        let token_clone = token.clone();
+        tokio::select! {
+            result = backend.run(task, token)? => Ok(result?),
+            () = tokio::time::sleep(limit) => {
+                token_clone.cancel();
+                error!("Timelimit reached: {timeout}");
+                Err(TaskRunError::Canceled.into())
+            }
+        }
+    } else {
+        //no time constraint
+        Ok(backend.run(task, token)?.await?)
+    }
+}
+
 ///Executes a `CWLDocument`
 /// # Panics
 ///  Panics if `Operation` is used as this anstract type is not meant to be executed
