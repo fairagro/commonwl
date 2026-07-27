@@ -22,6 +22,14 @@
 - Documents that reference themselves in a cycle are now rejected with a clear error instead
   of crashing: a workflow whose step (directly or transitively) runs itself, a packed CWL
   file where `$import`s form a loop, or a `Directory` input containing a symlink loop.
+- A `DockerRequirement` specifying only `dockerFile` (no `dockerImageId`) no longer crashes
+  the local backend; an image tag is now generated automatically.
+- The TES backend now reports a clear error for a `DockerRequirement` that needs building
+  from a `dockerFile`, instead of silently ignoring it and using the wrong container image.
+- Fixed several cases where a tool's output handling could crash instead of failing cleanly:
+  combining `secondaryFiles` with an output constructed via `outputEval`, a workflow step
+  input using `loadContents` on a `default` file value, and a tool's `cwl.output.json`
+  containing an incomplete file/directory entry.
 
 ### Performance
 - Local backend now hardlinks input/output files instead of always copying them when the
