@@ -124,12 +124,12 @@ fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
 mod tests {
     use super::*;
     use crate::documents::CommandLineTool;
-    use crate::error::Error;
-    use std::path::PathBuf;
 
     #[test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn load_test() {
+        use crate::error::Error;
+        use std::path::PathBuf;
         //move to cwl submodule
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
 
