@@ -723,13 +723,23 @@ impl StringOrWorkflowStepOutput {
     }
 }
 
+impl Validate for StringOrWorkflowStepOutput {
+    fn validate(&self) -> std::result::Result<(), validator::ValidationErrors> {
+        match self {
+            Self::String(_) => Ok(()),
+            Self::WorkflowStepOutput(wfs) => wfs.validate(),
+        }
+    }
+}
+
 #[doc = include_str!("docs/WorkflowStepOutput.md")]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Validate)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStepOutput>
 pub struct WorkflowStepOutput {
     #[doc = include_str!("docs/WorkflowStepOutput_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(required)]
     id: Option<String>,
 }
 

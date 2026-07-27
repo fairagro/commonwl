@@ -294,14 +294,6 @@ async fn create_symlink(src: &Path, dest: &Path) -> std::io::Result<()> {
     tokio::fs::symlink_file(src, dest).await
 }
 
-#[allow(unused_variables)]
 async fn is_same_file(src: &Path, dest: &Path) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::MetadataExt;
-        if let (Ok(s), Ok(d)) = (fs::metadata(src).await, fs::metadata(dest).await) {
-            return s.dev() == d.dev() && s.ino() == d.ino();
-        }
-    }
-    false
+    same_file::is_same_file(src, dest).unwrap_or_default()
 }

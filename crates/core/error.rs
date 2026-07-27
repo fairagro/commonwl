@@ -24,6 +24,10 @@ pub enum Error {
     #[diagnostic(code(commonwl::Error::Guard))]
     UrlParseError(#[from] url::ParseError),
 
+    #[error("CWL document failed validation")]
+    #[diagnostic(code(commonwl::Error::Validation))]
+    Validation(#[from] validator::ValidationErrors),
+
     #[error(transparent)]
     #[diagnostic(code(anyhow::error))]
     Unknown(#[from] anyhow::Error),

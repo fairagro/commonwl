@@ -4,6 +4,7 @@ use serde_json::Value;
 use serde_saphyr::Options;
 use std::{fs, path::Path};
 use url::Url;
+use validator::Validate;
 
 pub fn saphyr_options() -> Options {
     serde_saphyr::options! { strict_booleans: true, with_snippet: false }
@@ -30,17 +31,19 @@ pub fn load_cwl_file<P: AsRef<Path> + std::fmt::Debug>(
 
 /// Loads a `CWLDocument` from a string, may be packed or unpacked
 /// # Errors
-/// If the string is not a valid CWL Document, or if it is a packed CWL Document but can not be unpacked
+/// If the string is not a valid CWL Document, if it is a packed CWL Document but can not be
+/// unpacked, or if the resulting document fails CWL spec validation
 pub fn from_str(contents: &str) -> Result<CWLDocument> {
-    if contents.contains("$graph") {
+    let doc = if contents.contains("$graph") {
         let packed =
             serde_saphyr::from_str_with_options_validate::<PackedCWL>(contents, saphyr_options())
                 .context("Could not parse to packed CWL")?;
-        packed.unpack(None)
+        packed.unpack(None)?
     } else {
-        serde_saphyr::from_str_with_options_validate::<CWLDocument>(contents, saphyr_options())
-            .map_err(Into::into)
-    }
+        serde_saphyr::from_str_with_options_validate::<CWLDocument>(contents, saphyr_options())?
+    };
+    doc.validate()?;
+    Ok(doc)
 }
 
 fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
@@ -49,7 +52,7 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
     } else {
         &std::path::absolute(path)?
     };
-    
+
     //load via string to not strip the fragment
     let path_url = format!("file://{}", absolute_path.to_string_lossy());
 
@@ -66,7 +69,9 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
         };
         let pack =
             serde_saphyr::from_str_with_options_validate::<PackedCWL>(&contents, saphyr_options())?;
-        return pack.unpack(Some(fragment));
+        let doc = pack.unpack(Some(fragment))?;
+        doc.validate()?;
+        return Ok(doc);
     }
     Err(anyhow::anyhow!("Packed CWL could not be loaded. Can not guess fragment").into())
 }
@@ -116,14 +121,14 @@ fn resolve_imports(value: &mut Value, base_path: &Path) -> Result<()> {
 }
 
 #[cfg(test)]
-#[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
 mod tests {
     use super::*;
-    use crate::{documents::CommandLineTool, error::Error};
+    use crate::documents::CommandLineTool;
+    use crate::error::Error;
     use std::path::PathBuf;
-    use validator::Validate;
 
     #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
     fn load_test() {
         //move to cwl submodule
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
@@ -174,6 +179,150 @@ mod tests {
     #[test]
     fn validate_cwl_version() {
         let tool = CommandLineTool::builder().cwl_version("1vaa1.2").build();
-        tool.validate().expect_err("");
+        tool.validate()
+            .expect_err("malformed cwlVersion should fail validation");
+    }
+
+    #[test]
+    fn missing_input_id_fails() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: CommandLineTool
+baseCommand: echo
+inputs:
+  - type: string
+outputs: []
+",
+        )
+        .expect_err("input parameter without id should fail validation");
+    }
+
+    #[test]
+    fn missing_output_id_fails() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: CommandLineTool
+baseCommand: echo
+inputs: []
+outputs:
+  - type: string
+",
+        )
+        .expect_err("output parameter without id should fail validation");
+    }
+
+    #[test]
+    fn duplicate_input_ids_fail() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: CommandLineTool
+baseCommand: echo
+inputs:
+  - id: foo
+    type: string
+  - id: foo
+    type: string
+outputs: []
+",
+        )
+        .expect_err("two inputs sharing an id should fail validation");
+    }
+
+    #[test]
+    fn duplicate_output_ids_fail() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: CommandLineTool
+baseCommand: echo
+inputs: []
+outputs:
+  - id: foo
+    type: string
+  - id: foo
+    type: string
+",
+        )
+        .expect_err("two outputs sharing an id should fail validation");
+    }
+
+    #[test]
+    fn duplicate_requirement_classes_fail() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: CommandLineTool
+baseCommand: echo
+inputs: []
+outputs: []
+requirements:
+  - class: InlineJavascriptRequirement
+  - class: InlineJavascriptRequirement
+",
+        )
+        .expect_err("two requirements of the same class should fail validation");
+    }
+
+    #[test]
+    fn duplicate_step_ids_fail() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: Workflow
+inputs: []
+outputs: []
+steps:
+  - id: step1
+    in: []
+    out: []
+    run: tool.cwl
+  - id: step1
+    in: []
+    out: []
+    run: tool.cwl
+",
+        )
+        .expect_err("two steps sharing an id should fail validation");
+    }
+
+    #[test]
+    fn workflow_step_input_missing_id_fails() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: Workflow
+inputs: []
+outputs: []
+steps:
+  - id: step1
+    in:
+      - source: somewhere
+    out: []
+    run: tool.cwl
+",
+        )
+        .expect_err("step input without id should fail validation");
+    }
+
+    #[test]
+    fn workflow_step_output_missing_id_fails() {
+        from_str(
+            r"
+cwlVersion: v1.2
+class: Workflow
+inputs: []
+outputs: []
+steps:
+  - id: step1
+    in: []
+    out:
+      - {}
+    run: tool.cwl
+",
+        )
+        .expect_err("step output without id should fail validation");
     }
 }

@@ -43,6 +43,7 @@ tempfile.workspace = true
 tar = "0.4.46"
 dircpy.workspace = true
 url.workspace = true
+same-file.workspace = true
 cwl_engine_storage = { version = "0", path = "../storage" }
 
 # rdf

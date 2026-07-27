@@ -839,12 +839,15 @@ pub struct CommandLineBinding {
 }
 
 #[doc = include_str!("docs/WorkflowStepInput.md")]
-#[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Eq, Builder)]
+#[derive(
+    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Identifiable, Eq, Builder, Validate,
+)]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowStepInput>
 pub struct WorkflowStepInput {
     #[doc = include_str!("docs/WorkflowStepInput_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(required)]
     pub id: Option<String>,
     #[doc = include_str!("docs/WorkflowStepInput_source.md")]
     #[serde(skip_serializing_if = "Option::is_none")]

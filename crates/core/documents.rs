@@ -270,12 +270,12 @@ pub struct CommandLineTool {
     #[doc = include_str!("docs/CommandLineTool_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub inputs: Vec<CommandInputParameter>,
     #[doc = include_str!("docs/CommandLineTool_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub outputs: Vec<CommandOutputParameter>,
     #[doc = include_str!("docs/CommandLineTool_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -294,6 +294,7 @@ pub struct CommandLineTool {
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
+    #[validate(custom(function = "crate::validate::validate_unique_requirements"))]
     pub requirements: Option<Vec<ToolRequirements>>,
     #[doc = include_str!("docs/CommandLineTool_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -358,12 +359,12 @@ pub struct ExpressionTool {
     #[doc = include_str!("docs/ExpressionTool_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub inputs: Vec<WorkflowInputParameter>,
     #[doc = include_str!("docs/ExpressionTool_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub outputs: Vec<ExpressionToolOutputParameter>,
     #[doc = include_str!("docs/ExpressionTool_expression.md")]
     #[builder(into)]
@@ -386,6 +387,7 @@ pub struct ExpressionTool {
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
+    #[validate(custom(function = "crate::validate::validate_unique_requirements"))]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[doc = include_str!("docs/ExpressionTool_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -418,12 +420,12 @@ pub struct Operation {
     #[doc = include_str!("docs/Operation_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub inputs: Vec<OperationInputParameter>,
     #[doc = include_str!("docs/Operation_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub outputs: Vec<OperationOutputParameter>,
     #[doc = include_str!("docs/Operation_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -442,6 +444,7 @@ pub struct Operation {
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
+    #[validate(custom(function = "crate::validate::validate_unique_requirements"))]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[doc = include_str!("docs/Operation_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -474,17 +477,17 @@ pub struct Workflow {
     #[doc = include_str!("docs/Workflow_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub inputs: Vec<WorkflowInputParameter>,
     #[doc = include_str!("docs/Workflow_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub outputs: Vec<WorkflowOutputParameter>,
     #[doc = include_str!("docs/Workflow_steps.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(into)]
-    #[validate(nested)]
+    #[validate(nested, custom(function = "crate::validate::validate_unique_ids"))]
     pub steps: Vec<WorkflowStep>,
     #[doc = include_str!("docs/Workflow_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -503,6 +506,7 @@ pub struct Workflow {
     #[builder(into)]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
+    #[validate(custom(function = "crate::validate::validate_unique_requirements"))]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[doc = include_str!("docs/Workflow_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -557,13 +561,16 @@ impl Workflow {
 pub struct WorkflowStep {
     #[doc = include_str!("docs/WorkflowStep_in.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
+    #[validate(nested)]
     pub r#in: Vec<WorkflowStepInput>,
     #[doc = include_str!("docs/WorkflowStep_out.md")]
+    #[validate(nested)]
     pub out: Vec<StringOrWorkflowStepOutput>,
     #[doc = include_str!("docs/WorkflowStep_run.md")]
     pub run: StringOrDocument,
     #[doc = include_str!("docs/WorkflowStep_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[validate(required)]
     pub id: Option<String>,
     #[doc = include_str!("docs/WorkflowStep_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -575,6 +582,7 @@ pub struct WorkflowStep {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
+    #[validate(custom(function = "crate::validate::validate_unique_requirements"))]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[doc = include_str!("docs/WorkflowStep_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
