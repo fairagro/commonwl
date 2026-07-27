@@ -9,7 +9,6 @@ use crankshaft::engine::{
     },
 };
 use cwl_engine_storage::{Storage, StorageBackend};
-use dircpy::{CopyBuilder, copy_dir};
 use futures_util::{FutureExt, future::BoxFuture};
 use nonempty::NonEmpty;
 use std::{
@@ -148,8 +147,8 @@ async fn stage_inputs(
             }
             Contents::Path(src_path) => match input.ty() {
                 input::Type::File => {
-                    debug!("Copy from {src_path:?} to {dest:?}");
-                    fs::copy(src_path, dest).await.with_context(|| {
+                    debug!("Linking/copying from {src_path:?} to {dest:?}");
+                    link_or_copy_file(src_path, dest).await.with_context(|| {
                         format!(
                             "Could not copy from {} to {}",
                             src_path.display(),
@@ -158,8 +157,8 @@ async fn stage_inputs(
                     })?;
                 }
                 input::Type::Directory => {
-                    debug!("Copy from {src_path:?} to {dest:?}");
-                    copy_dir(src_path, dest).with_context(|| {
+                    debug!("Linking/copying from {src_path:?} to {dest:?}");
+                    link_or_copy_dir(src_path, dest).await.with_context(|| {
                         format!(
                             "Could not copy from {} to {}",
                             src_path.display(),
@@ -203,20 +202,72 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
             .map_err(|()| anyhow::anyhow!("Could not convert output url to file path: {dest}"))?;
         match output.ty() {
             output::Type::File => {
-                fs::copy(src, &dest_path).await.with_context(|| {
+                link_or_copy_file(src, &dest_path).await.with_context(|| {
                     format!("Could not copy from {} to {}", src.display(), dest_path.display())
                 })?;
             }
             output::Type::Directory => {
-                //we need overwrite options here!
-                CopyBuilder::new(src, &dest_path)
-                    .overwrite(true)
-                    .run()
-                    .with_context(|| {
-                        format!("Could not copy from {} to {}", src.display(), dest_path.display())
-                    })?;
+                link_or_copy_dir(src, &dest_path).await.with_context(|| {
+                    format!("Could not copy from {} to {}", src.display(), dest_path.display())
+                })?;
             }
         }
     }
     Ok(())
+}
+
+/// Hardlinks `src` to `dest` when possible (same-volume, no elevated privilege
+/// required even on Windows, unlike symlinks), falling back to a real copy when
+/// linking isn't possible (different filesystem/volume, or `dest` already exists).
+async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
+    if fs::hard_link(src, dest).await.is_ok() {
+        return Ok(());
+    }
+
+    // `dest` may already exist as a hardlink alias of `src` from an earlier staging
+    // step (e.g. the same file staged into both a scratch dir and the work dir).
+    // Unlink it first: a straight fs::copy would truncate-then-read in place, and if
+    // src/dest are the same inode that destroys the data before it can be copied.
+    if fs::metadata(dest).await.is_ok() {
+        let _ = fs::remove_file(dest).await;
+        if fs::hard_link(src, dest).await.is_ok() {
+            return Ok(());
+        }
+    }
+
+    fs::copy(src, dest)
+        .await
+        .map(|_| ())
+        .with_context(|| format!("Could not copy from {} to {}", src.display(), dest.display()))
+}
+
+/// Directory analogue of [`link_or_copy_file`]: mirrors the directory structure with
+/// real directories (hardlinks to a directory itself aren't supported on NTFS/most
+/// filesystems), then hardlinks or copies each file leaf.
+fn link_or_copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::Result<()>> {
+    async move {
+        fs::create_dir_all(dest)
+            .await
+            .with_context(|| format!("Could not create dir: {}", dest.display()))?;
+
+        let mut entries = fs::read_dir(src)
+            .await
+            .with_context(|| format!("Could not read dir: {}", src.display()))?;
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .with_context(|| format!("Could not read dir: {}", src.display()))?
+        {
+            let file_type = entry.file_type().await?;
+            let from = entry.path();
+            let to = dest.join(entry.file_name());
+            if file_type.is_dir() {
+                link_or_copy_dir(&from, &to).await?;
+            } else {
+                link_or_copy_file(&from, &to).await?;
+            }
+        }
+        Ok(())
+    }
+    .boxed()
 }
