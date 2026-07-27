@@ -341,6 +341,25 @@ impl TaskBackend for LocalBackend {
     }
 }
 
+impl Drop for LocalBackend {
+    fn drop(&mut self) {
+        if fs::exists(self.container_input_dir()).unwrap_or_default() {
+            fs::remove_dir_all(self.container_input_dir())
+                .expect("Could not remove backend's input directory")
+        }
+
+        if fs::exists(self.container_tmp_dir()).unwrap_or_default() {
+            fs::remove_dir_all(self.container_tmp_dir())
+                .expect("Could not remove backend's tmp directory")
+        }
+
+        if fs::exists(self.container_work_dir()).unwrap_or_default() {
+            fs::remove_dir_all(self.container_work_dir())
+                .expect("Could not remove backend's working directory")
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{

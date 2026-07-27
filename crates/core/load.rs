@@ -49,6 +49,8 @@ fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
     } else {
         &std::path::absolute(path)?
     };
+    
+    //load via string to not strip the fragment
     let path_url = format!("file://{}", absolute_path.to_string_lossy());
 
     let url = Url::parse(&path_url)?;
