@@ -1,7 +1,7 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     io::{
-        file::{PathOrFile, handle_secondary_file_schema},
+        file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
         unique_path,
     },
     schema::{format_validation::FormatValidator, validation::validate_type},
@@ -199,7 +199,9 @@ async fn evaluate_command_binding(
                     ..*context.eval_context
                 };
                 file.secondary_files =
-                    handle_secondary_files(file, secondary_files, &eval_context).ok();
+                    handle_secondary_files(file, secondary_files, &eval_context, &storage)
+                        .await
+                        .ok();
             }
         }
     }
@@ -207,10 +209,11 @@ async fn evaluate_command_binding(
     Ok(results)
 }
 
-fn handle_secondary_files(
+async fn handle_secondary_files(
     file: &File,
     secondary_files: &OneOrMany<SecondaryFileSchema>,
-    context: &EvaluationContext,
+    context: &EvaluationContext<'_>,
+    storage: &StorageBackend,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     if file.location.is_none() {
         debug!("Can not evaluate secondary_files as location is not set");
@@ -218,22 +221,41 @@ fn handle_secondary_files(
     }
     let mut secondaries = vec![];
     for item in &secondary_files.as_many() {
-        let Some(secondary_file) = handle_secondary_file_schema(file, item, context)? else {
+        let Some(secondary_file) = handle_secondary_file_schema(file, item, context, storage).await?
+        else {
             continue;
         };
         for item in secondary_file {
             match item {
-                PathOrFile::Path(secondary_path) => {
-                    if secondary_path.is_file() {
-                        let file = File::new_from_path(&secondary_path)?;
-                        secondaries.push(FileOrDirectory::File(file));
-                    } else if secondary_path.is_dir() {
-                        let mut dir = Directory::new_from_path(&secondary_path)?;
-                        dir.load_listing(LoadListingEnum::DeepListing)?;
+                PathOrFile::Location(url) => {
+                    let basename = Path::new(url.path())
+                        .file_name()
+                        .map(|s| s.to_string_lossy().into_owned());
+                    if storage.is_dir(&url).await? {
+                        let mut dir = Directory {
+                            location: Some(url.to_string()),
+                            basename,
+                            ..Default::default()
+                        };
+                        if url.scheme() == "file" {
+                            dir.path = url.to_file_path().ok().map(|p| p.to_string_lossy().into_owned());
+                            dir.load_listing(LoadListingEnum::DeepListing)?;
+                        }
                         secondaries.push(FileOrDirectory::Directory(dir));
+                    } else {
+                        // metadata (size/checksum) and staging into the output dir happen later
+                        let file = File {
+                            location: Some(url.to_string()),
+                            basename,
+                            ..Default::default()
+                        };
+                        secondaries.push(FileOrDirectory::File(file));
                     }
                 }
-                PathOrFile::File(fod) => secondaries.push(*fod),
+                PathOrFile::File(mut fod) => {
+                    resolve_location_from_primary(file, &mut fod)?;
+                    secondaries.push(*fod);
+                }
             }
         }
     }
@@ -843,16 +865,19 @@ fn validate_output_type(r#type: &OneOrMany<OutputType>, value: &DefaultValue) ->
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_handle_secondary_files_missing_location_does_not_panic() {
+    #[tokio::test]
+    async fn test_handle_secondary_files_missing_location_does_not_panic() {
         let file = File::default();
         let schema = OneOrMany::One(SecondaryFileSchema {
             pattern: ".idx".to_string(),
             required: None,
         });
         let context = EvaluationContext::default();
+        let storage = StorageBackend::new();
 
-        let result = handle_secondary_files(&file, &schema, &context).unwrap();
+        let result = handle_secondary_files(&file, &schema, &context, &storage)
+            .await
+            .unwrap();
         assert!(result.is_empty());
     }
 }

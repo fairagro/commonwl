@@ -68,6 +68,13 @@ impl Storage for LocalStorage {
         Ok(tokio::fs::try_exists(uri).await?)
     }
 
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool> {
+        let uri = uri
+            .to_file_path()
+            .map_err(|()| anyhow::anyhow!("Could not create file_path from url"))?;
+        Ok(tokio::fs::metadata(uri).await.is_ok_and(|m| m.is_dir()))
+    }
+
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
         ensure!(uri.scheme() == "file");
         let uri = uri

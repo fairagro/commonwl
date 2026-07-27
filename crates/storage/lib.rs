@@ -19,6 +19,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()>;
     async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()>;
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool>;
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool>;
     async fn delete(&self, uri: &Url) -> anyhow::Result<()>;
     async fn read_file(&self, uri: &Url) -> anyhow::Result<String>;
     async fn glob(
@@ -83,6 +84,14 @@ impl Storage for StorageBackend {
             .get(uri.scheme())
             .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
             .exists(uri)
+            .await
+    }
+
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool> {
+        self.inner
+            .get(uri.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .is_dir(uri)
             .await
     }
 

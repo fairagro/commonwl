@@ -171,6 +171,14 @@ impl Storage for S3Storage {
         }
     }
 
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool> {
+        let (bucket, key) = S3Storage::parse_uri(uri)?;
+        Ok(matches!(
+            self.s3_file_type(&bucket, &key).await?,
+            S3PathType::Directory
+        ))
+    }
+
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
         let (bucket, key) = S3Storage::parse_uri(uri)?;
 

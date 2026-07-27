@@ -305,7 +305,9 @@ pub async fn execute_workflow(
         &mut inputs,
         eval_context,
         &request.working_dir,
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
 
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
@@ -673,7 +675,9 @@ pub async fn execute_commandline_tool(
         &mut inputs,
         eval_context,
         &request.working_dir,
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
 
     let eval_context = &mut EvaluationContext {
         inputs: Some(&inputs.clone()),
