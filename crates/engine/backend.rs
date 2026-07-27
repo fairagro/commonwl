@@ -36,7 +36,7 @@ use cwl_core::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
         InlineJavascriptRequirement, InplaceUpdateRequirement, LoadListingRequirement,
         MultipleInputFeatureRequirement, NetworkAccess, ResourceRequirement,
-        ScatterFeatureRequirement, ToolTimeLimit,
+        ScatterFeatureRequirement, StringOrInclude, ToolTimeLimit,
     },
 };
 use cwl_engine_storage::{RemoteTempDir, Storage, StorageBackend, StoragePath};
@@ -171,6 +171,47 @@ pub(crate) async fn run_with_timelimit(
         //no time constraint
         Ok(backend.run(task, token)?.await?)
     }
+}
+
+pub(crate) struct ResolvedDockerRequirement {
+    pub image_id: String,
+    pub dockerfile: Option<StringOrInclude>,
+}
+
+/// Shared by the Local/Docker/TES backends
+pub(crate) fn resolve_docker_requirement(
+    dr: Option<&DockerRequirement>,
+    default_image: &str,
+) -> ResolvedDockerRequirement {
+    let default = || ResolvedDockerRequirement {
+        image_id: default_image.to_string(),
+        dockerfile: None,
+    };
+    let Some(dr) = dr else { return default() };
+
+    if let Some(df) = &dr.docker_file {
+        let image_id = dr
+            .docker_image_id
+            .clone()
+            .unwrap_or_else(|| format!("cwl-build-{}", &Uuid::new_v4().to_string()[..8]));
+        return ResolvedDockerRequirement {
+            image_id,
+            dockerfile: Some(df.clone()),
+        };
+    }
+    if let Some(pull) = &dr.docker_pull {
+        return ResolvedDockerRequirement {
+            image_id: pull.clone(),
+            dockerfile: None,
+        };
+    }
+    if let Some(id) = &dr.docker_image_id {
+        return ResolvedDockerRequirement {
+            image_id: id.clone(),
+            dockerfile: None,
+        };
+    }
+    default()
 }
 
 ///Executes a `CWLDocument`
@@ -853,5 +894,62 @@ pub fn evaluate_exitcodes(exit_codes: &NonEmpty<ExitStatus>, doc: &CWLDocument) 
         EngineStatus::Failure(code)
     } else {
         EngineStatus::Success(code)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resolve_docker_requirement_none_uses_default() {
+        let resolved = resolve_docker_requirement(None, "default:tag");
+        assert_eq!(resolved.image_id, "default:tag");
+        assert!(resolved.dockerfile.is_none());
+    }
+
+    #[test]
+    fn test_resolve_docker_requirement_empty_uses_default() {
+        let dr = DockerRequirement::default();
+        let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
+        assert_eq!(resolved.image_id, "default:tag");
+        assert!(resolved.dockerfile.is_none());
+    }
+
+    #[test]
+    fn test_resolve_docker_requirement_pull() {
+        let dr = DockerRequirement::builder().docker_pull("my/image:1.0").build();
+        let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
+        assert_eq!(resolved.image_id, "my/image:1.0");
+        assert!(resolved.dockerfile.is_none());
+    }
+
+    #[test]
+    fn test_resolve_docker_requirement_image_id_only() {
+        let dr = DockerRequirement::builder().docker_image_id("my-built-image").build();
+        let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
+        assert_eq!(resolved.image_id, "my-built-image");
+        assert!(resolved.dockerfile.is_none());
+    }
+
+    #[test]
+    fn test_resolve_docker_requirement_file_with_image_id() {
+        let dr = DockerRequirement::builder()
+            .docker_file(StringOrInclude::String("FROM ubuntu".to_string()))
+            .docker_image_id("tagged-build")
+            .build();
+        let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
+        assert_eq!(resolved.image_id, "tagged-build");
+        assert!(resolved.dockerfile.is_some());
+    }
+
+    #[test]
+    fn test_resolve_docker_requirement_file_only_generates_tag() {
+        let dr = DockerRequirement::builder()
+            .docker_file(StringOrInclude::String("FROM ubuntu".to_string()))
+            .build();
+        let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
+        assert!(resolved.image_id.starts_with("cwl-build-"));
+        assert!(resolved.dockerfile.is_some());
     }
 }

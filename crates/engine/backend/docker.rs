@@ -85,26 +85,20 @@ impl TaskBackend for DockerBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let mut container = "ubuntu:noble".to_string(); //add config "default-container"
-        if let Some(dr) = request.docker {
-            if let Some(df) = &dr.docker_file
-                && let Some(dt) = &dr.docker_image_id
-            {
-                let df = match df {
-                    StringOrInclude::Include(include) => include.include.clone(),
-                    StringOrInclude::String(s) => {
-                        let tmp = request.tmpdir.join("Dockerfile")?;
-                        self.storage
-                            .upload_bytes(s.as_bytes(), &tmp.as_url()?)
-                            .await?;
-                        tmp.as_local_path()?.to_string_lossy().into_owned()
-                    }
-                };
-                build_container(self.client.inner(), df, dt).await?;
-                container = dt.clone();
-            } else if let Some(dp) = &dr.docker_pull {
-                container = dp.clone();
-            }
+        let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu:noble");
+        let container = resolved.image_id;
+        if let Some(df) = &resolved.dockerfile {
+            let df = match df {
+                StringOrInclude::Include(include) => include.include.clone(),
+                StringOrInclude::String(s) => {
+                    let tmp = request.tmpdir.join("Dockerfile")?;
+                    self.storage
+                        .upload_bytes(s.as_bytes(), &tmp.as_url()?)
+                        .await?;
+                    tmp.as_local_path()?.to_string_lossy().into_owned()
+                }
+            };
+            build_container(self.client.inner(), df, &container).await?;
         }
 
         let stdout_file = if let Some(s) = request.stdout_file {
@@ -159,7 +153,7 @@ impl TaskBackend for DockerBackend {
                 Resources::builder()
                     .cpu(request.runtime.cores as f64)
                     //.disk(request.runtime.outdir_size) //we don't use this currently
-                    .ram(request.runtime.ram as f64)
+                    .ram(request.runtime.ram as f64 / 1024.0)
                     .build(),
             )
             .build();

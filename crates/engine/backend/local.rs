@@ -123,27 +123,23 @@ impl TaskBackend for LocalBackend {
         });
 
         //handle docker requirement
-        if let Some(dr) = &request.docker {
-            let dr = (*dr).clone();
-            let image_id = dr.docker_pull.or(dr.docker_image_id).unwrap();
+        if request.docker.is_some() {
+            let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu");
 
-            let df = if let Some(df) = dr.docker_file {
-                Some(match df {
-                    StringOrInclude::Include(include) => include.include.clone(),
-                    StringOrInclude::String(s) => {
-                        let tmp = request.tmpdir.join("Dockerfile")?;
-                        self.storage
-                            .upload_bytes(s.as_bytes(), &tmp.as_url()?)
-                            .await?;
-                        tmp.as_local_path()?.to_string_lossy().into_owned()
-                    }
-                })
-            } else {
-                None
+            let df = match &resolved.dockerfile {
+                Some(StringOrInclude::Include(include)) => Some(include.include.clone()),
+                Some(StringOrInclude::String(s)) => {
+                    let tmp = request.tmpdir.join("Dockerfile")?;
+                    self.storage
+                        .upload_bytes(s.as_bytes(), &tmp.as_url()?)
+                        .await?;
+                    Some(tmp.as_local_path()?.to_string_lossy().into_owned())
+                }
+                None => None,
             };
 
             let options = ContainerBuildOptions::builder()
-                .docker_image_id(image_id)
+                .docker_image_id(resolved.image_id)
                 .network(request.network)
                 .engine(self.container_engine)
                 .env(request.env.clone())
@@ -177,7 +173,7 @@ impl TaskBackend for LocalBackend {
                 Resources::builder()
                     .cpu(request.runtime.cores as f64)
                     .disk(request.runtime.outdir_size as f64)
-                    .ram(request.runtime.ram as f64)
+                    .ram(request.runtime.ram as f64 / 1024.0)
                     .build(),
             )
             .build();

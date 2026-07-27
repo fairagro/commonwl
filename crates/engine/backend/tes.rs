@@ -75,17 +75,13 @@ impl TaskBackend for TesBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let mut container = "ubuntu".to_string(); //add config "default-container"
-        if let Some(dr) = request.docker {
-            if let Some(_df) = &dr.docker_file
-                && let Some(dt) = &dr.docker_image_id
-            {
-                //build_container(self.client.inner(), df, dt).await?;
-                container = dt.clone();
-            } else if let Some(dp) = &dr.docker_pull {
-                container = dp.clone();
-            }
+        let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu");
+        if resolved.dockerfile.is_some() {
+            anyhow::bail!(
+                "TES backend does not support building images from a Dockerfile; provide dockerPull or a pre-built dockerImageId"
+            );
         }
+        let container = resolved.image_id;
 
         let stdout_file = if let Some(s) = request.stdout_file {
             &format!("/mnt/task/{s}")
