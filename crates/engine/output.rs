@@ -58,14 +58,18 @@ pub(crate) async fn collect_command_outputs(
         for value in values.values_mut() {
             match value {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
-                    let path = f.path.clone().or(f.location.clone()).unwrap();
+                    let path = f.path.clone().or(f.location.clone()).ok_or_else(|| {
+                        anyhow::anyhow!("cwl.output.json file entry has neither 'path' nor 'location'")
+                    })?;
                     let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
                     //can file have secondary files here?
                     *value = handle_file(&path, None, context, storage.clone()).await?;
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
-                    let path = d.path.clone().or(d.location.clone()).unwrap();
+                    let path = d.path.clone().or(d.location.clone()).ok_or_else(|| {
+                        anyhow::anyhow!("cwl.output.json directory entry has neither 'path' nor 'location'")
+                    })?;
                     let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
                     *value = handle_dir(&path, context, storage.clone()).await?;
@@ -209,6 +213,10 @@ fn handle_secondary_files(
     secondary_files: &OneOrMany<SecondaryFileSchema>,
     context: &EvaluationContext,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
+    if file.location.is_none() {
+        debug!("Can not evaluate secondary_files as location is not set");
+        return Ok(vec![]);
+    }
     let mut secondaries = vec![];
     for item in &secondary_files.as_many() {
         let Some(secondary_file) = handle_secondary_file_schema(file, item, context)? else {
@@ -827,5 +835,23 @@ fn validate_output_type(r#type: &OneOrMany<OutputType>, value: &DefaultValue) ->
                 None,
             )
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_handle_secondary_files_missing_location_does_not_panic() {
+        let file = File::default();
+        let schema = OneOrMany::One(SecondaryFileSchema {
+            pattern: ".idx".to_string(),
+            required: None,
+        });
+        let context = EvaluationContext::default();
+
+        let result = handle_secondary_files(&file, &schema, &context).unwrap();
+        assert!(result.is_empty());
     }
 }

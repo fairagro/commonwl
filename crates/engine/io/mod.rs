@@ -79,17 +79,19 @@ fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<PathBuf>
 pub fn load_file_contents(dv: &mut DefaultValue) -> anyhow::Result<()> {
     match dv {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
-            let location = file.location.as_ref().unwrap();
+            let Some(location) = &file.location else {
+                anyhow::bail!("Can not load file contents: file has no location");
+            };
 
-            if let Some(size) = &file.size
-                && size.as_i64() < 64 * 1024
-            {
-                file.contents = Some(fs::read_to_string(&string_url_to_file_path(location)?)?);
-            } else {
-                anyhow::bail!(
+            match &file.size {
+                Some(size) if size.as_i64() < 64 * 1024 => {
+                    file.contents = Some(fs::read_to_string(&string_url_to_file_path(location)?)?);
+                }
+                Some(_) => anyhow::bail!(
                     "Can not load file contents if file is larger than {} bytes.",
                     64 * 1024
-                )
+                ),
+                None => anyhow::bail!("Can not load file contents: file size is unknown"),
             }
         }
         DefaultValue::Any(serde_json::Value::Array(vec)) => {
@@ -198,6 +200,7 @@ pub(crate) fn normalize_url(url: &Url) -> Url {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cwl_core::{Integer, files::File};
 
     #[test]
     #[cfg(unix)]
@@ -221,6 +224,31 @@ mod tests {
 
         let path = "my_file.txt";
         assert_eq!(get_location(path, workdir), "file:///C:/mnt/my_file.txt");
+    }
+
+    // A workflow step input default (a literal File, typically only `path`, never staged)
+    // combined with loadContents: true used to unwrap file.location and panic.
+    #[test]
+    fn test_load_file_contents_missing_location_errors() {
+        let mut dv = DefaultValue::FileOrDirectory(FileOrDirectory::File(File {
+            size: Some(Integer::from(10)),
+            ..Default::default()
+        }));
+        load_file_contents(&mut dv).expect_err("missing location should error");
+    }
+
+    // A missing size used to bail with a misleading "file too large" message.
+    #[test]
+    fn test_load_file_contents_missing_size_errors_clearly() {
+        let mut dv = DefaultValue::FileOrDirectory(FileOrDirectory::File(File {
+            location: Some("file:///tmp/does-not-matter.txt".to_string()),
+            ..Default::default()
+        }));
+        let err = load_file_contents(&mut dv).expect_err("missing size should error");
+        assert!(
+            err.to_string().contains("size is unknown"),
+            "expected a size-is-unknown message, got: {err}"
+        );
     }
 
     #[test]

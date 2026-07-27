@@ -707,4 +707,44 @@ mod tests {
         dbg!(&result);
         assert!(result.is_ok());
     }
+
+    #[tokio::test]
+    async fn test_local_backend_broken_cwl_output_json_errors_cleanly() {
+        let storage = Arc::new(StorageBackend::new());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            StoragePath::from_local(&env::temp_dir()),
+        ));
+
+        let tool = CommandLineTool::builder()
+            .cwl_version("v1.2")
+            .base_command(&[
+                "sh",
+                "-c",
+                r#"echo '{"out":{"class":"File"}}' > cwl.output.json"#,
+            ])
+            .outputs(vec![
+                CommandOutputParameter::builder()
+                    .id("out")
+                    .r#type(CommandOutputType::CWLType(CWLType::File))
+                    .build(),
+            ])
+            .build();
+
+        let job = create_execution_request_from_document(
+            CWLDocument::CommandLineTool(tool),
+            InputObject::default(),
+            env::temp_dir(),
+            Some(tempdir().unwrap().path()),
+            None,
+        )
+        .unwrap();
+
+        let cancellation_token = CancellationToken::new();
+        let result = execute(backend, &job, cancellation_token).await;
+
+        dbg!(&result);
+        result.expect_err("cwl.output.json entry missing path/location should error");
+    }
 }
