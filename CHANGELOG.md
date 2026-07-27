@@ -27,3 +27,6 @@
 - JavaScript expression libraries (`InlineJavascriptRequirement.expressionLib` `$include`
   files) are now cached instead of being re-read from disk on every single expression
   evaluation. The cache is invalidated automatically if the library file changes on disk.
+
+## Start of Changelog: v0.8.5
+Init Changelog
