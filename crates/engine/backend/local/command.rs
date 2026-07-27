@@ -216,18 +216,14 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
     Ok(())
 }
 
-/// Hardlinks `src` to `dest` when possible (same-volume, no elevated privilege
-/// required even on Windows, unlike symlinks), falling back to a real copy when
-/// linking isn't possible (different filesystem/volume, or `dest` already exists).
+/// Hardlinks `src` to `dest` when possible, falling back to a real copy when
+/// linking isn't possible
 async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
     if fs::hard_link(src, dest).await.is_ok() {
         return Ok(());
     }
 
-    // `dest` may already exist as a hardlink alias of `src` from an earlier staging
-    // step (e.g. the same file staged into both a scratch dir and the work dir).
-    // Unlink it first: a straight fs::copy would truncate-then-read in place, and if
-    // src/dest are the same inode that destroys the data before it can be copied.
+    // `dest` may already exist as a hardlink alias of `src` 
     if fs::metadata(dest).await.is_ok() {
         let _ = fs::remove_file(dest).await;
         if fs::hard_link(src, dest).await.is_ok() {
@@ -241,9 +237,7 @@ async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
         .with_context(|| format!("Could not copy from {} to {}", src.display(), dest.display()))
 }
 
-/// Directory analogue of [`link_or_copy_file`]: mirrors the directory structure with
-/// real directories (hardlinks to a directory itself aren't supported on NTFS/most
-/// filesystems), then hardlinks or copies each file leaf.
+/// Directory analogue of [`link_or_copy_file`]
 fn link_or_copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::Result<()>> {
     async move {
         fs::create_dir_all(dest)
