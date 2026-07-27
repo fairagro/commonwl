@@ -288,7 +288,9 @@ pub async fn execute_workflow(
         Path::new(""),
         llr,
         Some(&fv),
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
 
     let collection_dir = tempdir()?;
 
@@ -645,7 +647,9 @@ pub async fn execute_commandline_tool(
         stage_dir,
         llr,
         Some(&fv),
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
         ijsr,

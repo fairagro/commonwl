@@ -579,6 +579,7 @@ fn apply_shell_quote(arg: &[String]) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::input::collect_inputs;
+    use cwl_engine_storage::StorageBackend;
     use cwl_core::{
         documents::CWLDocument,
         inputs::{CommandInputArraySchema, CommandInputParameter},
@@ -598,8 +599,8 @@ mod tests {
         args.iter().map(|s| strip_ids(s)).collect()
     }
 
-    #[test]
-    fn test_build_command() {
+    #[tokio::test]
+    async fn test_build_command() {
         let yaml = r"
 class: CommandLineTool
 cwlVersion: v1.2
@@ -629,7 +630,9 @@ stdout: output.txt";
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -644,8 +647,8 @@ stdout: output.txt";
         );
     }
 
-    #[test]
-    fn test_build_command_args() {
+    #[tokio::test]
+    async fn test_build_command_args() {
         let yaml = r#"class: CommandLineTool
 cwlVersion: v1.2
 requirements:
@@ -676,7 +679,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -698,8 +703,8 @@ stdout: output.txt"#;
         );
     }
 
-    #[test]
-    fn test_build_command_with_file() {
+    #[tokio::test]
+    async fn test_build_command_with_file() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata");
         let tool_path = base_dir.join("cat-tool.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -713,7 +718,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -724,9 +731,9 @@ stdout: output.txt"#;
         assert_eq!(normalize(&cmd), vec!["cat"]);
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_build_command_difficult() {
+    async fn test_build_command_difficult() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/bwa-mem-tool.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -740,7 +747,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -772,9 +781,9 @@ stdout: output.txt"#;
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_build_command_difficult_2() {
+    async fn test_build_command_difficult_2() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/binding-test.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -788,7 +797,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -813,9 +824,9 @@ stdout: output.txt"#;
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_build_command_with_record_bindings() {
+    async fn test_build_command_with_record_bindings() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/record-order.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -829,7 +840,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -845,9 +858,9 @@ stdout: output.txt"#;
         );
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_build_command_with_empty_array() {
+    async fn test_build_command_with_empty_array() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/empty-array-input.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -861,7 +874,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -874,9 +889,9 @@ stdout: output.txt"#;
         assert_eq!(cmd, Vec::<String>::new());
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_build_command_with_optional_missing() {
+    async fn test_build_command_with_optional_missing() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/cat1-testcli.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -890,7 +905,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {
@@ -903,9 +920,9 @@ stdout: output.txt"#;
         assert_eq!(normalize(&cmd), vec!["cat", "./file1-<ID>/hello.txt"]);
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_build_command_with_empty_binding() {
+    async fn test_build_command_with_empty_binding() {
         let base_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl");
         let tool_path = base_dir.join("tests/bool-empty-inputbinding.cwl");
         let doc = load_cwl_file(tool_path, true).unwrap();
@@ -919,7 +936,9 @@ stdout: output.txt"#;
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {

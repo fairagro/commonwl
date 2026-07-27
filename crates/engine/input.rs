@@ -11,6 +11,8 @@ use cwl_core::{
     inputs::{CommandInputParameterType, DefaultValue, OperationInputParameter},
     requirements::LoadListingRequirement,
 };
+use cwl_engine_storage::StorageBackend;
+use futures_util::{FutureExt, future::BoxFuture};
 use std::{collections::HashMap, path::Path};
 
 /// Collects all inputs for cwl file / job file combo
@@ -19,13 +21,14 @@ use std::{collections::HashMap, path::Path};
 /// # Panics
 /// input.id is None (should not be the case)
 #[allow(clippy::implicit_hasher)]
-pub fn collect_inputs(
+pub async fn collect_inputs(
     doc: &CWLDocument,
     inputs: &HashMap<String, DefaultValue>,
     work_dir: &Path,
     stage_dir: &Path,
     llr: Option<&LoadListingRequirement>,
     fv: Option<&FormatValidator>,
+    storage: &StorageBackend,
 ) -> anyhow::Result<HashMap<String, DefaultValue>> {
     let mut values = HashMap::new();
     for input in &doc.get_inputs() {
@@ -74,62 +77,71 @@ pub fn collect_inputs(
             &stage_dir,
             load_listing,
             load_contents,
-        )?;
+            storage,
+        )
+        .await?;
         values.insert(input.id.clone().unwrap_or_default(), value);
     }
 
     Ok(values)
 }
 
-fn load_input(
-    value: &mut DefaultValue,
-    work_dir: &Path,
-    stage_dir: &Path,
+fn load_input<'a>(
+    value: &'a mut DefaultValue,
+    work_dir: &'a Path,
+    stage_dir: &'a Path,
     load_listing: Option<LoadListingEnum>,
     load_contents: bool,
-) -> anyhow::Result<()> {
-    match value {
-        DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
-            locate_file(file, work_dir, stage_dir, load_contents)?;
-        }
-        DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
-            locate_dir(dir, work_dir, stage_dir, load_listing)?;
-        }
-        DefaultValue::Any(serde_json::Value::Array(vec)) => {
-            for item in vec {
-                let mut dv = serde_json::from_value(item.clone())?;
-                let stage_dir =
-                    stage_dir.join(format!("stg-{}", &uuid::Uuid::new_v4().to_string()[..8]));
-                load_input(&mut dv, work_dir, &stage_dir, load_listing, load_contents)?;
-                *item = serde_json::to_value(&dv)?;
+    storage: &'a StorageBackend,
+) -> BoxFuture<'a, anyhow::Result<()>> {
+    async move {
+        match value {
+            DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
+                locate_file(file, work_dir, stage_dir, load_contents, storage).await?;
             }
-        }
-        DefaultValue::Any(serde_json::Value::Object(map)) => {
-            for item in map.values_mut() {
-                let mut dv = serde_json::from_value(item.clone())?;
-                load_input(&mut dv, work_dir, stage_dir, None, false)?;
-                *item = serde_json::to_value(&dv)?;
+            DefaultValue::FileOrDirectory(FileOrDirectory::Directory(dir)) => {
+                locate_dir(dir, work_dir, stage_dir, load_listing, storage).await?;
             }
-        }
-        #[allow(clippy::cast_possible_truncation)]
-        DefaultValue::Any(serde_json::Value::Number(n)) => {
-            //the spec wants floats with .0 to be represented as integer
-            const MAX_I64_AS_FLOAT: f64 = 9_223_372_036_854_775_808.0;
-            const MIN_I64_AS_FLOAT: f64 = -9_223_372_036_854_775_808.0;
-            if let Some(f) = n.as_f64()
-                && f.is_finite()
-                && f.fract() == 0.0
-                && (MIN_I64_AS_FLOAT..MAX_I64_AS_FLOAT).contains(&f)
-            {
-                *value = DefaultValue::Any(serde_json::Value::Number(serde_json::Number::from(
-                    //guarded!
-                    f as i64,
-                )));
+            DefaultValue::Any(serde_json::Value::Array(vec)) => {
+                for item in vec {
+                    let mut dv = serde_json::from_value(item.clone())?;
+                    let stage_dir =
+                        stage_dir.join(format!("stg-{}", &uuid::Uuid::new_v4().to_string()[..8]));
+                    load_input(&mut dv, work_dir, &stage_dir, load_listing, load_contents, storage)
+                        .await?;
+                    *item = serde_json::to_value(&dv)?;
+                }
             }
+            DefaultValue::Any(serde_json::Value::Object(map)) => {
+                for item in map.values_mut() {
+                    let mut dv = serde_json::from_value(item.clone())?;
+                    load_input(&mut dv, work_dir, stage_dir, None, false, storage).await?;
+                    *item = serde_json::to_value(&dv)?;
+                }
+            }
+            #[allow(clippy::cast_possible_truncation)]
+            DefaultValue::Any(serde_json::Value::Number(n)) => {
+                //the spec wants floats with .0 to be represented as integer
+                const MAX_I64_AS_FLOAT: f64 = 9_223_372_036_854_775_808.0;
+                const MIN_I64_AS_FLOAT: f64 = -9_223_372_036_854_775_808.0;
+                if let Some(f) = n.as_f64()
+                    && f.is_finite()
+                    && f.fract() == 0.0
+                    && (MIN_I64_AS_FLOAT..MAX_I64_AS_FLOAT).contains(&f)
+                {
+                    *value = DefaultValue::Any(serde_json::Value::Number(
+                        serde_json::Number::from(
+                            //guarded!
+                            f as i64,
+                        ),
+                    ));
+                }
+            }
+            _ => {}
         }
-        _ => {}
+        Ok(())
     }
-    Ok(())
+    .boxed()
 }
 
 pub(crate) fn get_input_value(
@@ -216,10 +228,11 @@ mod tests {
     use crate::request::load_input_file_from_file;
     use cwl_core::load_cwl_file;
 
-    #[test]
+    #[tokio::test]
     #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
-    fn test_collect_inputs() {
+    async fn test_collect_inputs() {
         use cwl_core::documents::CommandLineTool;
+        use cwl_engine_storage::StorageBackend;
         use std::collections::HashMap;
 
         let tool: CommandLineTool = serde_saphyr::from_str(include_str!(
@@ -238,7 +251,9 @@ mod tests {
             Path::new("."),
             None,
             None,
-        );
+            &StorageBackend::new(),
+        )
+        .await;
         assert!(inputs.is_ok());
 
         assert_eq!(inputs.unwrap().len(), 2);
@@ -249,8 +264,9 @@ mod tests {
         re.replace_all(val, "-<ID>").to_string()
     }
 
-    #[test]
-    fn test_get_stdin() {
+    #[tokio::test]
+    async fn test_get_stdin() {
+        use cwl_engine_storage::StorageBackend;
         use std::path::MAIN_SEPARATOR_STR;
 
         let base_dir =
@@ -268,7 +284,9 @@ mod tests {
             Path::new("."),
             None,
             None,
+            &StorageBackend::new(),
         )
+        .await
         .unwrap();
 
         let CWLDocument::CommandLineTool(tool) = doc else {

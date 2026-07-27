@@ -21,89 +21,122 @@ use std::{
 use tracing::debug;
 use url::Url;
 
-/// locates a file by writing the location as Url and filling the staged metadata
-pub(crate) fn locate_file(
-    file: &mut File,
-    work_dir: &Path,
-    stage_dir: &Path,
+/// Reads size/checksum (and, if requested, contents) for a file
+fn read_metadata_and_contents(
+    path: &Path,
     load_contents: bool,
-) -> anyhow::Result<()> {
-    if let Some(path) = &file.path
-        && file.location.is_none()
-    {
-        file.location = Some(get_location(path, work_dir));
-    }
-
-    if let Some(location) = &file.location {
-        //make absolute URI
-        let location = get_location(location, work_dir);
-
-        let url = Url::parse(&location)?;
-        let relative_path = get_relative_path(&url, work_dir)?;
-        let designated_path = stage_dir.join(&relative_path);
-        file.location = Some(location.clone());
-
-        //calculate file metadata for designated path
-        let FilePathMetaData {
-            basename,
-            nameroot,
-            nameext,
-            dirname,
-        } = get_path_metadata(&designated_path);
-
-        if file.basename.is_none() {
-            file.basename = basename;
+) -> anyhow::Result<(Option<FileMetaData>, Option<String>)> {
+    let Ok(meta) = get_file_metadata(path) else {
+        return Ok((None, None));
+    };
+    let contents = if load_contents {
+        if meta.size < 64 * 1024 {
+            Some(fs::read_to_string(path)?)
+        } else {
+            anyhow::bail!(
+                "Can not load file contents if file is larger than {} bytes.",
+                64 * 1024
+            )
         }
+    } else {
+        None
+    };
+    Ok((Some(meta), contents))
+}
 
-        if file.nameroot.is_none() {
-            file.nameroot = nameroot;
-        }
-
-        if file.nameext.is_none() {
-            file.nameext = nameext;
-        }
-
-        file.dirname = dirname;
-        //We set them before!
-        let path =
-            file.dirname.clone().unwrap() + MAIN_SEPARATOR_STR + file.basename.as_ref().unwrap();
-        file.path = Some(path);
-        //try getting checksum and size (currently for local files only). Ignores failure (which usually means the file does not exist!)
-        if url.scheme() == "file"
-            && let Ok(FileMetaData { size, checksum }) =
-                get_file_metadata(&string_url_to_file_path(&location)?)
+/// locates a file by writing the location as Url and filling the staged metadata
+pub(crate) fn locate_file<'a>(
+    file: &'a mut File,
+    work_dir: &'a Path,
+    stage_dir: &'a Path,
+    load_contents: bool,
+    storage: &'a StorageBackend,
+) -> BoxFuture<'a, anyhow::Result<()>> {
+    async move {
+        if let Some(path) = &file.path
+            && file.location.is_none()
         {
-            file.checksum = checksum;
-            file.size = Some(Integer::Long(size.cast_signed()));
-            if load_contents && size < 64 * 1024 {
-                file.contents = Some(fs::read_to_string(&string_url_to_file_path(&location)?)?);
-            } else if load_contents {
-                anyhow::bail!(
-                    "Can not load file contents if file is larger than {} bytes.",
-                    64 * 1024
-                )
-            }
+            file.location = Some(get_location(path, work_dir));
         }
-    }
-    if let Some(contents) = &file.contents
-        && file.location.is_none()
-    {
-        let mut checksum = checksum(contents);
-        let path = stage_dir.join(checksum.split_off(5));
-        file.path = Some(path.to_string_lossy().into());
-    }
 
-    if let Some(secondary_files) = &mut file.secondary_files {
-        for item in secondary_files {
-            match item {
-                FileOrDirectory::File(file) => {
-                    locate_file(file, work_dir, stage_dir, load_contents)?;
-                }
-                FileOrDirectory::Directory(dir) => locate_dir(dir, work_dir, stage_dir, None)?,
+        if let Some(location) = &file.location {
+            //make absolute URI
+            let location = get_location(location, work_dir);
+
+            let url = Url::parse(&location)?;
+            let relative_path = get_relative_path(&url, work_dir)?;
+            let designated_path = stage_dir.join(&relative_path);
+            file.location = Some(location.clone());
+
+            //calculate file metadata for designated path
+            let FilePathMetaData {
+                basename,
+                nameroot,
+                nameext,
+                dirname,
+            } = get_path_metadata(&designated_path);
+
+            if file.basename.is_none() {
+                file.basename = basename;
+            }
+
+            if file.nameroot.is_none() {
+                file.nameroot = nameroot;
+            }
+
+            if file.nameext.is_none() {
+                file.nameext = nameext;
+            }
+
+            file.dirname = dirname;
+            //We set them before!
+            let path = file.dirname.clone().unwrap()
+                + MAIN_SEPARATOR_STR
+                + file.basename.as_ref().unwrap();
+            file.path = Some(path);
+
+            //try getting checksum, size and (if requested) contents. 
+            let (metadata, contents) = if url.scheme() == "file" {
+                read_metadata_and_contents(&string_url_to_file_path(&location)?, load_contents)?
+            } else if storage.exists(&url).await? {
+                let tmp = tempfile::NamedTempFile::new()?;
+                storage.download(&url, tmp.path()).await?;
+                read_metadata_and_contents(tmp.path(), load_contents)?
+            } else {
+                (None, None)
+            };
+
+            if let Some(FileMetaData { size, checksum }) = metadata {
+                file.checksum = checksum;
+                file.size = Some(Integer::Long(size.cast_signed()));
+            }
+            if let Some(contents) = contents {
+                file.contents = Some(contents);
             }
         }
+        if let Some(contents) = &file.contents
+            && file.location.is_none()
+        {
+            let mut checksum = checksum(contents);
+            let path = stage_dir.join(checksum.split_off(5));
+            file.path = Some(path.to_string_lossy().into());
+        }
+
+        if let Some(secondary_files) = &mut file.secondary_files {
+            for item in secondary_files {
+                match item {
+                    FileOrDirectory::File(file) => {
+                        locate_file(file, work_dir, stage_dir, load_contents, storage).await?;
+                    }
+                    FileOrDirectory::Directory(dir) => {
+                        locate_dir(dir, work_dir, stage_dir, None, storage).await?;
+                    }
+                }
+            }
+        }
+        Ok(())
     }
-    Ok(())
+    .boxed()
 }
 
 pub(crate) async fn collect_secondary_files_for_inputs(
@@ -286,7 +319,7 @@ pub(crate) async fn handle_secondary_files(
                                 ..Default::default()
                             };
                             //fill metadata
-                            locate_dir(&mut sec_dir, work_dir, stage_dir, None)?;
+                            locate_dir(&mut sec_dir, work_dir, stage_dir, None, storage).await?;
                             sec_files.push(FileOrDirectory::Directory(sec_dir));
                         } else {
                             let mut sec_file = File {
@@ -294,7 +327,7 @@ pub(crate) async fn handle_secondary_files(
                                 ..Default::default()
                             };
                             //fill metadata
-                            locate_file(&mut sec_file, work_dir, stage_dir, false)?;
+                            locate_file(&mut sec_file, work_dir, stage_dir, false, storage).await?;
                             sec_files.push(FileOrDirectory::File(sec_file));
                         }
                     }
@@ -302,10 +335,10 @@ pub(crate) async fn handle_secondary_files(
                         resolve_location_from_primary(file, item)?;
                         match &mut **item {
                             FileOrDirectory::File(file) => {
-                                locate_file(file, work_dir, stage_dir, false)?;
+                                locate_file(file, work_dir, stage_dir, false, storage).await?;
                             }
                             FileOrDirectory::Directory(dir) => {
-                                locate_dir(dir, work_dir, stage_dir, None)?;
+                                locate_dir(dir, work_dir, stage_dir, None, storage).await?;
                             }
                         }
                         sec_files.push(*item.clone());
@@ -437,12 +470,13 @@ fn handle_secondary_file_from_expression(
 mod tests {
     use super::*;
 
-    #[test]
+    #[tokio::test]
     #[cfg(unix)]
-    fn test_locate_file() {
+    async fn test_locate_file() {
         let path = "my_file.txt";
         let workdir = Path::new("/mnt/mydir");
         let stagedir = Path::new("/mnt/task/inputs/");
+        let storage = StorageBackend::new();
 
         let mut file = File::builder().location(path).build();
         let expected = File::builder()
@@ -454,16 +488,19 @@ mod tests {
             .dirname("/mnt/task/inputs")
             .build();
 
-        locate_file(&mut file, workdir, stagedir, false).unwrap();
+        locate_file(&mut file, workdir, stagedir, false, &storage)
+            .await
+            .unwrap();
         assert_eq!(file, expected);
     }
 
-    #[test]
+    #[tokio::test]
     #[cfg(windows)]
-    fn test_locate_file() {
+    async fn test_locate_file() {
         let path = "my_file.txt";
         let workdir = Path::new(r"C:\mnt\mydir");
         let stagedir = Path::new(r"C:\mnt\task\inputs");
+        let storage = StorageBackend::new();
 
         let mut file = File::builder().location(path).build();
         let expected = File::builder()
@@ -475,7 +512,9 @@ mod tests {
             .dirname(r"C:\mnt\task\inputs")
             .build();
 
-        locate_file(&mut file, workdir, stagedir, false).unwrap();
+        locate_file(&mut file, workdir, stagedir, false, &storage)
+            .await
+            .unwrap();
         assert_eq!(file, expected);
     }
 
