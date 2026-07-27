@@ -487,10 +487,15 @@ mod tests {
         // Overwrite the content and force the mtime forward
         fs::write(&path, "var CACHED_MARKER = 2;").unwrap();
 
-        //overwrite does not trigger mtime for some reason..?
+        // Force the mtime forward explicitly rather than relying on the write
         let bumped =
             fs::metadata(&path).unwrap().modified().unwrap() + std::time::Duration::from_secs(5);
-        fs::File::open(&path).unwrap().set_modified(bumped).unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(bumped)
+            .unwrap();
 
         let second = read_expression_lib_include(&path).unwrap();
         assert!(
