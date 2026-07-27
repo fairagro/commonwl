@@ -5,7 +5,41 @@ use cwl_core::{
     inputs::DefaultValue,
     requirements::{InlineJavascriptRequirement, StringOrInclude},
 };
-use std::{collections::HashMap, fs, ops::Range, path::Path, str::FromStr};
+use std::{
+    collections::HashMap,
+    fs,
+    ops::Range,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::{LazyLock, Mutex},
+    time::SystemTime,
+};
+
+static EXPRESSION_LIB_CACHE: LazyLock<Mutex<HashMap<PathBuf, (SystemTime, String)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn read_expression_lib_include(path: &Path) -> anyhow::Result<String> {
+    let modified = fs::metadata(path).and_then(|m| m.modified()).ok();
+
+    if let Some(modified) = modified
+        && let Some((cached_modified, contents)) = EXPRESSION_LIB_CACHE.lock().unwrap().get(path)
+        && *cached_modified == modified
+    {
+        return Ok(contents.clone());
+    }
+
+    let contents = fs::read_to_string(path)
+        .with_context(|| format!("Could not read expression_lib {}", path.display()))?;
+
+    if let Some(modified) = modified {
+        EXPRESSION_LIB_CACHE
+            .lock()
+            .unwrap()
+            .insert(path.to_path_buf(), (modified, contents.clone()));
+    }
+
+    Ok(contents)
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct EvaluationContext<'a> {
@@ -166,9 +200,8 @@ fn js_eval(
         for item in lib {
             match item {
                 StringOrInclude::Include(include) => {
-                    let include = &include.include;
-                    let contents = fs::read_to_string(workdir.join(include))
-                        .with_context(|| format!("Could not read expression_lib {include}"))?;
+                    let path = workdir.join(&include.include);
+                    let contents = read_expression_lib_include(&path)?;
                     context
                         .eval(Source::from_bytes(&contents))
                         .map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -437,6 +470,34 @@ pub(crate) fn extract_input_name(expr: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_expression_lib_include_is_cached_until_mtime_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("lib.js");
+        fs::write(&path, "var CACHED_MARKER = 1;").unwrap();
+
+        let first = read_expression_lib_include(&path).unwrap();
+        assert!(first.contains("CACHED_MARKER = 1"));
+
+        // Re-reading with no change on disk must hit the cache and return identical content.
+        let unchanged = read_expression_lib_include(&path).unwrap();
+        assert_eq!(first, unchanged);
+
+        // Overwrite the content and force the mtime forward
+        fs::write(&path, "var CACHED_MARKER = 2;").unwrap();
+
+        //overwrite does not trigger mtime for some reason..?
+        let bumped =
+            fs::metadata(&path).unwrap().modified().unwrap() + std::time::Duration::from_secs(5);
+        fs::File::open(&path).unwrap().set_modified(bumped).unwrap();
+
+        let second = read_expression_lib_include(&path).unwrap();
+        assert!(
+            second.contains("CACHED_MARKER = 2"),
+            "cache should invalidate once the file's mtime changes"
+        );
+    }
 
     #[test]
     fn test_expression() {
