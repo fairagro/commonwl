@@ -9,6 +9,7 @@ use cwl_salad::deserialize::{
 use cwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use validator::Validate;
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
 #[serde(untagged)]
@@ -74,7 +75,17 @@ impl From<OneOrMany<OutputType>> for CommandOutputParameterType {
 
 #[doc = include_str!("docs/CommandOutputParameter.md")]
 #[derive(
-    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/CommandLineTool.html#CommandOutputParameter>
@@ -103,6 +114,7 @@ pub struct CommandOutputParameter {
     pub doc: Option<OneOrMany<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[doc = include_str!("docs/CommandOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -118,7 +130,17 @@ make_shorthand_impl!(CommandOutputParameter, "id", "type");
 
 #[doc = include_str!("docs/WorkflowOutputParameter.md")]
 #[derive(
-    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#WorkflowOutputParameter>
@@ -148,6 +170,7 @@ pub struct WorkflowOutputParameter {
     #[doc = include_str!("docs/WorkflowOutputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[doc = include_str!("docs/WorkflowOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -171,7 +194,17 @@ make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
 
 #[doc = include_str!("docs/OperationOutputParameter.md")]
 #[derive(
-    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#OperationOutputParameter>
@@ -201,6 +234,7 @@ pub struct OperationOutputParameter {
     #[doc = include_str!("docs/OperationOutputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[doc = include_str!("docs/OperationOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -211,7 +245,17 @@ pub struct OperationOutputParameter {
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
 #[derive(
-    Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Default, Builder, Identifiable, Eq,
+    Serialize,
+    Deserialize,
+    Debug,
+    PartialEq,
+    Hash,
+    Clone,
+    Default,
+    Builder,
+    Identifiable,
+    Eq,
+    Validate,
 )]
 #[serde(rename_all = "camelCase")]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#ExpressionTool>
@@ -241,6 +285,7 @@ pub struct ExpressionToolOutputParameter {
     #[doc = include_str!("docs/ExpressionToolOutputParameter_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[builder(into)]
+    #[validate(required)]
     pub id: Option<String>,
     #[doc = include_str!("docs/ExpressionToolOutputParameter_format.md")]
     #[serde(skip_serializing_if = "Option::is_none")]

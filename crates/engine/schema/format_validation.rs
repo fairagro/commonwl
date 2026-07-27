@@ -195,6 +195,7 @@ impl FormatValidator {
             if let Some(context) = context
                 && let Ok(value) = do_eval(t_format, context)
             {
+                //only string expressions are valid here
                 *t_format = value.as_str().unwrap().to_string();
             }
 

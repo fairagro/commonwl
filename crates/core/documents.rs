@@ -270,10 +270,12 @@ pub struct CommandLineTool {
     #[doc = include_str!("docs/CommandLineTool_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub inputs: Vec<CommandInputParameter>,
     #[doc = include_str!("docs/CommandLineTool_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub outputs: Vec<CommandOutputParameter>,
     #[doc = include_str!("docs/CommandLineTool_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -356,10 +358,12 @@ pub struct ExpressionTool {
     #[doc = include_str!("docs/ExpressionTool_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub inputs: Vec<WorkflowInputParameter>,
     #[doc = include_str!("docs/ExpressionTool_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub outputs: Vec<ExpressionToolOutputParameter>,
     #[doc = include_str!("docs/ExpressionTool_expression.md")]
     #[builder(into)]
@@ -414,10 +418,12 @@ pub struct Operation {
     #[doc = include_str!("docs/Operation_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub inputs: Vec<OperationInputParameter>,
     #[doc = include_str!("docs/Operation_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub outputs: Vec<OperationOutputParameter>,
     #[doc = include_str!("docs/Operation_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -468,14 +474,17 @@ pub struct Workflow {
     #[doc = include_str!("docs/Workflow_inputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub inputs: Vec<WorkflowInputParameter>,
     #[doc = include_str!("docs/Workflow_outputs.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(default, into)]
+    #[validate(nested)]
     pub outputs: Vec<WorkflowOutputParameter>,
     #[doc = include_str!("docs/Workflow_steps.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[builder(into)]
+    #[validate(nested)]
     pub steps: Vec<WorkflowStep>,
     #[doc = include_str!("docs/Workflow_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]

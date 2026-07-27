@@ -6,3 +6,6 @@
 logs
 funnel-work-dir
 ./funnel-config.yaml
+# we dont want AI stuff
+.claude
+CLAUDE.md
