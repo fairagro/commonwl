@@ -8,6 +8,7 @@
   or missing required fields on workflow step inputs/outputs are now rejected with a clear
   error at load time instead of being accepted and potentially causing a crash later during
   execution.
+- `.dev/tes_env.sh` created that operates on a local Funnel TES server with rustfs S3 compatible storage
 
 ### Fixed
 - Local backend: a document with `scatter: []` (scattering over an empty list) no longer
@@ -26,6 +27,26 @@
   the local backend; an image tag is now generated automatically.
 - The TES backend now reports a clear error for a `DockerRequirement` that needs building
   from a `dockerFile`, instead of silently ignoring it and using the wrong container image.
+- TES backend conformance raised from 24% to 95% via a series of fixes:
+  - `secondaryFiles` handling is now storage-aware instead of assuming a local file path.
+  - File metadata (size/checksum/contents) is now computed correctly once a value's location
+    becomes remote, e.g. after crossing a workflow step boundary.
+  - The TES backend no longer wires the GA4GH `stdin` executor field, which some TES servers
+    (e.g. Funnel) truncate to zero bytes as soon as the task starts; the resolved stdin path
+    remains reachable via the existing trailing positional command argument.
+  - `runtime.outdir`/`runtime.tmpdir` no longer crash after a task runs on remote storage.
+  - Empty directories - both ones staged via `InitialWorkDirRequirement` and ones a tool
+    creates itself (e.g. `mkdir -p`) - are now represented correctly on S3, which has no
+    native concept of an empty directory.
+  - Fixed every `InitialWorkDirRequirement`-staged file/directory upload silently landing at
+    the S3 bucket root instead of the run's own prefix, which could also cause an unrelated
+    object elsewhere in the bucket to be swept up as if it belonged to the current run.
+  - Fixed `cwl.output.json`-declared outputs (`path`/`location`) resolving to the same wrong,
+    unprefixed S3 location.
+  - Directory-typed `outputBinding: {glob: ...}` now matches a directory-shaped S3 prefix;
+    previously it only ever matched individual object keys.
+  - Fixed a regression where a tool relying on its Docker image's own `ENTRYPOINT` (rather
+    than a bare shell command) stopped working under TES.
 - Fixed several cases where a tool's output handling could crash instead of failing cleanly:
   combining `secondaryFiles` with an output constructed via `outputEval`, a workflow step
   input using `loadContents` on a `default` file value, and a tool's `cwl.output.json`

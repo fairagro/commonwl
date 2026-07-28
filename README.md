@@ -27,7 +27,7 @@ The CWL Engine features high conformance to the specification, passing all Tests
 |---------|--------|---------------------|
 | Local   |   ✔️  | ![]( https://img.shields.io/badge/all-99%25-yellow ) ![]( https://img.shields.io/badge/required-97%25-red ) ![]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![]( https://img.shields.io/badge/expression_tool-100%25-green )![]( https://img.shields.io/badge/workflow-100%25-green)   |
 | Docker* |   ✔️  | ![]( https://img.shields.io/badge/all-99%25-yellow ) ![]( https://img.shields.io/badge/required-97%25-red ) ![]( https://img.shields.io/badge/command_line_tool-98%25-yellow ) ![]( https://img.shields.io/badge/expression_tool-100%25-green )![]( https://img.shields.io/badge/workflow-100%25-green )|
-| TES     |   🏗️  | -   |
+| TES     |   🏗️  | ![]( https://img.shields.io/badge/all-95%25-yellow ) ![]( https://img.shields.io/badge/required-90%25-yellow ) ![]( https://img.shields.io/badge/command_line_tool-91%25-yellow ) ![]( https://img.shields.io/badge/expression_tool-100%25-green )![]( https://img.shields.io/badge/workflow-98%25-yellow )   |
 | Slurm   |   🧾  | -   |
 
 ✔️: Fully operational - 🏗️: Under Construction - 🧾: Planned
@@ -35,6 +35,26 @@ The CWL Engine features high conformance to the specification, passing all Tests
 *=Uses Docker even if `DockerRequirement` is not specified.
 
 Two tests fail due to f64 overflow outputting 1e42 instead of one with 42 zeros. `serde_json` stores all numbers as f64.
+
+## Storage Backends
+File/Directory staging is storage-agnostic and works the same across all task backends:
+| Storage | Description |
+|---------|--------------|
+| Local   | Plain filesystem access. |
+| S3      | Any S3-compatible object store (used by the TES backend for remote input/output staging). |
+| HTTP(S) | Read-only fetch of `http://`/`https://` input locations. |
+
+## Developing the TES Backend
+The TES backend talks to a [GA4GH Task Execution Service](https://github.com/ga4gh/task-execution-schemas). To iterate on it locally you need a TES server plus S3-compatible storage. `.dev/tes_env.sh` spins both up (rustfs + [Funnel](https://github.com/ohsu-comp-bio/funnel)):
+```bash
+.dev/tes_env.sh start    # start rustfs + funnel, wait until both are healthy
+eval "$(.dev/tes_env.sh env)"   # export BACKEND=tes and the S3 credentials/endpoint
+cargo build --release -p conformance
+BACKEND=tes cwltest --test testdata/cwl/conformance_tests.yaml --tool target/release/conformance
+.dev/tes_env.sh stop     # tear both down
+```
+Funnel has an upstream crash under concurrent load; `.dev/tes_env.sh watchdog` (run alongside a test run) restarts it automatically if that happens.
+
 ## License
 This work is dual-licensed under Apache 2.0 and MIT . You can choose between one of them if you use this work. 
 
