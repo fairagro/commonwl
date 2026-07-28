@@ -209,7 +209,7 @@ impl TaskBackend for TesBackend {
         task.add_output(
             Output::builder()
                 .name("workdir")
-                .path(CONTAINER_WORKDIR)
+                .path(request.execution_path)
                 .url(outdir.clone())
                 .ty(output::Type::Directory)
                 .build(),
