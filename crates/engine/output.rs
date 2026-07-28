@@ -425,12 +425,12 @@ async fn validate_dir(
             anyhow::bail!("Source location {source_location} does not exist for output directory");
         }
 
-        // remove the marker file
         if downloaded && dir.listing.is_none() && u_source_location.scheme() != "file" {
-            remove_empty_dir_markers(dest_path)?;
             // load listing for remote objects after download
             dir.path = Some(dest_path.to_string_lossy().into_owned());
             dir.load_listing(LoadListingEnum::DeepListing)?;
+           
+            filter_empty_dir_markers(dir);
         }
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
@@ -457,19 +457,20 @@ async fn validate_dir(
     Ok(())
 }
 
-/// Recursively removes any `S3_EMPTY_DIR_MARKER` placeholder file
-fn remove_empty_dir_markers(dir: &Path) -> anyhow::Result<()> {
-    for entry in fs::read_dir(dir)?.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            remove_empty_dir_markers(&path)?;
-        } else if path.file_name().and_then(|n| n.to_str())
-            == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER)
-        {
-            fs::remove_file(&path)?;
+/// Recursively drops any `S3_EMPTY_DIR_MARKER` placeholder entries from a directory's
+/// listing, without touching the files themselves on disk.
+fn filter_empty_dir_markers(dir: &mut Directory) {
+    if let Some(listing) = &mut dir.listing {
+        listing.retain(|item| {
+            item.basename()
+                .is_none_or(|b| b != crate::backend::mount::S3_EMPTY_DIR_MARKER)
+        });
+        for item in listing {
+            if let FileOrDirectory::Directory(d) = item {
+                filter_empty_dir_markers(d);
+            }
         }
     }
-    Ok(())
 }
 
 /// creates the new output path by stripping prefixes of known folders

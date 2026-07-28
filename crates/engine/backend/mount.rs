@@ -177,12 +177,15 @@ async fn mount_workdir_item_remote(
     //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
     let target = mount.target.as_str();
 
-    //make sure url ends with /
-    let base_url = if base_url.as_str().ends_with('/') {
-        base_url.clone()
-    } else {
-        Url::parse(&format!("{base_url}/"))?
-    };
+    // Push an empty path segment so that future joins of the work directory URL
+    // treat it as a directory
+    let mut base_url = base_url.clone();
+    if !base_url.as_str().ends_with('/') {
+        base_url
+            .path_segments_mut()
+            .map_err(|()| anyhow::anyhow!("base_url cannot be a base"))?
+            .push("");
+    }
     let base_url = &base_url;
 
     let rel = target

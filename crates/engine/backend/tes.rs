@@ -102,6 +102,7 @@ impl TaskBackend for TesBackend {
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
+        let cleanup_container = container.clone();
 
         //build crankshaft task object
         // Deliberately not wired to `Execution::stdin` as TES implementations may truncate the file
@@ -119,6 +120,22 @@ impl TaskBackend for TesBackend {
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
+                    .build(),
+                // mark all created empty dirs with the s3 marker
+                Execution::builder()
+                    .work_dir(request.execution_path)
+                    .program("find")
+                    .args([
+                        ".".to_string(),
+                        "-type".to_string(),
+                        "d".to_string(),
+                        "-empty".to_string(),
+                        "-exec".to_string(),
+                        "touch".to_string(),
+                        format!("{{}}/{}", crate::backend::mount::S3_EMPTY_DIR_MARKER),
+                        ";".to_string(),
+                    ])
+                    .image(cleanup_container)
                     .build()
             ])
             .resources(
