@@ -58,7 +58,9 @@ pub(crate) async fn collect_command_outputs(
             match value {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                     let path = f.path.clone().or(f.location.clone()).ok_or_else(|| {
-                        anyhow::anyhow!("cwl.output.json file entry has neither 'path' nor 'location'")
+                        anyhow::anyhow!(
+                            "cwl.output.json file entry has neither 'path' nor 'location'"
+                        )
                     })?;
                     let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
@@ -67,7 +69,9 @@ pub(crate) async fn collect_command_outputs(
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     let path = d.path.clone().or(d.location.clone()).ok_or_else(|| {
-                        anyhow::anyhow!("cwl.output.json directory entry has neither 'path' nor 'location'")
+                        anyhow::anyhow!(
+                            "cwl.output.json directory entry has neither 'path' nor 'location'"
+                        )
                     })?;
                     let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
@@ -134,11 +138,13 @@ async fn evaluate_command_binding(
                         .location(item.as_url()?)
                         .maybe_basename(basename)
                         .build();
-                    //handle load_listing
-                    if let Some(load_listing) = binding.load_listing {
-                        dir.load_listing(load_listing)?;
-                    } else {
-                        dir.load_listing(LoadListingEnum::DeepListing)?;
+                    // listing needs a real local path to walk
+                    if item.is_local() {
+                        if let Some(load_listing) = binding.load_listing {
+                            dir.load_listing(load_listing)?;
+                        } else {
+                            dir.load_listing(LoadListingEnum::DeepListing)?;
+                        }
                     }
                     FileOrDirectory::Directory(dir)
                 } else {
@@ -221,7 +227,8 @@ async fn handle_secondary_files(
     }
     let mut secondaries = vec![];
     for item in &secondary_files.as_many() {
-        let Some(secondary_file) = handle_secondary_file_schema(file, item, context, storage).await?
+        let Some(secondary_file) =
+            handle_secondary_file_schema(file, item, context, storage).await?
         else {
             continue;
         };
@@ -238,7 +245,10 @@ async fn handle_secondary_files(
                             ..Default::default()
                         };
                         if url.scheme() == "file" {
-                            dir.path = url.to_file_path().ok().map(|p| p.to_string_lossy().into_owned());
+                            dir.path = url
+                                .to_file_path()
+                                .ok()
+                                .map(|p| p.to_string_lossy().into_owned());
                             dir.load_listing(LoadListingEnum::DeepListing)?;
                         }
                         secondaries.push(FileOrDirectory::Directory(dir));
@@ -396,16 +406,27 @@ async fn validate_dir(
             .or_else(|_| Url::from_file_path(source_location))
             .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))?;
 
-        if storage.exists(&u_source_location).await? {
+        let mut downloaded = false;
+
+        if storage.exists(&u_source_location).await? || storage.is_dir(&u_source_location).await? {
             if copy {
                 let parent = dest_path.parent().unwrap();
                 if !parent.exists() {
                     fs::create_dir_all(parent)?;
                 }
                 storage.download(&u_source_location, dest_path).await?;
+                downloaded = true;
             }
         } else {
             anyhow::bail!("Source location {source_location} does not exist for output directory");
+        }
+
+        // remove the marker file
+        if downloaded && dir.listing.is_none() && u_source_location.scheme() != "file" {
+            remove_empty_dir_markers(dest_path)?;
+            // load listing for remote objects after download
+            dir.path = Some(dest_path.to_string_lossy().into_owned());
+            dir.load_listing(LoadListingEnum::DeepListing)?;
         }
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
@@ -429,6 +450,21 @@ async fn validate_dir(
         }
     }
 
+    Ok(())
+}
+
+/// Recursively removes any `S3_EMPTY_DIR_MARKER` placeholder file
+fn remove_empty_dir_markers(dir: &Path) -> anyhow::Result<()> {
+    for entry in fs::read_dir(dir)?.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            remove_empty_dir_markers(&path)?;
+        } else if path.file_name().and_then(|n| n.to_str())
+            == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER)
+        {
+            fs::remove_file(&path)?;
+        }
+    }
     Ok(())
 }
 

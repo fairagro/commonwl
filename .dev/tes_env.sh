@@ -4,10 +4,16 @@
 # .github/workflows/conformance.yaml and .github/funnel-config.yaml as closely as possible.
 #
 # Usage:
-#   .dev/tes_env.sh start    # start rustfs + funnel, wait until both are healthy
-#   .dev/tes_env.sh stop     # tear both down
-#   .dev/tes_env.sh status   # check whether they're up and reachable
-#   .dev/tes_env.sh env      # print the shell exports needed to point tools at this env
+#   .dev/tes_env.sh start     # start rustfs + funnel, wait until both are healthy
+#   .dev/tes_env.sh stop      # tear both down
+#   .dev/tes_env.sh status    # check whether they're up and reachable
+#   .dev/tes_env.sh env       # print the shell exports needed to point tools at this env
+#   .dev/tes_env.sh watchdog  # (run in background, alongside a conformance run) poll
+#                             # Funnel's health and restart it if it goes down - works
+#                             # around Funnel's own upstream crash under concurrent S3
+#                             # downloads (a Go panic in its debug-log formatter) so a
+#                             # mid-suite crash only loses the in-flight tests instead of
+#                             # every test after it
 #
 # After 'start', run the TES conformance suite against it with:
 #   eval "$(.dev/tes_env.sh env)"
@@ -194,6 +200,18 @@ status() {
     fi
 }
 
+watchdog() {
+    local interval="${TES_WATCHDOG_INTERVAL:-5}"
+    echo "funnel: watchdog started (checking every ${interval}s)"
+    while true; do
+        if ! curl -sf "$TES_ENDPOINT/v1/tasks" >/dev/null 2>&1; then
+            echo "funnel: watchdog detected server is down, restarting..."
+            start_funnel || echo "funnel: restart attempt failed, will retry in ${interval}s"
+        fi
+        sleep "$interval"
+    done
+}
+
 print_env() {
     cat <<EOF
 export AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
@@ -209,6 +227,7 @@ case "${1:-}" in
     stop) stop ;;
     status) status ;;
     env) print_env ;;
+    watchdog) watchdog ;;
     *)
         usage
         exit 1

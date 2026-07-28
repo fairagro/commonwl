@@ -158,7 +158,10 @@ impl StoragePath {
             Self::Local(path_buf) => path_buf
                 .file_name()
                 .map(|o| o.to_string_lossy().to_string()),
-            Self::Remote(url) => url.path_segments()?.next_back().map(ToString::to_string),
+            Self::Remote(url) => url
+                .path_segments()?
+                .rfind(|s| !s.is_empty())
+                .map(ToString::to_string),
         }
     }
 

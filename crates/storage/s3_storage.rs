@@ -6,6 +6,7 @@ use aws_sdk_s3::config::RequestChecksumCalculation;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use glob::Pattern;
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -254,6 +255,7 @@ impl Storage for S3Storage {
     ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
         let (bucket, key_prefix) = S3Storage::parse_uri(base)?;
         let pattern = Pattern::new(pattern)?;
+        let strip_prefix = format!("{}/", &*key_prefix);
 
         let res = self
             .client()
@@ -264,21 +266,37 @@ impl Storage for S3Storage {
             .send()
             .await?;
 
-        let urls = res
-            .contents()
-            .iter()
-            .filter_map(|obj| obj.key())
-            .filter(|key| {
-                let relative = key
-                    .strip_prefix(&format!("{}/", &*key_prefix))
-                    .unwrap_or(key);
-                pattern.matches(relative)
-            })
-            .flat_map(|key| Url::parse(&format!("s3://{bucket}/{key}")))
-            .map(StoragePath::Remote)
-            .collect::<Vec<_>>();
+        let mut file_urls = vec![];
+        // S3 has no real directories, only object keys
+        // a glob pattern like  "somedir" is meant to match a *directory*, which only exists here as a
+        // common prefix shared by one or more object keys.
+        let mut dir_matches: HashSet<String> = HashSet::new();
 
-        Ok(Box::new(urls.into_iter()))
+        for key in res.contents().iter().filter_map(|obj| obj.key()) {
+            let relative = key.strip_prefix(&strip_prefix).unwrap_or(key);
+
+            if pattern.matches(relative)
+                && let Ok(url) = Url::parse(&format!("s3://{bucket}/{key}"))
+            {
+                file_urls.push(StoragePath::Remote(url));
+            }
+
+            let segments: Vec<&str> = relative.split('/').collect();
+            for i in 1..segments.len() {
+                let candidate = segments[..i].join("/");
+                if pattern.matches(&candidate) {
+                    dir_matches.insert(candidate);
+                }
+            }
+        }
+
+        let dir_urls = dir_matches.into_iter().filter_map(move |dir| {
+            Url::parse(&format!("s3://{bucket}/{strip_prefix}{dir}/"))
+                .ok()
+                .map(StoragePath::Remote)
+        });
+
+        Ok(Box::new(file_urls.into_iter().chain(dir_urls)))
     }
 }
 
