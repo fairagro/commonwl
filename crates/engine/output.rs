@@ -109,11 +109,14 @@ fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> Storag
                 StoragePath::Local(base.join(path))
             }
         }
-        StoragePath::Remote(base_url) => {
+        StoragePath::Remote(_) => {
             // path here came from cwl.output.json which uses container paths
             // strip container workdir prefix and rebase onto S3
             let stripped = path.strip_prefix(context.workdir).unwrap_or(path);
-            StoragePath::from_url(base_url.join(&stripped.to_string_lossy()).unwrap())
+            context
+                .source_dir
+                .join(&stripped.to_string_lossy())
+                .unwrap()
         }
     }
 }
@@ -429,7 +432,7 @@ async fn validate_dir(
             // load listing for remote objects after download
             dir.path = Some(dest_path.to_string_lossy().into_owned());
             dir.load_listing(LoadListingEnum::DeepListing)?;
-           
+
             filter_empty_dir_markers(dir);
         }
     } else if let Some(dest_path) = &path {
