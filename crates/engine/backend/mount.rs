@@ -177,7 +177,18 @@ async fn mount_workdir_item_remote(
     //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
     let target = mount.target.as_str();
 
-    let rel = target.strip_prefix(outdir.as_str()).unwrap_or(target);
+    //make sure url ends with /
+    let base_url = if base_url.as_str().ends_with('/') {
+        base_url.clone()
+    } else {
+        Url::parse(&format!("{base_url}/"))?
+    };
+    let base_url = &base_url;
+
+    let rel = target
+        .strip_prefix(outdir.as_str())
+        .unwrap_or(target)
+        .trim_start_matches('/');
     let guest_path = if target.starts_with(outdir.as_str()) {
         format!("{workdir}/{rel}")
     } else {

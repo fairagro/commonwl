@@ -131,6 +131,10 @@ async fn evaluate_command_binding(
     if let Some(globs) = &binding.glob {
         for glob_ in get_globs(globs, context.eval_context) {
             for item in storage.glob(&context.source_dir.as_url()?, &glob_).await? {
+                // never surface S3-empty-directory placeholder as it were real tool output - it can end up glob-matched here directly
+                if item.file_name().as_deref() == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER) {
+                    continue;
+                }
                 let fod = if item.is_dir() {
                     let basename = item.file_name();
                     let mut dir = Directory::builder()
