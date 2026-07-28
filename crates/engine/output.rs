@@ -95,6 +95,27 @@ pub(crate) async fn collect_command_outputs(
     Ok(output_map)
 }
 
+/// Resolves a `File`/`Directory`'s raw `path`/`location` value into an absolute `Url`.
+fn resolve_output_source_location(
+    source_location: &str,
+    context: &OutputCollectionContext,
+) -> anyhow::Result<Url> {
+    if let Ok(url) = Url::parse(source_location) {
+        return Ok(url);
+    }
+    if let StoragePath::Remote(_) = context.source_dir {
+        let base_path = context.source_dir.path();
+        if let Some(stripped) = source_location.strip_prefix(&base_path) {
+            return context
+                .source_dir
+                .join(stripped.trim_start_matches('/'))?
+                .as_url();
+        }
+    }
+    Url::from_file_path(source_location)
+        .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))
+}
+
 fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> StoragePath {
     match &context.source_dir {
         StoragePath::Local(base) => {
@@ -326,9 +347,7 @@ async fn validate_file(
     if let Some(source_location) = &location
         && let Some(dest_path) = &path
     {
-        let u_source_location = Url::parse(source_location)
-            .or_else(|_| Url::from_file_path(source_location))
-            .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))?;
+        let u_source_location = resolve_output_source_location(source_location, context)?;
         if storage.exists(&u_source_location).await? {
             if copy {
                 let parent = dest_path.parent().unwrap();
@@ -409,9 +428,7 @@ async fn validate_dir(
     if let Some(source_location) = &location
         && let Some(dest_path) = &path
     {
-        let u_source_location = Url::parse(source_location)
-            .or_else(|_| Url::from_file_path(source_location))
-            .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))?;
+        let u_source_location = resolve_output_source_location(source_location, context)?;
 
         let mut downloaded = false;
 
