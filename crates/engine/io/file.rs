@@ -95,9 +95,10 @@ pub(crate) fn locate_file<'a>(
                 + file.basename.as_ref().unwrap();
             file.path = Some(path);
 
-            //try getting checksum, size and (if requested) contents. 
+            //try getting checksum, size and (if requested) contents.
             let (metadata, contents) = if url.scheme() == "file" {
-                read_metadata_and_contents(&string_url_to_file_path(&location)?, load_contents)?
+                let p = string_url_to_file_path(&location)?;
+                read_metadata_and_contents(&p, load_contents)?
             } else if storage.exists(&url).await? {
                 let tmp = tempfile::NamedTempFile::new()?;
                 storage.download(&url, tmp.path()).await?;

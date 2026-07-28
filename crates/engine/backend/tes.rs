@@ -104,6 +104,8 @@ impl TaskBackend for TesBackend {
             .collect::<Vec<_>>();
 
         //build crankshaft task object
+        // Deliberately not wired to `Execution::stdin` as TES implementations may truncate the file
+        // appended to args as trailing in backend.rs
         #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
             .name(request.id)
@@ -117,7 +119,6 @@ impl TaskBackend for TesBackend {
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
-                    .maybe_stdin(request.stdin_file)
                     .build()
             ])
             .resources(
@@ -148,7 +149,7 @@ impl TaskBackend for TesBackend {
             let use_container = request.use_container;
             let storage = self.storage();
             let permit = sem.clone().acquire_owned().await?;
-            
+
             set.spawn(async move {
                 let _permit = permit;
                 mount_workdir_item(
@@ -157,7 +158,9 @@ impl TaskBackend for TesBackend {
                     &workdir,
                     use_container,
                     storage,
-                    MountStrategy::Remote { base_url: outdir.as_url()? },
+                    MountStrategy::Remote {
+                        base_url: outdir.as_url()?,
+                    },
                 )
                 .await
             });
