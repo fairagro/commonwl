@@ -27,7 +27,8 @@
   the local backend; an image tag is now generated automatically.
 - The TES backend now reports a clear error for a `DockerRequirement` that needs building
   from a `dockerFile`, instead of silently ignoring it and using the wrong container image.
-- TES backend conformance raised from 24% to 98% via a series of fixes:
+- TES backend conformance raised from 24% to 99%, now matching Docker's own
+  conformance ceiling exactly, via a series of fixes:
   - `secondaryFiles` handling is now storage-aware instead of assuming a local file path.
   - File metadata (size/checksum/contents) is now computed correctly once a value's location
     becomes remote, e.g. after crossing a workflow step boundary.
@@ -71,6 +72,12 @@
     Docker's behavior; previously any write to it failed outright.
   - Fixed a latent bug that could corrupt S3 listing/prefix-matching for any directory-shaped
     path whose URL already carried a trailing slash.
+  - A workflow step's `Directory` input with `loadListing` set no longer surfaces the internal
+    `.cwl_empty_dir` marker as if it were a real file.
+  - A filename containing `:` (e.g. `stdout: re:sult`) no longer breaks task submission or
+    loses everything before the colon.
+  - `outputBinding: {glob: dir/*}` no longer also matches files nested deeper than one level
+    (e.g. `dir/sub/file`).
 - Fixed several cases where a tool's output handling could crash instead of failing cleanly:
   combining `secondaryFiles` with an output constructed via `outputEval`, a workflow step
   input using `loadContents` on a `default` file value, and a tool's `cwl.output.json`
