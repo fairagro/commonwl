@@ -189,23 +189,6 @@ impl TaskBackend for TesBackend {
             }
         }
 
-        //handle stderr output
-        let stderr_path = crate::backend::resolve_output_location(
-            request.stderr_file,
-            "stderr",
-            request.outdir,
-            request.tmpdir,
-            request.eval_context,
-        )?;
-        task.add_output(
-            Output::builder()
-                .name("stderr")
-                .path(stderr_file)
-                .url(stderr_path.as_url()?)
-                .ty(output::Type::File)
-                .build(),
-        );
-
         task.add_output(
             Output::builder()
                 .name("workdir")
@@ -215,6 +198,32 @@ impl TaskBackend for TesBackend {
                 .build(),
         );
 
+        task.add_output(
+            Output::builder()
+                .name("tmpdir")
+                .path(self.container_tmp_dir())
+                .url(request.tmpdir.as_url()?)
+                .ty(output::Type::Directory)
+                .build(),
+        );
+
+        //handle stderr output
+        let stderr_path = crate::backend::resolve_output_location(
+            request.stderr_file,
+            "stderr",
+            request.outdir,
+            request.tmpdir,
+            request.eval_context,
+        )?;
+
+        task.add_output(
+            Output::builder()
+                .name("stderr")
+                .path(stderr_file)
+                .url(stderr_path.as_url()?)
+                .ty(output::Type::File)
+                .build(),
+        );
         //handle stdout output
         let stdout_path = crate::backend::resolve_output_location(
             request.stdout_file,

@@ -257,8 +257,22 @@ impl Storage for S3Storage {
         pattern: &str,
     ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>> {
         let (bucket, key_prefix) = S3Storage::parse_uri(base)?;
+
+        // an empty pattern (bare `$(runtime.outdir)`) or "." means "the source_dir itself is the match"
+        if pattern.is_empty() || pattern == "." {
+            let dir_url = Url::parse(&format!(
+                "s3://{bucket}/{}/",
+                key_prefix.trim_end_matches('/')
+            ))?;
+            return Ok(Box::new(std::iter::once(StoragePath::Remote(dir_url))));
+        }
+
         let pattern = Pattern::new(pattern)?;
-        let strip_prefix = format!("{}/", &*key_prefix);
+        let strip_prefix = if key_prefix.is_empty() || key_prefix.ends_with('/') {
+            key_prefix.clone()
+        } else {
+            format!("{key_prefix}/")
+        };
 
         let res = self
             .client()

@@ -127,6 +127,54 @@ fn relativize_glob_pattern(glob: String, source_dir: &StoragePath) -> String {
     glob
 }
 
+/// Builds a directory listing from remote storage without downloading file contents
+fn list_remote_listing<'a>(
+    dir_url: &'a Url,
+    recursive: bool,
+    storage: &'a StorageBackend,
+) -> BoxFuture<'a, anyhow::Result<Vec<FileOrDirectory>>> {
+    async move {
+        let mut entries = vec![];
+        for child in storage.glob(dir_url, "*").await? {
+            if child.file_name().as_deref() == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER) {
+                continue;
+            }
+            if child.is_dir() {
+                let child_url = child.as_url()?;
+                let mut dir = Directory::builder()
+                    .path(child.path())
+                    .location(child_url.clone())
+                    .maybe_basename(child.file_name())
+                    .build();
+                if recursive {
+                    dir.listing = Some(list_remote_listing(&child_url, true, storage).await?);
+                }
+                entries.push(FileOrDirectory::Directory(dir));
+            } else {
+                let mut file = File::builder()
+                    .maybe_basename(child.file_name())
+                    .location(child.as_url()?)
+                    .path(child.path())
+                    .build();
+                let FilePathMetaData {
+                    basename,
+                    nameroot,
+                    nameext,
+                    dirname,
+                } = get_path_metadata(Path::new(&child.path()));
+                file.basename = basename;
+                file.nameext = nameext;
+                file.nameroot = nameroot;
+                file.dirname = dirname;
+                entries.push(FileOrDirectory::File(file));
+            }
+        }
+        entries.sort_by_key(|e| e.basename().cloned());
+        Ok(entries)
+    }
+    .boxed()
+}
+
 fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> StoragePath {
     match &context.source_dir {
         StoragePath::Local(base) => {
@@ -178,12 +226,26 @@ async fn evaluate_command_binding(
                         .location(item.as_url()?)
                         .maybe_basename(basename)
                         .build();
-                    // listing needs a real local path to walk
                     if item.is_local() {
+                        // listing needs a real local path to walk
                         if let Some(load_listing) = binding.load_listing {
                             dir.load_listing(load_listing)?;
                         } else {
                             dir.load_listing(LoadListingEnum::DeepListing)?;
+                        }
+                    } else {
+                        match binding.load_listing.unwrap_or(LoadListingEnum::DeepListing) {
+                            LoadListingEnum::NoListing => {}
+                            LoadListingEnum::ShallowListing => {
+                                dir.listing = Some(
+                                    list_remote_listing(&item.as_url()?, false, &storage).await?,
+                                );
+                            }
+                            LoadListingEnum::DeepListing => {
+                                dir.listing = Some(
+                                    list_remote_listing(&item.as_url()?, true, &storage).await?,
+                                );
+                            }
                         }
                     }
                     FileOrDirectory::Directory(dir)
@@ -457,8 +519,9 @@ async fn validate_dir(
             anyhow::bail!("Source location {source_location} does not exist for output directory");
         }
 
-        if downloaded && dir.listing.is_none() && u_source_location.scheme() != "file" {
-            // load listing for remote objects after download
+        if downloaded && u_source_location.scheme() != "file" {
+            // any listing built before download (e.g. `list_remote_listing`) points at remote
+            // locations, not the paths just downloaded to - always regenerate from the real copy
             dir.path = Some(dest_path.to_string_lossy().into_owned());
             dir.load_listing(LoadListingEnum::DeepListing)?;
 
