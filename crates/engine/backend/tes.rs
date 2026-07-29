@@ -1,6 +1,6 @@
 use crate::{
     backend::{
-        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     string_url_to_path_string,
@@ -75,7 +75,8 @@ impl TaskBackend for TesBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu:noble");
+        let resolved =
+            crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
         if resolved.dockerfile.is_some() {
             anyhow::bail!(
                 "TES backend does not support building images from a Dockerfile; provide dockerPull or a pre-built dockerImageId"

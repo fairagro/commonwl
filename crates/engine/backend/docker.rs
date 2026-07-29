@@ -1,6 +1,6 @@
 use crate::{
     backend::{
-        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     docker::build_container,
@@ -82,7 +82,8 @@ impl TaskBackend for DockerBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu:noble");
+        let resolved =
+            crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
         let container = resolved.image_id;
         if let Some(df) = &resolved.dockerfile {
             let df = match df {

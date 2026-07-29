@@ -1,3 +1,7 @@
+use crate::{
+    environment::workdir::{self, WorkDirMount},
+    string_url_to_file_path,
+};
 use anyhow::ensure;
 use bollard::{Docker, body_full, query_parameters::BuildImageOptions};
 use bon::Builder;
@@ -9,11 +13,6 @@ use std::{
     io::BufRead,
     path::Path,
     process::{Command, Stdio},
-};
-
-use crate::{
-    environment::workdir::{self, WorkDirMount},
-    string_url_to_file_path,
 };
 
 /// builds a Docker container using the bollard Docker client

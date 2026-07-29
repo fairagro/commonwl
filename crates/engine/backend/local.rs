@@ -1,10 +1,7 @@
 use crate::{
     backend::{
-        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
-        local::command::CommandBackend,
-        mount::{MountStrategy, mount_input, mount_workdir_item},
-    },
-    docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
+        DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult, local::command::CommandBackend, mount::{MountStrategy, mount_input, mount_workdir_item},
+    }, docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
 };
 use anyhow::{Context, ensure};
 use async_trait::async_trait;
@@ -123,7 +120,7 @@ impl TaskBackend for LocalBackend {
 
         //handle docker requirement
         if request.docker.is_some() {
-            let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu");
+            let resolved = crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
 
             let df = match &resolved.dockerfile {
                 Some(StringOrInclude::Include(include)) => Some(include.include.clone()),
