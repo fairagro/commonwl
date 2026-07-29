@@ -103,7 +103,6 @@ impl TaskBackend for TesBackend {
             .iter()
             .map(ToString::to_string)
             .collect::<Vec<_>>();
-        let cleanup_container = container.clone();
 
         //build crankshaft task object
         // Deliberately not wired to `Execution::stdin` as TES implementations may truncate the file
@@ -136,7 +135,7 @@ impl TaskBackend for TesBackend {
                         format!("{{}}/{}", crate::backend::mount::S3_EMPTY_DIR_MARKER),
                         ";".to_string(),
                     ])
-                    .image(cleanup_container)
+                    .image(DEFAULT_DOCKER_CONTAINER)
                     .build()
             ])
             .resources(
