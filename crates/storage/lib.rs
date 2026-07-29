@@ -219,7 +219,10 @@ impl StoragePath {
     pub fn join(&self, segment: &str) -> anyhow::Result<Self> {
         match self {
             Self::Local(path) => Ok(Self::Local(path.join(segment))),
-            Self::Remote(url) => {
+            // a leading '/' is left on the old Url::join path since some callers rely on its
+            // "absolute segment replaces the whole path" behavior deliberately (see mount.rs's
+            // out-of-convention absolute entryname handling)
+            Self::Remote(url) if segment.starts_with('/') => {
                 let base = if url.path().ends_with('/') {
                     url.clone()
                 } else {
@@ -229,6 +232,22 @@ impl StoragePath {
                 };
 
                 Ok(Self::Remote(base.join(segment)?))
+            }
+            Self::Remote(url) => {
+                // append as literal path segments rather than Url::join: a segment containing ':'
+                // (e.g. `stdout: re:sult`) would otherwise parse as its own absolute URL
+                // (scheme:opaque), and Url::join would discard base entirely
+                let mut base = url.clone();
+                {
+                    let mut segments = base
+                        .path_segments_mut()
+                        .map_err(|()| anyhow::anyhow!("base_url cannot be a base"))?;
+                    for part in segment.split('/') {
+                        segments.push(part);
+                    }
+                }
+
+                Ok(Self::Remote(base))
             }
         }
     }

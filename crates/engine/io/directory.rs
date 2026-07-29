@@ -132,6 +132,12 @@ fn read_dir<'a>(
         for entry in read_dir.flatten() {
             let path_buf = entry.path();
 
+            if path_buf.file_name().and_then(|n| n.to_str())
+                == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER)
+            {
+                continue;
+            }
+
             if path_buf.is_dir() {
                 let mut dir = Directory {
                     location: Some(path_buf.to_string_lossy().to_string()),

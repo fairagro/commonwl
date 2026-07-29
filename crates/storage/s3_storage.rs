@@ -289,10 +289,17 @@ impl Storage for S3Storage {
         // common prefix shared by one or more object keys.
         let mut dir_matches: BTreeSet<String> = BTreeSet::new();
 
+        // matches shell/Local glob semantics: `*` doesn't cross a `/` (e.g. `dir/*` must not also
+        // match `dir/sub/file`)
+        let match_options = glob::MatchOptions {
+            require_literal_separator: true,
+            ..glob::MatchOptions::new()
+        };
+
         for key in res.contents().iter().filter_map(|obj| obj.key()) {
             let relative = key.strip_prefix(&strip_prefix).unwrap_or(key);
 
-            if pattern.matches(relative)
+            if pattern.matches_with(relative, match_options)
                 && let Ok(url) = Url::parse(&format!("s3://{bucket}/{key}"))
             {
                 file_urls.push(StoragePath::Remote(url));
@@ -301,7 +308,7 @@ impl Storage for S3Storage {
             let segments: Vec<&str> = relative.split('/').collect();
             for i in 1..segments.len() {
                 let candidate = segments[..i].join("/");
-                if pattern.matches(&candidate) {
+                if pattern.matches_with(&candidate, match_options) {
                     dir_matches.insert(candidate);
                 }
             }
