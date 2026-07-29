@@ -413,7 +413,7 @@ pub(crate) async fn handle_secondary_file_schema(
         anyhow::bail!("required secondary file not found {pattern} for {file:?}");
     }
 
-    if !storage.exists(&secondary_url).await? {
+    if !storage.exists(&secondary_url).await? && !storage.is_dir(&secondary_url).await? {
         if is_required {
             anyhow::bail!("required secondary file not found {pattern}");
         }

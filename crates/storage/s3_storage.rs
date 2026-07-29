@@ -6,7 +6,7 @@ use aws_sdk_s3::config::RequestChecksumCalculation;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::{Delete, ObjectIdentifier};
 use glob::Pattern;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::sync::Arc;
 use tokio::fs::File;
@@ -121,7 +121,10 @@ impl Storage for S3Storage {
                 let mut set = tokio::task::JoinSet::new();
                 let sem = Arc::new(tokio::sync::Semaphore::new(32));
                 for obj_key in keys {
-                    let relative = obj_key.strip_prefix(&key).unwrap_or(&obj_key);
+                    let relative = obj_key
+                        .strip_prefix(&key)
+                        .unwrap_or(&obj_key)
+                        .trim_start_matches('/');
                     let local_path = local.join(relative);
                     if let Some(parent) = local_path.parent() {
                         tokio::fs::create_dir_all(parent).await.with_context(|| {
@@ -270,7 +273,7 @@ impl Storage for S3Storage {
         // S3 has no real directories, only object keys
         // a glob pattern like  "somedir" is meant to match a *directory*, which only exists here as a
         // common prefix shared by one or more object keys.
-        let mut dir_matches: HashSet<String> = HashSet::new();
+        let mut dir_matches: BTreeSet<String> = BTreeSet::new();
 
         for key in res.contents().iter().filter_map(|obj| obj.key()) {
             let relative = key.strip_prefix(&strip_prefix).unwrap_or(key);

@@ -27,7 +27,7 @@
   the local backend; an image tag is now generated automatically.
 - The TES backend now reports a clear error for a `DockerRequirement` that needs building
   from a `dockerFile`, instead of silently ignoring it and using the wrong container image.
-- TES backend conformance raised from 24% to 95% via a series of fixes:
+- TES backend conformance raised from 24% to 97% via a series of fixes:
   - `secondaryFiles` handling is now storage-aware instead of assuming a local file path.
   - File metadata (size/checksum/contents) is now computed correctly once a value's location
     becomes remote, e.g. after crossing a workflow step boundary.
@@ -47,6 +47,21 @@
     previously it only ever matched individual object keys.
   - Fixed a regression where a tool relying on its Docker image's own `ENTRYPOINT` (rather
     than a bare shell command) stopped working under TES.
+  - Output values produced via `outputEval` (including nested `File`/`Directory` values
+    inside a `record`) now resolve their source location correctly instead of failing when a
+    bare `runtime.outdir`-relative path needed rebasing onto the run's remote storage prefix.
+  - `secondaryFiles` existence checks now recognize a directory-shaped secondary file, not
+    just a file.
+  - Downloading a directory whose objects have a leading slash in their key-relative path no
+    longer fails outright.
+  - `outputBinding: {glob: ...}` patterns built from `$(runtime.outdir)` now match correctly
+    instead of never matching anything.
+  - `InitialWorkDirRequirement` entries with an absolute, out-of-convention `entryname` (e.g.
+    mapped to a path inside the container that isn't under the working directory) are now
+    mounted correctly when `DockerRequirement` is a real `requirements` entry, and are still
+    correctly rejected when it's only a `hints` entry.
+  - Directory-typed `outputBinding: {glob: ...}` results are now returned in a deterministic,
+    sorted order instead of an arbitrary hash-based one.
 - Fixed several cases where a tool's output handling could crash instead of failing cleanly:
   combining `secondaryFiles` with an output constructed via `outputEval`, a workflow step
   input using `loadContents` on a `default` file value, and a tool's `cwl.output.json`

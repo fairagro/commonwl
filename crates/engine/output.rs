@@ -116,6 +116,17 @@ fn resolve_output_source_location(
         .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))
 }
 
+/// A glob built from `$(runtime.outdir)` carries a bare remote path prefix; remote `Storage::glob` only matches relative patterns, so strip it back off.
+fn relativize_glob_pattern(glob: String, source_dir: &StoragePath) -> String {
+    if let StoragePath::Remote(_) = source_dir {
+        let base_path = source_dir.path();
+        if let Some(stripped) = glob.strip_prefix(&base_path) {
+            return stripped.trim_start_matches('/').to_string();
+        }
+    }
+    glob
+}
+
 fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> StoragePath {
     match &context.source_dir {
         StoragePath::Local(base) => {
@@ -154,6 +165,7 @@ async fn evaluate_command_binding(
     //collect items via globs
     if let Some(globs) = &binding.glob {
         for glob_ in get_globs(globs, context.eval_context) {
+            let glob_ = relativize_glob_pattern(glob_, context.source_dir);
             for item in storage.glob(&context.source_dir.as_url()?, &glob_).await? {
                 // never surface S3-empty-directory placeholder as it were real tool output - it can end up glob-matched here directly
                 if item.file_name().as_deref() == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER) {

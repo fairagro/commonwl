@@ -90,7 +90,7 @@ pub(crate) async fn mount_workdir_item(
             mount_workdir_item_local(mount, outdir, use_container, backend).await
         }
         MountStrategy::Remote { base_url } => {
-            mount_workdir_item_remote(mount, outdir, workdir, backend, &base_url).await
+            mount_workdir_item_remote(mount, outdir, workdir, use_container, backend, &base_url).await
         }
     }
 }
@@ -170,6 +170,7 @@ async fn mount_workdir_item_remote(
     mount: WorkDirMount,
     outdir: &Url,
     workdir: &str,
+    use_container: bool,
     backend: Arc<StorageBackend>,
     base_url: &Url,
 ) -> anyhow::Result<Vec<Input>> {
@@ -194,8 +195,13 @@ async fn mount_workdir_item_remote(
         .trim_start_matches('/');
     let guest_path = if target.starts_with(outdir.as_str()) {
         format!("{workdir}/{rel}")
+    } else if use_container {
+        // out-of-convention absolute entryname: mount at just its path, not the full staging URL
+        mount.target.path().to_string()
     } else {
-        target.to_string()
+        anyhow::bail!(
+            "Workdir item target {target} is outside of working directory and container is not used, can not stage"
+        );
     };
 
     match (mount.ty, mount.source) {
