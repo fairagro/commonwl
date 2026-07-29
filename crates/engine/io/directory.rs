@@ -132,8 +132,12 @@ fn read_dir<'a>(
         for entry in read_dir.flatten() {
             let path_buf = entry.path();
 
+            // this walker runs for every backend, not just S3/TES, so only treat a marker-named
+            // entry as the placeholder (and hide it) if it's empty like the real markers always
+            // are - a legitimate tool output that happens to share the name is never empty by luck
             if path_buf.file_name().and_then(|n| n.to_str())
                 == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER)
+                && fs::metadata(&path_buf).is_ok_and(|m| m.len() == 0)
             {
                 continue;
             }

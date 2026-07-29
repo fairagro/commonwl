@@ -12,9 +12,16 @@ use crankshaft::engine::{
     },
 };
 use cwl_core::files::FileOrDirectory;
-use cwl_engine_storage::{Storage, StorageBackend};
+use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
 use std::{fs, path::PathBuf, sync::Arc};
 use url::Url;
+
+/// joins `segment` onto `base` via `StoragePath::join`, which (unlike raw `Url::join`) safely
+/// handles segments containing ':' and doesn't require a trailing slash on `base` to append
+/// rather than replace the last path component
+fn join_url(base: &Url, segment: &str) -> anyhow::Result<Url> {
+    StoragePath::Remote(base.clone()).join(segment)?.as_url()
+}
 
 /// Marker object name uploaded under an otherwise-empty S3 "directory" prefix so a TES
 /// server has at least one object to materialize into a real directory. Stripped back out
@@ -178,17 +185,6 @@ async fn mount_workdir_item_remote(
     //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
     let target = mount.target.as_str();
 
-    // Push an empty path segment so that future joins of the work directory URL
-    // treat it as a directory
-    let mut base_url = base_url.clone();
-    if !base_url.as_str().ends_with('/') {
-        base_url
-            .path_segments_mut()
-            .map_err(|()| anyhow::anyhow!("base_url cannot be a base"))?
-            .push("");
-    }
-    let base_url = &base_url;
-
     let rel = target
         .strip_prefix(outdir.as_str())
         .unwrap_or(target)
@@ -210,7 +206,7 @@ async fn mount_workdir_item_remote(
                 let local = url
                     .to_file_path()
                     .map_err(|()| anyhow::anyhow!("Url of mount source not local!"))?;
-                let dest = base_url.join(rel)?;
+                let dest = join_url(base_url, rel)?;
                 backend.upload(&local, &dest).await?;
                 dest
             } else {
@@ -226,7 +222,7 @@ async fn mount_workdir_item_remote(
             );
         }
         (MountType::File, Source::Contents(data)) => {
-            let dest = base_url.join(rel)?;
+            let dest = join_url(base_url, rel)?;
             backend.upload_bytes(&data, &dest).await?;
             inputs.push(
                 Input::builder()
@@ -242,7 +238,7 @@ async fn mount_workdir_item_remote(
                 let local = url
                     .to_file_path()
                     .map_err(|()| anyhow::anyhow!("Url of mount source not local!"))?;
-                let dest = base_url.join(&format!("{rel}/"))?;
+                let dest = join_url(base_url, &format!("{rel}/"))?;
                 backend.upload(&local, &dest).await?;
                 dest
             } else {
@@ -258,7 +254,7 @@ async fn mount_workdir_item_remote(
             );
         }
         (MountType::Directory, Source::Contents(_)) => {
-            let dest = base_url.join(&format!("{rel}/"))?;
+            let dest = join_url(base_url, &format!("{rel}/"))?;
             if dest.scheme() == "s3" {
                 //upload placeholder object
                 backend

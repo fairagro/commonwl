@@ -163,7 +163,9 @@ impl TaskBackend for TesBackend {
         for mount in request.mounts.iter().cloned() {
             let outdir = request.outdir.to_owned();
             let workdir = request.execution_path.to_owned();
-            let use_container = request.use_container;
+            // request.use_container only reflects an explicit DockerRequirement, but TES always
+            // runs the task in a container (falling back to DEFAULT_DOCKER_CONTAINER otherwise)
+            let use_container = true;
             let storage = self.storage();
             let permit = sem.clone().acquire_owned().await?;
 
@@ -250,6 +252,17 @@ impl TaskBackend for TesBackend {
         )
         .await?;
 
+        // only the primary executor's exit code determines CWL success/failure; surface a
+        // failure of the empty-dir-marking cleanup step so it doesn't fail completely silently
+        if let Some(cleanup_status) = exit_status.get(1)
+            && !cleanup_status.success()
+        {
+            tracing::warn!(
+                "empty-directory marker cleanup step exited with {cleanup_status}; \
+                 empty output directories may be missing from results"
+            );
+        }
+
         Ok(TaskExecutionResult {
             exit_status,
             stdout_file: stdout_path,
@@ -295,12 +308,17 @@ impl TesBackend {
             .filter_map(|(i, input)| {
                 let location = input.location()?;
                 let path = string_url_to_path_string(location).ok()?;
-                let dest = outdir
+                // raw Url::join would drop outdir's own unique per-task path segment when it
+                // lacks a trailing slash (RFC 3986 "replace last segment" semantics); StoragePath::join
+                // appends instead
+                let dest = StoragePath::Remote(outdir.clone())
                     .join(&format!(
                         "inputs/{}{}",
                         &Uuid::new_v4().to_string()[..8],
                         input.basename()?
                     ))
+                    .ok()?
+                    .as_url()
                     .ok()?;
                 Some((i, path, dest))
             })

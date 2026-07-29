@@ -242,8 +242,20 @@ impl StoragePath {
                     let mut segments = base
                         .path_segments_mut()
                         .map_err(|()| anyhow::anyhow!("base_url cannot be a base"))?;
+                    // PathSegmentsMut::push silently ignores "." / ".." (see url crate docs) rather
+                    // than resolving them like Url::join does, so resolve them ourselves
                     for part in segment.split('/') {
-                        segments.push(part);
+                        match part {
+                            // "" (from a trailing '/') is intentionally still pushed - it's how
+                            // directory URLs get their trailing-slash marker
+                            "." => {}
+                            ".." => {
+                                segments.pop();
+                            }
+                            part => {
+                                segments.push(part);
+                            }
+                        }
                     }
                 }
 
@@ -295,5 +307,44 @@ impl Drop for RemoteTempDir {
                 tracing::warn!("Failed to clean up temp dir {path}: {e}");
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn remote(s: &str) -> StoragePath {
+        StoragePath::Remote(Url::parse(s).unwrap())
+    }
+
+    #[test]
+    fn join_appends_per_task_segment_without_trailing_slash_on_base() {
+        let base = remote("s3://bucket/prefix/ab12cd34");
+        let joined = base.join("inputs/x").unwrap();
+        assert_eq!(joined.as_url().unwrap().as_str(), "s3://bucket/prefix/ab12cd34/inputs/x");
+    }
+
+    #[test]
+    fn join_preserves_trailing_slash_for_directory_segments() {
+        let base = remote("s3://bucket/prefix/ab12cd34");
+        let joined = base.join("out/").unwrap();
+        assert!(joined.as_url().unwrap().as_str().ends_with('/'));
+    }
+
+    #[test]
+    fn join_does_not_misinterpret_colon_segment_as_scheme() {
+        let base = remote("s3://bucket/prefix");
+        let joined = base.join("re:sult").unwrap();
+        let url = joined.as_url().unwrap();
+        assert_eq!(url.scheme(), "s3");
+        assert_eq!(url.as_str(), "s3://bucket/prefix/re:sult");
+    }
+
+    #[test]
+    fn join_resolves_parent_segment() {
+        let base = remote("s3://bucket/dir/sub");
+        let joined = base.join("../other.txt").unwrap();
+        assert_eq!(joined.as_url().unwrap().as_str(), "s3://bucket/dir/other.txt");
     }
 }

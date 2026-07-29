@@ -100,7 +100,11 @@ fn resolve_output_source_location(
     source_location: &str,
     context: &OutputCollectionContext,
 ) -> anyhow::Result<Url> {
-    if let Ok(url) = Url::parse(source_location) {
+    // a bare relative filename containing ':' (e.g. an entryname `re:sult`) is itself a valid
+    // "cannot-be-a-base" URL (scheme=re, opaque path=sult); only accept genuine absolute URLs here
+    if let Ok(url) = Url::parse(source_location)
+        && !url.cannot_be_a_base()
+    {
         return Ok(url);
     }
     if let StoragePath::Remote(_) = context.source_dir {
@@ -504,19 +508,20 @@ async fn validate_dir(
     {
         let u_source_location = resolve_output_source_location(source_location, context)?;
 
+        let parent = dest_path.parent().unwrap();
+        if !parent.exists() {
+            fs::create_dir_all(parent)?;
+        }
+
         let mut downloaded = false;
 
-        if storage.exists(&u_source_location).await? || storage.is_dir(&u_source_location).await? {
-            if copy {
-                let parent = dest_path.parent().unwrap();
-                if !parent.exists() {
-                    fs::create_dir_all(parent)?;
-                }
+        if copy {
+            if storage.exists(&u_source_location).await? || storage.is_dir(&u_source_location).await? {
                 storage.download(&u_source_location, dest_path).await?;
                 downloaded = true;
+            } else {
+                anyhow::bail!("Source location {source_location} does not exist for output directory");
             }
-        } else {
-            anyhow::bail!("Source location {source_location} does not exist for output directory");
         }
 
         if downloaded && u_source_location.scheme() != "file" {
@@ -815,10 +820,12 @@ async fn handle_dir(
     storage: Arc<StorageBackend>,
 ) -> anyhow::Result<DefaultValue> {
     let url = path.as_url()?.clone();
+    let source_path = context.source_dir.path();
     let relative_path = url
         .path()
-        .strip_prefix(context.source_dir.as_url()?.as_str())
-        .unwrap();
+        .strip_prefix(&source_path)
+        .unwrap_or_else(|| url.path())
+        .trim_start_matches('/');
     let dest_path = context.dest_dir.join(relative_path);
     let dest_path_as_str = dest_path.to_string_lossy();
 

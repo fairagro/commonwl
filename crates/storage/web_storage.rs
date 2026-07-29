@@ -69,9 +69,10 @@ impl Storage for WebStorage {
         Ok(status.is_success())
     }
 
-    async fn is_dir(&self, _uri: &Url) -> anyhow::Result<bool> {
-        // plain HTTP(S) resources have no directory concept
-        Ok(false)
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool> {
+        // plain HTTP(S) has no directory metadata to query; treat a trailing '/' as the
+        // conventional directory marker, same as directory URLs built elsewhere (e.g. S3Storage)
+        Ok(uri.path().ends_with('/'))
     }
 
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {

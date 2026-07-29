@@ -104,27 +104,12 @@ impl Storage for S3Storage {
         match file_type {
             S3PathType::File => self.download_file(&bucket, &key, local).await?,
             S3PathType::Directory => {
-                let objects = self
-                    .client()
-                    .await?
-                    .list_objects_v2()
-                    .bucket(&bucket)
-                    .prefix(&key)
-                    .send()
-                    .await?;
-
-                let keys: Vec<String> = objects
-                    .contents()
-                    .iter()
-                    .filter_map(|obj| obj.key().map(str::to_owned))
-                    .collect();
+                let dir_prefix = S3Storage::dir_prefix(&key);
+                let keys = self.list_all_keys(&bucket, &dir_prefix).await?;
                 let mut set = tokio::task::JoinSet::new();
                 let sem = Arc::new(tokio::sync::Semaphore::new(32));
                 for obj_key in keys {
-                    let relative = obj_key
-                        .strip_prefix(&key)
-                        .unwrap_or(&obj_key)
-                        .trim_start_matches('/');
+                    let relative = obj_key.strip_prefix(&dir_prefix).unwrap_or(&obj_key);
                     let local_path = local.join(relative);
                     if let Some(parent) = local_path.parent() {
                         tokio::fs::create_dir_all(parent).await.with_context(|| {
@@ -268,20 +253,9 @@ impl Storage for S3Storage {
         }
 
         let pattern = Pattern::new(pattern)?;
-        let strip_prefix = if key_prefix.is_empty() || key_prefix.ends_with('/') {
-            key_prefix.clone()
-        } else {
-            format!("{key_prefix}/")
-        };
+        let strip_prefix = S3Storage::dir_prefix(&key_prefix);
 
-        let res = self
-            .client()
-            .await?
-            .list_objects_v2()
-            .bucket(&bucket)
-            .prefix(&key_prefix)
-            .send()
-            .await?;
+        let keys = self.list_all_keys(&bucket, &key_prefix).await?;
 
         let mut file_urls = vec![];
         // S3 has no real directories, only object keys
@@ -296,7 +270,7 @@ impl Storage for S3Storage {
             ..glob::MatchOptions::new()
         };
 
-        for key in res.contents().iter().filter_map(|obj| obj.key()) {
+        for key in &keys {
             let relative = key.strip_prefix(&strip_prefix).unwrap_or(key);
 
             if pattern.matches_with(relative, match_options)
@@ -379,7 +353,7 @@ impl S3Storage {
             .await?
             .list_objects_v2()
             .bucket(bucket)
-            .prefix(key)
+            .prefix(S3Storage::dir_prefix(key))
             .max_keys(1)
             .send()
             .await?;
@@ -389,6 +363,49 @@ impl S3Storage {
         } else {
             Ok(S3PathType::Directory)
         }
+    }
+
+    /// key prefix that only matches objects *under* `key`, not sibling keys sharing the same string prefix
+    fn dir_prefix(key: &str) -> String {
+        if key.is_empty() || key.ends_with('/') {
+            key.to_string()
+        } else {
+            format!("{key}/")
+        }
+    }
+
+    /// lists every object key under `prefix`, following S3's continuation-token pagination
+    async fn list_all_keys(&self, bucket: &str, prefix: &str) -> anyhow::Result<Vec<String>> {
+        let mut keys = Vec::new();
+        let mut continuation_token = None;
+
+        loop {
+            let mut req = self
+                .client()
+                .await?
+                .list_objects_v2()
+                .bucket(bucket)
+                .prefix(prefix);
+
+            if let Some(token) = continuation_token {
+                req = req.continuation_token(token);
+            }
+
+            let page = req.send().await?;
+            keys.extend(
+                page.contents()
+                    .iter()
+                    .filter_map(|obj| obj.key().map(str::to_owned)),
+            );
+
+            if page.is_truncated().unwrap_or(false) {
+                continuation_token = page.next_continuation_token().map(str::to_string);
+            } else {
+                break;
+            }
+        }
+
+        Ok(keys)
     }
 }
 

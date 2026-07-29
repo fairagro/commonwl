@@ -811,6 +811,7 @@ pub async fn execute_commandline_tool(
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
         runtime.outdir = resolve_runtime_path(outdir.storage_path());
+        runtime.tmpdir = resolve_runtime_path(tmpdir.storage_path());
 
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
