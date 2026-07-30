@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.10.0
+### Added
+- Ergonomic functions for all `CWLDocument` types
+
 ## 0.9.0
 
 ### Added
