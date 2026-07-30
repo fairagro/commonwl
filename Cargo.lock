@@ -1117,7 +1117,7 @@ dependencies = [
 
 [[package]]
 name = "commonwl"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "cwl_core",
  "cwl_engine",
@@ -1140,7 +1140,7 @@ dependencies = [
 
 [[package]]
 name = "conformance"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1435,7 +1435,7 @@ dependencies = [
 
 [[package]]
 name = "cwl-lsp"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "cwl_core",
  "dashmap",
@@ -1448,7 +1448,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_core"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "base16ct 1.0.0",
@@ -1469,7 +1469,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1508,7 +1508,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_engine_storage"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1528,7 +1528,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_salad"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "cwl_salad_derive",
  "serde",
@@ -1539,7 +1539,7 @@ dependencies = [
 
 [[package]]
 name = "cwl_salad_derive"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "proc-macro2",
  "quote",

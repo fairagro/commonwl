@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## 0.9.0
 
 ### Added
 - CWL documents are now validated against the spec when loaded. Documents with duplicate
