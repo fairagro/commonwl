@@ -248,6 +248,22 @@ pub struct InitialWorkDirRequirement {
     pub listing: WorkDirItems,
 }
 
+impl InitialWorkDirRequirement {
+    #[must_use]
+    pub fn new_from_filename_include(filename: &str) -> Self {
+        InitialWorkDirRequirement::builder()
+            .listing(WorkDirItems::ListingItems(vec![ListingItems::Dirent(
+                Dirent::builder()
+                    .entry(StringOrInclude::Include(Include {
+                        include: filename.to_string(),
+                    }))
+                    .entryname(filename)
+                    .build(),
+            )]))
+            .build()
+    }
+}
+
 #[doc = include_str!("docs/EnvVarRequirement.md")]
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone, Builder)]
 #[serde(rename_all = "camelCase")]
