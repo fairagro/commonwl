@@ -32,6 +32,7 @@ commonwl = { version = "0.9", features = ["engine", "tes"] }
 use commonwl::load_cwl_file;
 
 let doc = load_cwl_file("workflow.cwl", true)?;
+# Ok::<(), commonwl::Error>(())
 ```
 
 ## CWL Engine
@@ -72,6 +73,8 @@ Funnel has an upstream crash under concurrent load; `.dev/tes_env.sh watchdog` (
 This work is dual-licensed under MIT and Apache 2.0. You can choose either one to use this work.
 
 SPDX-License-Identifier: `MIT OR Apache-2.0`
+
+See [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE) for the full license texts.
 
 **Funded by**
 
