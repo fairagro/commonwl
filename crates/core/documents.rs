@@ -1138,40 +1138,51 @@ pub struct WorkflowStep {
     #[doc = include_str!("docs/WorkflowStep_in.md")]
     #[serde(deserialize_with = "deserialize_map_list_id")]
     #[validate(nested)]
+    #[builder(into)]
     pub r#in: Vec<WorkflowStepInput>,
     #[doc = include_str!("docs/WorkflowStep_out.md")]
     #[validate(nested)]
+    #[builder(into)]
     pub out: Vec<StringOrWorkflowStepOutput>,
     #[doc = include_str!("docs/WorkflowStep_run.md")]
+    #[builder(into)]
     pub run: StringOrDocument,
     #[doc = include_str!("docs/WorkflowStep_id.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[validate(required)]
+    #[builder(into)]
     pub id: Option<String>,
     #[doc = include_str!("docs/WorkflowStep_label.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub label: Option<String>,
     #[doc = include_str!("docs/WorkflowStep_doc.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub doc: Option<OneOrMany<String>>,
     #[doc = include_str!("docs/WorkflowStep_requirements.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
     #[validate(custom(function = "crate::validate::validate_unique_requirements"))]
+    #[builder(into)]
     pub requirements: Option<Vec<WorkflowRequirements>>,
     #[doc = include_str!("docs/WorkflowStep_hints.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     #[serde(deserialize_with = "deserialize_map_list_option_class")]
+    #[builder(into)]
     pub hints: Option<Vec<WorkflowHints>>,
     #[doc = include_str!("docs/WorkflowStep_when.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub when: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub scatter: Option<OneOrMany<String>>,
     #[doc = include_str!("docs/WorkflowStep_scatterMethod.md")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
     pub scatter_method: Option<ScatterMethod>,
 }
 impl FromShortHand for WorkflowStep {}
