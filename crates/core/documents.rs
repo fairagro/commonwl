@@ -107,6 +107,7 @@ impl CWLDocument {
             Self::Workflow(wf) => wf.get_requirement_or_hint::<T>(),
         }
     }
+
     #[must_use]
     pub fn cwl_version(&self) -> Option<&String> {
         match self {
@@ -349,6 +350,16 @@ pub struct CommandLineTool {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
+impl CommandLineTool {
+    pub fn append_requirement_mut(&mut self, requirement: ToolRequirements) {
+        if let Some(reqs) = &mut self.requirements {
+            reqs.push(requirement);
+        } else {
+            self.requirements = Some(vec![requirement]);
+        }
+    }
+}
+
 #[doc = include_str!("docs/ExpressionTool.md")]
 #[derive(
     Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
@@ -410,6 +421,16 @@ pub struct ExpressionTool {
     pub extension_fields: HashMap<String, serde_json::Value>,
 }
 
+impl ExpressionTool {
+    pub fn append_requirement_mut(&mut self, requirement: WorkflowRequirements) {
+        if let Some(reqs) = &mut self.requirements {
+            reqs.push(requirement);
+        } else {
+            self.requirements = Some(vec![requirement]);
+        }
+    }
+}
+
 #[doc = include_str!("docs/Operation.md")]
 #[derive(
     Serialize, Deserialize, Debug, Clone, Builder, Default, Identifiable, PartialEq, Validate,
@@ -465,6 +486,16 @@ pub struct Operation {
     #[serde(flatten)]
     #[builder(default, into)]
     pub extension_fields: HashMap<String, serde_json::Value>,
+}
+
+impl Operation {
+    pub fn append_requirement_mut(&mut self, requirement: WorkflowRequirements) {
+        if let Some(reqs) = &mut self.requirements {
+            reqs.push(requirement);
+        } else {
+            self.requirements = Some(vec![requirement]);
+        }
+    }
 }
 
 #[doc = include_str!("docs/Workflow.md")]
@@ -551,6 +582,16 @@ impl Workflow {
     #[must_use]
     pub fn has_output(&self, id: &str) -> bool {
         self.outputs.iter().any(|s| s.id == Some(id.to_owned()))
+    }
+}
+
+impl Workflow {
+    pub fn append_requirement_mut(&mut self, requirement: WorkflowRequirements) {
+        if let Some(reqs) = &mut self.requirements {
+            reqs.push(requirement);
+        } else {
+            self.requirements = Some(vec![requirement]);
+        }
     }
 }
 
