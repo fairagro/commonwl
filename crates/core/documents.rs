@@ -1,5 +1,6 @@
 #[doc = "Defines the CWL Document Types - `CommandLineTool`, `ExpressionTool`, `Operation`, and `Workflow`"]
 use crate::ExtractFromEnum;
+use crate::files::FileOrDirectory;
 use crate::inputs::{
     CommandInputParameter, CommandLineBinding, DefaultValue, InputType, OperationInputParameter,
     WorkflowInputParameter, WorkflowStepInput,
@@ -10,10 +11,12 @@ use crate::outputs::{
     WorkflowOutputParameter,
 };
 use crate::requirements::{
-    SubworkflowFeatureRequirement, ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements,
+    DockerRequirement, EnvVarRequirement, EnvironmentDef, InitialWorkDirRequirement, ListingItems,
+    NetworkAccess, StringOrInclude, SubworkflowFeatureRequirement, ToolHints, ToolRequirements,
+    WorkDirItems, WorkflowHints, WorkflowRequirements,
 };
 use crate::validate::{CWL_VERSION, validate_expression};
-use crate::{OneOrMany, Result, guard};
+use crate::{BoolOrExpression, OneOrMany, Result, guard};
 use bon::Builder;
 use cwl_salad::{
     Identifiable,
@@ -148,6 +151,56 @@ impl CWLDocument {
             Self::ExpressionTool(_) => "ExpressionTool",
             Self::Operation(_) => "Operation",
             Self::Workflow(_) => "Workflow",
+        }
+    }
+
+    // grab docker image by name
+    pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
+        match self {
+            Self::CommandLineTool(clt) => clt.use_docker_pull_mut(pull),
+            Self::ExpressionTool(et) => et.use_docker_pull_mut(pull),
+            Self::Operation(op) => op.use_docker_pull_mut(pull),
+            Self::Workflow(wf) => wf.use_docker_pull_mut(pull),
+        }
+    }
+
+    // build docker image from file plus tag
+    pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
+        match self {
+            Self::CommandLineTool(clt) => clt.use_docker_file_mut(dockerfile, tag),
+            Self::ExpressionTool(et) => et.use_docker_file_mut(dockerfile, tag),
+            Self::Operation(op) => op.use_docker_file_mut(dockerfile, tag),
+            Self::Workflow(wf) => wf.use_docker_file_mut(dockerfile, tag),
+        }
+    }
+
+    // let tool talk network, no more silent wall
+    pub fn use_network_mut(&mut self) {
+        match self {
+            Self::CommandLineTool(clt) => clt.use_network_mut(),
+            Self::ExpressionTool(et) => et.use_network_mut(),
+            Self::Operation(op) => op.use_network_mut(),
+            Self::Workflow(wf) => wf.use_network_mut(),
+        }
+    }
+
+    // stuff env vars in, no dupes
+    pub fn use_env_requirement_mut(&mut self, env: &HashMap<String, String>) {
+        match self {
+            Self::CommandLineTool(clt) => clt.use_env_requirement_mut(env),
+            Self::ExpressionTool(et) => et.use_env_requirement_mut(env),
+            Self::Operation(op) => op.use_env_requirement_mut(env),
+            Self::Workflow(wf) => wf.use_env_requirement_mut(env),
+        }
+    }
+
+    // drop files in workdir before run
+    pub fn add_mount_requirement_mut(&mut self, entries: Vec<FileOrDirectory>) {
+        match self {
+            Self::CommandLineTool(clt) => clt.add_mount_requirement_mut(entries),
+            Self::ExpressionTool(et) => et.add_mount_requirement_mut(entries),
+            Self::Operation(op) => op.add_mount_requirement_mut(entries),
+            Self::Workflow(wf) => wf.add_mount_requirement_mut(entries),
         }
     }
 }
@@ -356,9 +409,83 @@ pub struct CommandLineTool {
 impl CommandLineTool {
     pub fn append_requirement_mut(&mut self, requirement: ToolRequirements) {
         if let Some(reqs) = &mut self.requirements {
-            reqs.push(requirement);
+            if let Some(existing) = reqs
+                .iter_mut()
+                .find(|r| std::mem::discriminant(*r) == std::mem::discriminant(&requirement))
+            {
+                *existing = requirement;
+            } else {
+                reqs.push(requirement);
+            }
         } else {
             self.requirements = Some(vec![requirement]);
+        }
+    }
+
+    // let tool talk network, no more silent wall
+    pub fn use_network_mut(&mut self) {
+        self.append_requirement_mut(ToolRequirements::NetworkAccess(NetworkAccess {
+            network_access: BoolOrExpression::Bool(true),
+        }));
+    }
+
+    // stuff env vars in, no dupes
+    pub fn use_env_requirement_mut(&mut self, env: &HashMap<String, String>) {
+        self.append_requirement_mut(ToolRequirements::EnvVarRequirement(
+            EnvVarRequirement::builder()
+                .env_def(
+                    env.iter()
+                        .map(|(k, v)| EnvironmentDef::builder().env_name(k).env_value(v).build())
+                        .collect(),
+                )
+                .build(),
+        ));
+    }
+
+    // grab docker image by name
+    pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
+        self.append_requirement_mut(ToolRequirements::DockerRequirement(
+            DockerRequirement::builder().docker_pull(pull.into()).build(),
+        ));
+    }
+
+    // build docker image from file plus tag
+    pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
+        self.append_requirement_mut(ToolRequirements::DockerRequirement(
+            DockerRequirement::builder()
+                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_image_id(tag.into())
+                .build(),
+        ));
+    }
+
+    // drop files in workdir before run
+    pub fn add_mount_requirement_mut(&mut self, entries: Vec<FileOrDirectory>) {
+        if let Some(iwdr) = self.get_requirement_mut::<InitialWorkDirRequirement>() {
+            match &mut iwdr.listing {
+                WorkDirItems::Expression(s) => {
+                    let mut items: Vec<ListingItems> = entries
+                        .into_iter()
+                        .map(ListingItems::FileOrDirectory)
+                        .collect();
+                    items.push(ListingItems::Expression(s.clone()));
+                    iwdr.listing = WorkDirItems::ListingItems(items);
+                }
+                WorkDirItems::ListingItems(items) => {
+                    items.extend(entries.into_iter().map(ListingItems::FileOrDirectory));
+                }
+            }
+        } else {
+            let items: Vec<ListingItems> = entries
+                .into_iter()
+                .map(ListingItems::FileOrDirectory)
+                .collect();
+            if !items.is_empty() {
+                let iwdr = InitialWorkDirRequirement {
+                    listing: WorkDirItems::ListingItems(items),
+                };
+                self.append_requirement_mut(ToolRequirements::InitialWorkDirRequirement(iwdr));
+            }
         }
     }
 }
@@ -427,10 +554,84 @@ pub struct ExpressionTool {
 impl ExpressionTool {
     pub fn append_requirement_mut(&mut self, requirement: WorkflowRequirements) {
         if let Some(reqs) = &mut self.requirements {
-            reqs.push(requirement);
+            if let Some(existing) = reqs
+                .iter_mut()
+                .find(|r| std::mem::discriminant(*r) == std::mem::discriminant(&requirement))
+            {
+                *existing = requirement;
+            } else {
+                reqs.push(requirement);
+            }
         } else {
             self.requirements = Some(vec![requirement]);
         }
+    }
+
+    // let tool talk network, no more silent wall
+    pub fn use_network_mut(&mut self) {
+        self.append_requirement_mut(WorkflowRequirements::NetworkAccess(NetworkAccess {
+            network_access: BoolOrExpression::Bool(true),
+        }));
+    }
+
+    // stuff env vars in, no dupes
+    pub fn use_env_requirement_mut(&mut self, env: &HashMap<String, String>) {
+        self.append_requirement_mut(WorkflowRequirements::EnvVarRequirement(
+            EnvVarRequirement::builder()
+                .env_def(
+                    env.iter()
+                        .map(|(k, v)| EnvironmentDef::builder().env_name(k).env_value(v).build())
+                        .collect(),
+                )
+                .build(),
+        ));
+    }
+
+    // drop files in workdir before run
+    pub fn add_mount_requirement_mut(&mut self, entries: Vec<FileOrDirectory>) {
+        if let Some(iwdr) = self.get_requirement_mut::<InitialWorkDirRequirement>() {
+            match &mut iwdr.listing {
+                WorkDirItems::Expression(s) => {
+                    let mut items: Vec<ListingItems> = entries
+                        .into_iter()
+                        .map(ListingItems::FileOrDirectory)
+                        .collect();
+                    items.push(ListingItems::Expression(s.clone()));
+                    iwdr.listing = WorkDirItems::ListingItems(items);
+                }
+                WorkDirItems::ListingItems(items) => {
+                    items.extend(entries.into_iter().map(ListingItems::FileOrDirectory));
+                }
+            }
+        } else {
+            let items: Vec<ListingItems> = entries
+                .into_iter()
+                .map(ListingItems::FileOrDirectory)
+                .collect();
+            if !items.is_empty() {
+                let iwdr = InitialWorkDirRequirement {
+                    listing: WorkDirItems::ListingItems(items),
+                };
+                self.append_requirement_mut(WorkflowRequirements::InitialWorkDirRequirement(iwdr));
+            }
+        }
+    }
+
+    // grab docker image by name
+    pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
+        self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
+            DockerRequirement::builder().docker_pull(pull.into()).build(),
+        ));
+    }
+
+    // build docker image from file plus tag
+    pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
+        self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
+            DockerRequirement::builder()
+                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_image_id(tag.into())
+                .build(),
+        ));
     }
 }
 
@@ -494,10 +695,84 @@ pub struct Operation {
 impl Operation {
     pub fn append_requirement_mut(&mut self, requirement: WorkflowRequirements) {
         if let Some(reqs) = &mut self.requirements {
-            reqs.push(requirement);
+            if let Some(existing) = reqs
+                .iter_mut()
+                .find(|r| std::mem::discriminant(*r) == std::mem::discriminant(&requirement))
+            {
+                *existing = requirement;
+            } else {
+                reqs.push(requirement);
+            }
         } else {
             self.requirements = Some(vec![requirement]);
         }
+    }
+
+    // let tool talk network, no more silent wall
+    pub fn use_network_mut(&mut self) {
+        self.append_requirement_mut(WorkflowRequirements::NetworkAccess(NetworkAccess {
+            network_access: BoolOrExpression::Bool(true),
+        }));
+    }
+
+    // stuff env vars in, no dupes
+    pub fn use_env_requirement_mut(&mut self, env: &HashMap<String, String>) {
+        self.append_requirement_mut(WorkflowRequirements::EnvVarRequirement(
+            EnvVarRequirement::builder()
+                .env_def(
+                    env.iter()
+                        .map(|(k, v)| EnvironmentDef::builder().env_name(k).env_value(v).build())
+                        .collect(),
+                )
+                .build(),
+        ));
+    }
+
+    // drop files in workdir before run
+    pub fn add_mount_requirement_mut(&mut self, entries: Vec<FileOrDirectory>) {
+        if let Some(iwdr) = self.get_requirement_mut::<InitialWorkDirRequirement>() {
+            match &mut iwdr.listing {
+                WorkDirItems::Expression(s) => {
+                    let mut items: Vec<ListingItems> = entries
+                        .into_iter()
+                        .map(ListingItems::FileOrDirectory)
+                        .collect();
+                    items.push(ListingItems::Expression(s.clone()));
+                    iwdr.listing = WorkDirItems::ListingItems(items);
+                }
+                WorkDirItems::ListingItems(items) => {
+                    items.extend(entries.into_iter().map(ListingItems::FileOrDirectory));
+                }
+            }
+        } else {
+            let items: Vec<ListingItems> = entries
+                .into_iter()
+                .map(ListingItems::FileOrDirectory)
+                .collect();
+            if !items.is_empty() {
+                let iwdr = InitialWorkDirRequirement {
+                    listing: WorkDirItems::ListingItems(items),
+                };
+                self.append_requirement_mut(WorkflowRequirements::InitialWorkDirRequirement(iwdr));
+            }
+        }
+    }
+
+    // grab docker image by name
+    pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
+        self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
+            DockerRequirement::builder().docker_pull(pull.into()).build(),
+        ));
+    }
+
+    // build docker image from file plus tag
+    pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
+        self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
+            DockerRequirement::builder()
+                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_image_id(tag.into())
+                .build(),
+        ));
     }
 }
 
@@ -766,10 +1041,84 @@ impl Workflow {
 impl Workflow {
     pub fn append_requirement_mut(&mut self, requirement: WorkflowRequirements) {
         if let Some(reqs) = &mut self.requirements {
-            reqs.push(requirement);
+            if let Some(existing) = reqs
+                .iter_mut()
+                .find(|r| std::mem::discriminant(*r) == std::mem::discriminant(&requirement))
+            {
+                *existing = requirement;
+            } else {
+                reqs.push(requirement);
+            }
         } else {
             self.requirements = Some(vec![requirement]);
         }
+    }
+
+    // let tool talk network, no more silent wall
+    pub fn use_network_mut(&mut self) {
+        self.append_requirement_mut(WorkflowRequirements::NetworkAccess(NetworkAccess {
+            network_access: BoolOrExpression::Bool(true),
+        }));
+    }
+
+    // stuff env vars in, no dupes
+    pub fn use_env_requirement_mut(&mut self, env: &HashMap<String, String>) {
+        self.append_requirement_mut(WorkflowRequirements::EnvVarRequirement(
+            EnvVarRequirement::builder()
+                .env_def(
+                    env.iter()
+                        .map(|(k, v)| EnvironmentDef::builder().env_name(k).env_value(v).build())
+                        .collect(),
+                )
+                .build(),
+        ));
+    }
+
+    // drop files in workdir before run
+    pub fn add_mount_requirement_mut(&mut self, entries: Vec<FileOrDirectory>) {
+        if let Some(iwdr) = self.get_requirement_mut::<InitialWorkDirRequirement>() {
+            match &mut iwdr.listing {
+                WorkDirItems::Expression(s) => {
+                    let mut items: Vec<ListingItems> = entries
+                        .into_iter()
+                        .map(ListingItems::FileOrDirectory)
+                        .collect();
+                    items.push(ListingItems::Expression(s.clone()));
+                    iwdr.listing = WorkDirItems::ListingItems(items);
+                }
+                WorkDirItems::ListingItems(items) => {
+                    items.extend(entries.into_iter().map(ListingItems::FileOrDirectory));
+                }
+            }
+        } else {
+            let items: Vec<ListingItems> = entries
+                .into_iter()
+                .map(ListingItems::FileOrDirectory)
+                .collect();
+            if !items.is_empty() {
+                let iwdr = InitialWorkDirRequirement {
+                    listing: WorkDirItems::ListingItems(items),
+                };
+                self.append_requirement_mut(WorkflowRequirements::InitialWorkDirRequirement(iwdr));
+            }
+        }
+    }
+
+    // grab docker image by name
+    pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
+        self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
+            DockerRequirement::builder().docker_pull(pull.into()).build(),
+        ));
+    }
+
+    // build docker image from file plus tag
+    pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
+        self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
+            DockerRequirement::builder()
+                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_image_id(tag.into())
+                .build(),
+        ));
     }
 }
 
