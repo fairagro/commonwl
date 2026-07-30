@@ -1,17 +1,19 @@
 #[doc = "Defines the CWL Document Types - `CommandLineTool`, `ExpressionTool`, `Operation`, and `Workflow`"]
 use crate::ExtractFromEnum;
-use crate::OneOrMany;
 use crate::inputs::{
-    CommandInputParameter, CommandLineBinding, OperationInputParameter, WorkflowInputParameter,
-    WorkflowStepInput,
+    CommandInputParameter, CommandLineBinding, DefaultValue, InputType, OperationInputParameter,
+    WorkflowInputParameter, WorkflowStepInput,
 };
-use crate::outputs::CommandOutputParameter;
+use crate::outputs::{CommandOutputParameter, CommandOutputParameterType};
 use crate::outputs::{
     ExpressionToolOutputParameter, OperationOutputParameter, StringOrWorkflowStepOutput,
     WorkflowOutputParameter,
 };
-use crate::requirements::{ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements};
+use crate::requirements::{
+    SubworkflowFeatureRequirement, ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements,
+};
 use crate::validate::{CWL_VERSION, validate_expression};
+use crate::{OneOrMany, Result};
 use bon::Builder;
 use cwl_salad::{
     Identifiable,
@@ -19,6 +21,7 @@ use cwl_salad::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::Path;
 use validator::Validate;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -582,6 +585,111 @@ impl Workflow {
     #[must_use]
     pub fn has_output(&self, id: &str) -> bool {
         self.outputs.iter().any(|s| s.id == Some(id.to_owned()))
+    }
+}
+
+impl Workflow {
+    pub fn add_workflow_step_empty_mut(
+        &mut self,
+        step_id: &str,
+        path_relative_to_workflow: &Path,
+    ) -> Result<()> {
+        if self.has_step(step_id) {
+            return Err(crate::Error::Guard("A step with this ID already exists"));
+        }
+
+        let run_path = path_relative_to_workflow.to_string_lossy().into_owned();
+
+        let workflow_step = WorkflowStep::builder()
+            .id(step_id.to_string())
+            .run(StringOrDocument::String(run_path))
+            .out(vec![])
+            .r#in(vec![])
+            .build();
+        self.steps.push(workflow_step);
+        if !self.has_requirement::<SubworkflowFeatureRequirement>() {
+            if let Some(requirements) = &mut self.requirements {
+                requirements.push(WorkflowRequirements::SubworkflowFeatureRequirement(
+                    SubworkflowFeatureRequirement {},
+                ));
+            } else {
+                self.requirements =
+                    Some(vec![WorkflowRequirements::SubworkflowFeatureRequirement(
+                        SubworkflowFeatureRequirement {},
+                    )]);
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn add_workflow_input_mut(
+        &mut self,
+        input_id: &str,
+        input_type: OneOrMany<InputType>,
+        default: Option<DefaultValue>,
+    ) {
+        let input = WorkflowInputParameter::builder()
+            .id(input_id)
+            .r#type(input_type)
+            .maybe_default(default)
+            .build();
+        self.inputs.push(input);
+    }
+
+    pub fn add_workflow_output_mut(
+        &mut self,
+        output_id: &str,
+        output_type: CommandOutputParameterType,
+        sources: OneOrMany<String>,
+    ) {
+        let output = WorkflowOutputParameter::builder()
+            .id(output_id)
+            .r#type(output_type)
+            .output_source(sources)
+            .build();
+        self.outputs.push(output);
+    }
+
+    pub fn add_workflow_step_input_mut(
+        &mut self,
+        step_id: &str,
+        input_id: &str,
+        sources: OneOrMany<String>,
+    ) {
+        self.steps
+            .iter_mut()
+            .find(|step| step.id == Some(step_id.to_owned()))
+            .unwrap()
+            .r#in
+            .push(
+                WorkflowStepInput::builder()
+                    .id(input_id.to_owned())
+                    .source(sources)
+                    .build(),
+            );
+    }
+
+    pub fn add_workflow_step_outputs_mut(
+        &mut self,
+        step_id: &str,
+        outputs: Vec<StringOrWorkflowStepOutput>,
+    ) {
+        self.steps
+            .iter_mut()
+            .find(|step| step.id == Some(step_id.to_owned()))
+            .unwrap()
+            .out = outputs
+    }
+
+    pub fn add_workflow_step_outputs_by_doc_mut(&mut self, step_id: &str, doc: &CWLDocument) {
+        let ids = doc
+            .get_output_ids()
+            .iter()
+            .map(|id| StringOrWorkflowStepOutput::String(id.clone()))
+            .collect::<Vec<_>>();
+
+        self.add_workflow_step_outputs_mut(step_id, ids);
     }
 }
 
