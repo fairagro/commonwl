@@ -589,6 +589,9 @@ impl Workflow {
 }
 
 impl Workflow {
+    /// Adds an empty step running the document at `path_relative_to_workflow`
+    /// # Errors
+    /// If a step with `step_id` already exists
     pub fn add_workflow_step_empty_mut(
         &mut self,
         step_id: &str,
@@ -625,6 +628,7 @@ impl Workflow {
         Ok(())
     }
 
+    /// Adds a new input to the workflow
     pub fn add_workflow_input_mut(
         &mut self,
         input_id: &str,
@@ -639,6 +643,7 @@ impl Workflow {
         self.inputs.push(input);
     }
 
+    /// Adds a new output to the workflow
     pub fn add_workflow_output_mut(
         &mut self,
         output_id: &str,
@@ -652,7 +657,10 @@ impl Workflow {
             .build();
         self.outputs.push(output);
     }
-
+    
+    /// Adds a new input to an existing step
+    /// # Errors
+    /// If no step with `step_id` exists
     pub fn add_workflow_step_input_mut(
         &mut self,
         step_id: &str,
@@ -671,7 +679,10 @@ impl Workflow {
         );
         Ok(())
     }
-
+    
+    /// Sets the outputs of an existing step
+    /// # Errors
+    /// If no step with `step_id` exists
     pub fn add_workflow_step_outputs_mut(
         &mut self,
         step_id: &str,
@@ -684,7 +695,10 @@ impl Workflow {
         step.out = outputs;
         Ok(())
     }
-
+    
+    /// Sets the outputs of an existing step from another document's output ids
+    /// # Errors
+    /// If no step with `step_id` exists
     pub fn add_workflow_step_outputs_by_doc_mut(
         &mut self,
         step_id: &str,
@@ -698,7 +712,10 @@ impl Workflow {
 
         self.add_workflow_step_outputs_mut(step_id, ids)
     }
-
+    
+    /// Removes an input from the workflow
+    /// # Errors
+    /// If no input with `input_id` exists
     pub fn remove_workflow_input_mut(&mut self, input_id: &str) -> Result<()> {
         guard!(
             let Some(index) = self.inputs.iter().position(|s| s.id == Some(input_id.to_string())),
@@ -707,7 +724,10 @@ impl Workflow {
         self.inputs.remove(index);
         Ok(())
     }
-
+    
+    /// Removes an input from an existing step
+    /// # Errors
+    /// If no step with `step_id` exists
     pub fn remove_workflow_step_input_mut(&mut self, step_id: &str, input_id: &str) -> Result<()> {
         guard!(
             let Some(step) = self.steps.iter_mut().find(|s| s.id == Some(step_id.to_owned())),
@@ -716,7 +736,7 @@ impl Workflow {
         step.r#in.retain(|v| v.id != Some(input_id.to_owned()));
         Ok(())
     }
-
+    
     pub fn remove_workflow_output_mut(&mut self, output_id: &str) -> Result<()> {
         guard!(
             let Some(index) = self.outputs.iter().position(|s| s.id == Some(output_id.to_string())),
