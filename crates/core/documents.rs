@@ -445,7 +445,9 @@ impl CommandLineTool {
     // grab docker image by name
     pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
         self.append_requirement_mut(ToolRequirements::DockerRequirement(
-            DockerRequirement::builder().docker_pull(pull.into()).build(),
+            DockerRequirement::builder()
+                .docker_pull(pull.into())
+                .build(),
         ));
     }
 
@@ -620,7 +622,9 @@ impl ExpressionTool {
     // grab docker image by name
     pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
         self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
-            DockerRequirement::builder().docker_pull(pull.into()).build(),
+            DockerRequirement::builder()
+                .docker_pull(pull.into())
+                .build(),
         ));
     }
 
@@ -761,7 +765,9 @@ impl Operation {
     // grab docker image by name
     pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
         self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
-            DockerRequirement::builder().docker_pull(pull.into()).build(),
+            DockerRequirement::builder()
+                .docker_pull(pull.into())
+                .build(),
         ));
     }
 
@@ -1107,7 +1113,9 @@ impl Workflow {
     // grab docker image by name
     pub fn use_docker_pull_mut(&mut self, pull: impl Into<String>) {
         self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
-            DockerRequirement::builder().docker_pull(pull.into()).build(),
+            DockerRequirement::builder()
+                .docker_pull(pull.into())
+                .build(),
         ));
     }
 

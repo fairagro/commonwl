@@ -16,6 +16,7 @@ use cwl_salad::deserialize::{
 use cwl_salad::make_shorthand_impl;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::Display;
 use validator::Validate;
 
 #[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
@@ -153,6 +154,25 @@ impl DefaultValue {
         match self {
             Self::FileOrDirectory(FileOrDirectory::File(f)) => Some(f),
             _ => None,
+        }
+    }
+}
+
+impl Display for DefaultValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // location preferred, path and basename as fallback - all three are optional
+            DefaultValue::FileOrDirectory(item) => f.write_str(
+                item.location()
+                    .or_else(|| item.path())
+                    .or_else(|| item.basename())
+                    .map_or("", String::as_str),
+            ),
+            // strings are printed as-is, everything else as json
+            DefaultValue::Any(Value::String(s)) => f.write_str(s),
+            DefaultValue::Any(value) => {
+                f.write_str(&serde_json::to_string(value).unwrap_or_default())
+            }
         }
     }
 }
@@ -880,7 +900,87 @@ make_shorthand_impl!(WorkflowStepInput, "id", "source");
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::files::Directory;
     use cwl_salad::deserialize::deserialize_map_list_id;
+
+    #[test]
+    fn test_display_file_prefers_location() {
+        let file = File::builder()
+            .location("file:///data/in.txt")
+            .path("/data/in.txt")
+            .basename("in.txt")
+            .build();
+        assert_eq!(DefaultValue::from(file).to_string(), "file:///data/in.txt");
+    }
+
+    #[test]
+    fn test_display_file_falls_back_to_path() {
+        let file = File::builder()
+            .path("/data/in.txt")
+            .basename("in.txt")
+            .build();
+        assert_eq!(DefaultValue::from(file).to_string(), "/data/in.txt");
+    }
+
+    #[test]
+    fn test_display_file_falls_back_to_basename() {
+        // literal file: only contents + basename, no location or path
+        let file = File::builder().contents("hello").basename("in.txt").build();
+        assert_eq!(DefaultValue::from(file).to_string(), "in.txt");
+    }
+
+    #[test]
+    fn test_display_file_without_any_name() {
+        assert_eq!(DefaultValue::from(File::default()).to_string(), "");
+    }
+
+    #[test]
+    fn test_display_directory() {
+        let dir = Directory::builder()
+            .location("file:///data")
+            .path("/data")
+            .build();
+        assert_eq!(DefaultValue::from(dir).to_string(), "file:///data");
+
+        let dir = Directory::builder().path("/data").build();
+        assert_eq!(DefaultValue::from(dir).to_string(), "/data");
+
+        let dir = Directory::builder().basename("data").build();
+        assert_eq!(DefaultValue::from(dir).to_string(), "data");
+
+        assert_eq!(DefaultValue::from(Directory::default()).to_string(), "");
+    }
+
+    #[test]
+    fn test_display_any_string_is_unquoted() {
+        assert_eq!(DefaultValue::from("hello world").to_string(), "hello world");
+    }
+
+    #[test]
+    fn test_display_any_scalars() {
+        assert_eq!(DefaultValue::Any(serde_json::json!(42)).to_string(), "42");
+        assert_eq!(DefaultValue::Any(serde_json::json!(1.5)).to_string(), "1.5");
+        assert_eq!(
+            DefaultValue::Any(serde_json::json!(true)).to_string(),
+            "true"
+        );
+        assert_eq!(
+            DefaultValue::Any(serde_json::Value::Null).to_string(),
+            "null"
+        );
+    }
+
+    #[test]
+    fn test_display_any_collections() {
+        assert_eq!(
+            DefaultValue::Any(serde_json::json!([1, "a"])).to_string(),
+            r#"[1,"a"]"#
+        );
+        assert_eq!(
+            DefaultValue::Any(serde_json::json!({"k": 1})).to_string(),
+            r#"{"k":1}"#
+        );
+    }
 
     #[test]
     #[allow(unused)]

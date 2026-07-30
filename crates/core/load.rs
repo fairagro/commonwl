@@ -121,7 +121,11 @@ fn resolve_imports(value: &mut Value, base_path: &Path, visited: &mut Vec<PathBu
                     serde_saphyr::from_str_with_options(&contents, saphyr_options())?;
 
                 visited.push(canonical);
-                resolve_imports(&mut imported_value, path.parent().unwrap_or(base_path), visited)?;
+                resolve_imports(
+                    &mut imported_value,
+                    path.parent().unwrap_or(base_path),
+                    visited,
+                )?;
                 visited.pop();
 
                 *value = imported_value;

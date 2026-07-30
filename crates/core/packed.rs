@@ -68,7 +68,6 @@ impl PackedCWL {
     }
 }
 
-
 fn unpack_workflow(
     wf: &mut Workflow,
     graph: &[CWLDocument],

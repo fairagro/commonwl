@@ -1,7 +1,7 @@
+use crate::Result;
 use cwl_salad::Mapping;
 use serde_json::Value;
 use std::{collections::HashMap, error::Error};
-use crate::Result;
 const HASH_BANG: &str = "#!/usr/bin/env cwl-runner\n\n";
 const HASH_BANG_PRE: &str = "#!/usr/bin/env ";
 const KEYS_WITH_NEWLINES: [&str; 7] = [
