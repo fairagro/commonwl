@@ -1,7 +1,7 @@
 use crate::Result;
 use cwl_salad::Mapping;
 use serde_json::Value;
-use std::{collections::HashMap, error::Error};
+use std::collections::HashMap;
 const HASH_BANG: &str = "#!/usr/bin/env cwl-runner\n\n";
 const HASH_BANG_PRE: &str = "#!/usr/bin/env ";
 const KEYS_WITH_NEWLINES: [&str; 7] = [
@@ -17,7 +17,7 @@ const KEYS_WITH_NEWLINES: [&str; 7] = [
 /// formats cwl document in an oppinionated way. Heavily inspired by <https://github.com/rabix/cwl-format>
 /// # Errors
 /// Returns an error if the input string is not a valid yaml document or if there is an issue during serialization.
-pub fn format_cwl(raw_cwl: &str) -> Result<String, Box<dyn Error>> {
+pub fn format_cwl(raw_cwl: &str) -> Result<String> {
     let cwl = &serde_saphyr::from_str(raw_cwl)?;
 
     let comment = add_leading_comment(raw_cwl);
