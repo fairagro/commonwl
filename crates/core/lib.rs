@@ -248,7 +248,7 @@ pub fn value_as_string(value: &serde_json::Value) -> Result<String> {
         serde_json::Value::String(s) => Ok(s.clone()),
         serde_json::Value::Number(n) => Ok(n.to_string()),
         serde_json::Value::Bool(b) => Ok(b.to_string()),
-        _ => Err(Error::Guard("Value is not a string, number, or bool")),
+        _ => Err(Error::Guard("Value is not a string, number, or bool".to_string())),
     }
 }
 

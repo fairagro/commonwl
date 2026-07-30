@@ -13,7 +13,7 @@ use crate::requirements::{
     SubworkflowFeatureRequirement, ToolHints, ToolRequirements, WorkflowHints, WorkflowRequirements,
 };
 use crate::validate::{CWL_VERSION, validate_expression};
-use crate::{OneOrMany, Result};
+use crate::{OneOrMany, Result, guard};
 use bon::Builder;
 use cwl_salad::{
     Identifiable,
@@ -595,7 +595,9 @@ impl Workflow {
         path_relative_to_workflow: &Path,
     ) -> Result<()> {
         if self.has_step(step_id) {
-            return Err(crate::Error::Guard("A step with this ID already exists"));
+            return Err(crate::Error::Guard(
+                "A step with this ID already exists".to_string(),
+            ));
         }
 
         let run_path = path_relative_to_workflow.to_string_lossy().into_owned();
@@ -656,40 +658,82 @@ impl Workflow {
         step_id: &str,
         input_id: &str,
         sources: OneOrMany<String>,
-    ) {
-        self.steps
-            .iter_mut()
-            .find(|step| step.id == Some(step_id.to_owned()))
-            .unwrap()
-            .r#in
-            .push(
-                WorkflowStepInput::builder()
-                    .id(input_id.to_owned())
-                    .source(sources)
-                    .build(),
-            );
+    ) -> Result<()> {
+        guard!(
+            let Some(step) = self.steps.iter_mut().find(|step| step.id == Some(step_id.to_owned())),
+            "Failed to find step {step_id} in workflow!"
+        );
+        step.r#in.push(
+            WorkflowStepInput::builder()
+                .id(input_id.to_owned())
+                .source(sources)
+                .build(),
+        );
+        Ok(())
     }
 
     pub fn add_workflow_step_outputs_mut(
         &mut self,
         step_id: &str,
         outputs: Vec<StringOrWorkflowStepOutput>,
-    ) {
-        self.steps
-            .iter_mut()
-            .find(|step| step.id == Some(step_id.to_owned()))
-            .unwrap()
-            .out = outputs
+    ) -> Result<()> {
+        guard!(
+            let Some(step) = self.steps.iter_mut().find(|step| step.id == Some(step_id.to_owned())),
+            "Failed to find step {step_id} in workflow!"
+        );
+        step.out = outputs;
+        Ok(())
     }
 
-    pub fn add_workflow_step_outputs_by_doc_mut(&mut self, step_id: &str, doc: &CWLDocument) {
+    pub fn add_workflow_step_outputs_by_doc_mut(
+        &mut self,
+        step_id: &str,
+        doc: &CWLDocument,
+    ) -> Result<()> {
         let ids = doc
             .get_output_ids()
             .iter()
             .map(|id| StringOrWorkflowStepOutput::String(id.clone()))
             .collect::<Vec<_>>();
 
-        self.add_workflow_step_outputs_mut(step_id, ids);
+        self.add_workflow_step_outputs_mut(step_id, ids)
+    }
+
+    pub fn remove_workflow_input_mut(&mut self, input_id: &str) -> Result<()> {
+        guard!(
+            let Some(index) = self.inputs.iter().position(|s| s.id == Some(input_id.to_string())),
+            "Failed to find input {input_id} in workflow!"
+        );
+        self.inputs.remove(index);
+        Ok(())
+    }
+
+    pub fn remove_workflow_step_input_mut(&mut self, step_id: &str, input_id: &str) -> Result<()> {
+        guard!(
+            let Some(step) = self.steps.iter_mut().find(|s| s.id == Some(step_id.to_owned())),
+            "Failed to find step {step_id} in workflow!"
+        );
+        step.r#in.retain(|v| v.id != Some(input_id.to_owned()));
+        Ok(())
+    }
+
+    pub fn remove_workflow_output_mut(&mut self, output_id: &str) -> Result<()> {
+        guard!(
+            let Some(index) = self.outputs.iter().position(|s| s.id == Some(output_id.to_string())),
+            "Failed to find output {output_id} in workflow!"
+        );
+        self.outputs.remove(index);
+        Ok(())
+    }
+
+    pub fn remove_workflow_output_source_mut(&mut self, output_id: &str) -> Result<()> {
+        guard!(
+            let Some(output) = self.outputs.iter_mut().find(|s| s.id == Some(output_id.to_string())),
+            "Failed to find output {output_id} in workflow!"
+        );
+
+        output.output_source = None;
+        Ok(())
     }
 }
 
@@ -762,6 +806,7 @@ pub enum ScatterMethod {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::CWLType;
     use std::{env, fs, path::Path};
 
     #[test]
@@ -845,5 +890,192 @@ mod tests {
             .id("example_tool".to_string())
             .build();
         assert_eq!(tool.id.unwrap(), "example_tool");
+    }
+
+    #[test]
+    fn test_add_workflow_step_empty_mut_adds_step() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+
+        assert!(wf.has_step("step1"));
+        let step = wf.get_step("step1").unwrap();
+        assert_eq!(step.run, StringOrDocument::String("tool.cwl".to_string()));
+        assert!(step.out.is_empty());
+        assert!(step.r#in.is_empty());
+        assert!(wf.has_requirement::<SubworkflowFeatureRequirement>());
+    }
+
+    #[test]
+    fn test_add_workflow_step_empty_mut_duplicate_id_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+
+        let result = wf.add_workflow_step_empty_mut("step1", Path::new("other.cwl"));
+
+        assert!(result.is_err());
+        assert_eq!(wf.steps.len(), 1);
+    }
+
+    #[test]
+    fn test_add_workflow_step_empty_mut_does_not_duplicate_requirement() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("a.cwl"))
+            .unwrap();
+        wf.add_workflow_step_empty_mut("step2", Path::new("b.cwl"))
+            .unwrap();
+
+        let count = wf
+            .requirements
+            .as_ref()
+            .unwrap()
+            .iter()
+            .filter(|r| matches!(r, WorkflowRequirements::SubworkflowFeatureRequirement(_)))
+            .count();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn test_add_workflow_input_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_input_mut(
+            "in1",
+            OneOrMany::One(InputType::CWLType(CWLType::String)),
+            None,
+        );
+
+        assert!(wf.has_input("in1"));
+        assert_eq!(wf.inputs.len(), 1);
+    }
+
+    #[test]
+    fn test_add_workflow_output_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_output_mut(
+            "out1",
+            CWLType::String.into(),
+            OneOrMany::One("step1/out1".to_string()),
+        );
+
+        assert!(wf.has_output("out1"));
+        assert_eq!(wf.outputs.len(), 1);
+    }
+
+    #[test]
+    fn test_add_workflow_step_input_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("wf_in".to_string()))
+            .unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert_eq!(step.r#in.len(), 1);
+        assert_eq!(step.r#in[0].id, Some("in1".to_string()));
+    }
+
+    #[test]
+    fn test_add_workflow_step_input_mut_missing_step_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        let result =
+            wf.add_workflow_step_input_mut("missing", "in1", OneOrMany::One("wf_in".to_string()));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_workflow_step_outputs_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+        wf.add_workflow_step_outputs_mut(
+            "step1",
+            vec![StringOrWorkflowStepOutput::String("out1".to_string())],
+        )
+        .unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert_eq!(step.out.len(), 1);
+        assert_eq!(step.out[0].id(), "out1");
+    }
+
+    #[test]
+    fn test_add_workflow_step_outputs_mut_missing_step_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        let result = wf.add_workflow_step_outputs_mut("missing", vec![]);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_workflow_step_outputs_by_doc_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+
+        let tool = CommandLineTool::builder()
+            .outputs(vec![
+                CommandOutputParameter::builder()
+                    .id("out1")
+                    .r#type(CWLType::String)
+                    .build(),
+            ])
+            .build();
+        let doc = CWLDocument::CommandLineTool(tool);
+
+        wf.add_workflow_step_outputs_by_doc_mut("step1", &doc)
+            .unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert_eq!(step.out.len(), 1);
+        assert_eq!(step.out[0].id(), "out1");
+    }
+
+    #[test]
+    fn test_remove_workflow_input_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_input_mut(
+            "in1",
+            OneOrMany::One(InputType::CWLType(CWLType::String)),
+            None,
+        );
+
+        wf.remove_workflow_input_mut("in1").unwrap();
+
+        assert!(!wf.has_input("in1"));
+        assert!(wf.inputs.is_empty());
+    }
+
+    #[test]
+    fn test_remove_workflow_input_mut_missing_id_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+
+        let result = wf.remove_workflow_input_mut("missing");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_workflow_step_input_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("wf_in".to_string()))
+            .unwrap();
+
+        wf.remove_workflow_step_input_mut("step1", "in1").unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert!(step.r#in.is_empty());
+    }
+
+    #[test]
+    fn test_remove_workflow_step_input_mut_missing_step_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+
+        let result = wf.remove_workflow_step_input_mut("missing", "in1");
+
+        assert!(result.is_err());
     }
 }

@@ -18,7 +18,7 @@ pub enum Error {
 
     #[error("{0}")]
     #[diagnostic(code(commonwl::Error::Guard))]
-    Guard(&'static str),
+    Guard(String),
 
     #[error("URL Parsing Error")]
     #[diagnostic(code(commonwl::Error::Guard))]
@@ -37,9 +37,9 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 #[macro_export]
 macro_rules! guard {
-    (let $pat:pat = $expr:expr, $err:expr) => {
+    (let $pat:pat = $expr:expr, $($err:tt)*) => {
         let $pat = $expr else {
-            return Err($crate::Error::Guard($err).into());
+            return Err($crate::Error::Guard(format!($($err)*)).into());
         };
     };
 }
