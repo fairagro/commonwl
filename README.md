@@ -1,24 +1,37 @@
 # `CommonWL`
-[![🦆 Continuous Integration](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml/badge.svg)](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml) ![Crates.io License](https://img.shields.io/crates/l/commonwl) 
+[![🦆 Continuous Integration](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml/badge.svg)](https://github.com/fairagro/commonwl/actions/workflows/ci.yaml) ![Crates.io License](https://img.shields.io/crates/l/commonwl)
 ![Crates.io Version](https://img.shields.io/crates/v/commonwl) ![Crates.io MSRV](https://img.shields.io/crates/msrv/commonwl) ![Crates.io Total Downloads](https://img.shields.io/crates/d/commonwl)
 
 
 A Rust-framework for the Common Workflow Language (CWL) that supports parsing and execution.
 
 ## Overview
-`commonwl` is a Rust-based library crate supporting parsing and executing CWL Workflows and Tools. It is based on the headless task execution framework [crankshaft](https://github.com/stjude-rust-labs/crankshaft). It is developed to being used in the Scientific Workflow Infrastructure ([SciWIn](https://github.com/fairagro/sciwin)).
-There is a `conformance` CLI which is being used to evaluate CWL Conformance.
+`commonwl` is a Rust-based library crate for parsing and executing CWL documents (`CommandLineTool`, `Workflow`, `ExpressionTool`, `Operation`). It is based on the headless task execution framework [crankshaft](https://github.com/stjude-rust-labs/crankshaft). It is developed for use in the Scientific Workflow Infrastructure ([SciWIn](https://github.com/fairagro/sciwin)).
+
+Besides the library, this repo also ships:
+- `conformance` — CLI used to evaluate CWL conformance against the official test suite.
+- `cwl-lsp` — a language server providing diagnostics, symbols and formatting for CWL documents in editors. (🏗️ Under construction)
 
 ## Getting Started
 ### Installation
 To use `commonwl`, you need to install and setup a Rust environment.
-Once Rust is installed, you can add the latest version of `commonwl` be using the following command
+Once Rust is installed, you can add the latest version of `commonwl` using the following command
 ```bash
-cargo add commonwl 
+cargo add commonwl
 ```
-To use the execution engine, the `engine` feature needs to be enabled!
+Parsing-only usage requires no extra features. To use the execution engine, enable the `engine` feature (add `tes` as well for the GA4GH Task Execution Service (TES) backend):
 ```toml
-commonwl = { version = "0.8", features = ["engine"] }
+# enable execution engine feature
+commonwl = { version = "0.9", features = ["engine"] } 
+# enable the TES executor
+commonwl = { version = "0.9", features = ["engine", "tes"] }
+```
+
+### Usage
+```rust,no_run
+use commonwl::load_cwl_file;
+
+let doc = load_cwl_file("workflow.cwl", true)?;
 ```
 
 ## CWL Engine
@@ -56,9 +69,9 @@ BACKEND=tes cwltest --test testdata/cwl/conformance_tests.yaml --tool target/rel
 Funnel has an upstream crash under concurrent load; `.dev/tes_env.sh watchdog` (run alongside a test run) restarts it automatically if that happens.
 
 ## License
-This work is dual-licensed under Apache 2.0 and MIT . You can choose between one of them if you use this work. 
+This work is dual-licensed under MIT and Apache 2.0. You can choose either one to use this work.
 
-SPDX-License-Identifier: `Apache-2.0 OR MIT`
+SPDX-License-Identifier: `MIT OR Apache-2.0`
 
 **Funded by**
 
