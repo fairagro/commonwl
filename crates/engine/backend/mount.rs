@@ -19,7 +19,7 @@ use url::Url;
 /// Marker object name uploaded under an otherwise-empty S3 "directory" prefix so a TES
 /// server has at least one object to materialize into a real directory. Stripped back out
 /// wherever a downloaded remote directory's listing gets generated (see `output.rs`).
-pub(crate) const S3_EMPTY_DIR_MARKER: &str = ".cwl_empty_dir";
+pub(crate) const EMPTY_DIR_MARKER: &str = ".cwl_empty_dir";
 
 pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
     let ty = match input {
@@ -90,7 +90,8 @@ pub(crate) async fn mount_workdir_item(
             mount_workdir_item_local(mount, outdir, use_container, backend).await
         }
         MountStrategy::Remote { base_url } => {
-            mount_workdir_item_remote(mount, outdir, workdir, use_container, backend, &base_url).await
+            mount_workdir_item_remote(mount, outdir, workdir, use_container, backend, &base_url)
+                .await
         }
     }
 }
@@ -262,7 +263,7 @@ async fn mount_workdir_item_remote(
             if dest.scheme() == "s3" {
                 //upload placeholder object
                 backend
-                    .upload_bytes(&[], &dest.join(S3_EMPTY_DIR_MARKER)?)
+                    .upload_bytes(&[], &dest.join(EMPTY_DIR_MARKER)?)
                     .await?;
             } else {
                 let tmp = tempfile::tempdir()?;

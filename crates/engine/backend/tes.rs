@@ -132,7 +132,7 @@ impl TaskBackend for TesBackend {
                         "-empty".to_string(),
                         "-exec".to_string(),
                         "touch".to_string(),
-                        format!("{{}}/{}", crate::backend::mount::S3_EMPTY_DIR_MARKER),
+                        format!("{{}}/{}", crate::backend::mount::EMPTY_DIR_MARKER),
                         ";".to_string(),
                     ])
                     .image(DEFAULT_DOCKER_CONTAINER)
@@ -163,6 +163,8 @@ impl TaskBackend for TesBackend {
         for mount in request.mounts.iter().cloned() {
             let outdir = request.outdir.to_owned();
             let workdir = request.execution_path.to_owned();
+            // represents if there is a docker requirement
+            // a container in tes is always used but cwl e.g. only allows absolute path in iwdr when docker requirement is specified
             let use_container = request.use_container;
             let storage = self.storage();
             let permit = sem.clone().acquire_owned().await?;
@@ -249,6 +251,16 @@ impl TaskBackend for TesBackend {
             request.eval_context,
         )
         .await?;
+
+        // evaluate side task exit status
+        if let Some(cleanup_status) = exit_status.get(1)
+            && !cleanup_status.success()
+        {
+            tracing::warn!(
+                "empty-directory marker cleanup step exited with {cleanup_status}; \
+                 empty output directories may be missing from results"
+            );
+        }
 
         Ok(TaskExecutionResult {
             exit_status,

@@ -136,7 +136,7 @@ fn list_remote_listing<'a>(
     async move {
         let mut entries = vec![];
         for child in storage.glob(dir_url, "*").await? {
-            if child.file_name().as_deref() == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER) {
+            if child.file_name().as_deref() == Some(crate::backend::mount::EMPTY_DIR_MARKER) {
                 continue;
             }
             if child.is_dir() {
@@ -216,7 +216,7 @@ async fn evaluate_command_binding(
             let glob_ = relativize_glob_pattern(glob_, context.source_dir);
             for item in storage.glob(&context.source_dir.as_url()?, &glob_).await? {
                 // never surface S3-empty-directory placeholder as it were real tool output - it can end up glob-matched here directly
-                if item.file_name().as_deref() == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER) {
+                if item.file_name().as_deref() == Some(crate::backend::mount::EMPTY_DIR_MARKER) {
                     continue;
                 }
                 let fod = if item.is_dir() {
@@ -558,7 +558,7 @@ fn filter_empty_dir_markers(dir: &mut Directory) {
     if let Some(listing) = &mut dir.listing {
         listing.retain(|item| {
             item.basename()
-                .is_none_or(|b| b != crate::backend::mount::S3_EMPTY_DIR_MARKER)
+                .is_none_or(|b| b != crate::backend::mount::EMPTY_DIR_MARKER)
         });
         for item in listing {
             if let FileOrDirectory::Directory(d) = item {

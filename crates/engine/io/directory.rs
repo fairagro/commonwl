@@ -133,7 +133,7 @@ fn read_dir<'a>(
             let path_buf = entry.path();
 
             if path_buf.file_name().and_then(|n| n.to_str())
-                == Some(crate::backend::mount::S3_EMPTY_DIR_MARKER)
+                == Some(crate::backend::mount::EMPTY_DIR_MARKER)
             {
                 continue;
             }
