@@ -48,44 +48,15 @@ jobs:
           path: target/release
       - run: chmod +x target/release/conformance
 
-      - name: Start rustfs
+      - name: Start TES dev environment (rustfs + funnel)
+        if: matrix.variant == 'tes'
+        run: .dev/tes_env.sh start
+
+      - name: Start Funnel watchdog
         if: matrix.variant == 'tes'
         run: |
-          mkdir logs data
-          sudo chown 10001:10001 logs data
-          docker run -d -p 9000:9000 -p 9001:9001 \
-            -e RUSTFS_ALLOW_INSECURE_DEFAULT_CREDENTIALS=true \
-            -v $(pwd)/data:/data \
-            -v $(pwd)/logs:/logs \
-            rustfs/rustfs:latest
-          sleep 10
-          curl -sf http://localhost:9000/health
-
-      - name: Create S3 bucket
-        if: matrix.variant == 'tes'
-        env:
-          AWS_ACCESS_KEY_ID: rustfsadmin
-          AWS_SECRET_ACCESS_KEY: rustfsadmin
-        run: |
-          aws s3 mb s3://commonwl-bucket \
-            --endpoint-url http://localhost:9000 \
-            --region us-east-1
-
-      - name: Start Funnel
-        if: matrix.variant == 'tes'
-        run: |
-          FUNNEL_VERSION=$(curl -s https://api.github.com/repos/calypr/funnel/releases/latest \
-            | jq -r '.tag_name')
-          curl -sL "https://github.com/calypr/funnel/releases/download/${FUNNEL_VERSION}/funnel-linux-amd64-${FUNNEL_VERSION}.tar.gz" \
-            | tar -xz
-          chmod +x funnel
-          ./funnel server run --config ./.github/funnel-config.yaml &
-          FUNNEL_PID=$!
-          echo "FUNNEL_PID=$FUNNEL_PID" >> $GITHUB_ENV
-
-          until curl -sf http://localhost:8000/v1/tasks; do
-            sleep 1
-          done
+          nohup .dev/tes_env.sh watchdog > funnel-watchdog.log 2>&1 &
+          echo "WATCHDOG_PID=$!" >> "$GITHUB_ENV"
 
       - name: Run Conformance Tests
         continue-on-error: true
@@ -101,7 +72,7 @@ jobs:
           pip install cwltest
           mkdir badges
           cwltest --test testdata/cwl/conformance_tests.yaml \
-            -j 4 \
+            -j 3 \
             --tool target/release/conformance \
             --badgedir badges/$BACKEND
           exit 0
@@ -110,11 +81,8 @@ jobs:
         if: always() && matrix.variant == 'tes'
         run: |
           curl -s "http://localhost:8000/v1/tasks?view=FULL" | jq '.tasks[] | {id, state, logs}'
-          [ -n "$FUNNEL_PID" ] && kill "$FUNNEL_PID" || true
-
-      - name: Stop rustfs
-        if: always() && matrix.variant == 'tes'
-        run: docker rm -f rustfs || true
+          [ -n "$WATCHDOG_PID" ] && kill "$WATCHDOG_PID" 2>/dev/null || true
+          .dev/tes_env.sh stop
 
       - name: Generate Summary
         env:

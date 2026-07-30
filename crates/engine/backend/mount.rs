@@ -16,6 +16,11 @@ use cwl_engine_storage::{Storage, StorageBackend};
 use std::{fs, path::PathBuf, sync::Arc};
 use url::Url;
 
+/// Marker object name uploaded under an otherwise-empty S3 "directory" prefix so a TES
+/// server has at least one object to materialize into a real directory. Stripped back out
+/// wherever a downloaded remote directory's listing gets generated (see `output.rs`).
+pub(crate) const EMPTY_DIR_MARKER: &str = ".cwl_empty_dir";
+
 pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
     let ty = match input {
         FileOrDirectory::File(_) => input::Type::File,
@@ -85,7 +90,8 @@ pub(crate) async fn mount_workdir_item(
             mount_workdir_item_local(mount, outdir, use_container, backend).await
         }
         MountStrategy::Remote { base_url } => {
-            mount_workdir_item_remote(mount, outdir, workdir, backend, &base_url).await
+            mount_workdir_item_remote(mount, outdir, workdir, use_container, backend, &base_url)
+                .await
         }
     }
 }
@@ -165,6 +171,7 @@ async fn mount_workdir_item_remote(
     mount: WorkDirMount,
     outdir: &Url,
     workdir: &str,
+    use_container: bool,
     backend: Arc<StorageBackend>,
     base_url: &Url,
 ) -> anyhow::Result<Vec<Input>> {
@@ -172,11 +179,30 @@ async fn mount_workdir_item_remote(
     //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
     let target = mount.target.as_str();
 
-    let rel = target.strip_prefix(outdir.as_str()).unwrap_or(target);
+    // Push an empty path segment so that future joins of the work directory URL
+    // treat it as a directory
+    let mut base_url = base_url.clone();
+    if !base_url.as_str().ends_with('/') {
+        base_url
+            .path_segments_mut()
+            .map_err(|()| anyhow::anyhow!("base_url cannot be a base"))?
+            .push("");
+    }
+    let base_url = &base_url;
+
+    let rel = target
+        .strip_prefix(outdir.as_str())
+        .unwrap_or(target)
+        .trim_start_matches('/');
     let guest_path = if target.starts_with(outdir.as_str()) {
         format!("{workdir}/{rel}")
+    } else if use_container {
+        // out-of-convention absolute entryname: mount at just its path, not the full staging URL
+        mount.target.path().to_string()
     } else {
-        target.to_string()
+        anyhow::bail!(
+            "Workdir item target {target} is outside of working directory and container is not used, can not stage"
+        );
     };
 
     match (mount.ty, mount.source) {
@@ -232,7 +258,26 @@ async fn mount_workdir_item_remote(
                     .build(),
             );
         }
-        (MountType::Directory, Source::Contents(_)) => {}
+        (MountType::Directory, Source::Contents(_)) => {
+            let dest = base_url.join(&format!("{rel}/"))?;
+            if dest.scheme() == "s3" {
+                //upload placeholder object
+                backend
+                    .upload_bytes(&[], &dest.join(EMPTY_DIR_MARKER)?)
+                    .await?;
+            } else {
+                let tmp = tempfile::tempdir()?;
+                backend.upload(tmp.path(), &dest).await?;
+            }
+            inputs.push(
+                Input::builder()
+                    .path(&guest_path)
+                    .contents(Contents::Url(dest))
+                    .ty(input::Type::Directory)
+                    .read_only(mount.readonly)
+                    .build(),
+            );
+        }
     }
 
     Ok(inputs)

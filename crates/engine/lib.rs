@@ -2,6 +2,7 @@
 use cwl_core::documents::CWLDocument;
 use semver::Version;
 use std::path::PathBuf;
+use url::Url;
 
 pub(crate) mod backend;
 pub(crate) mod command;
@@ -49,8 +50,6 @@ pub use request::{
     create_execution_request_from_document, create_execution_request_with_inputs,
     load_input_file_from_file,
 };
-
-use url::Url;
 
 pub(crate) fn string_url_to_file_path(url: &str) -> anyhow::Result<PathBuf> {
     let url = Url::parse(url)?;

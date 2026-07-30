@@ -69,6 +69,10 @@ impl Storage for WebStorage {
         Ok(status.is_success())
     }
 
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool> {
+        Ok(uri.path().ends_with('/'))
+    }
+
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
         anyhow::bail!("WebStorage does not support delete ({uri})")
     }

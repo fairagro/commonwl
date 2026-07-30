@@ -19,6 +19,7 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()>;
     async fn download(&self, src: &Url, local: &Path) -> anyhow::Result<()>;
     async fn exists(&self, uri: &Url) -> anyhow::Result<bool>;
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool>;
     async fn delete(&self, uri: &Url) -> anyhow::Result<()>;
     async fn read_file(&self, uri: &Url) -> anyhow::Result<String>;
     async fn glob(
@@ -86,6 +87,14 @@ impl Storage for StorageBackend {
             .await
     }
 
+    async fn is_dir(&self, uri: &Url) -> anyhow::Result<bool> {
+        self.inner
+            .get(uri.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .is_dir(uri)
+            .await
+    }
+
     async fn delete(&self, uri: &Url) -> anyhow::Result<()> {
         self.inner
             .get(uri.scheme())
@@ -149,7 +158,10 @@ impl StoragePath {
             Self::Local(path_buf) => path_buf
                 .file_name()
                 .map(|o| o.to_string_lossy().to_string()),
-            Self::Remote(url) => url.path_segments()?.next_back().map(ToString::to_string),
+            Self::Remote(url) => url
+                .path_segments()?
+                .rfind(|s| !s.is_empty())
+                .map(ToString::to_string),
         }
     }
 
@@ -207,7 +219,10 @@ impl StoragePath {
     pub fn join(&self, segment: &str) -> anyhow::Result<Self> {
         match self {
             Self::Local(path) => Ok(Self::Local(path.join(segment))),
-            Self::Remote(url) => {
+            // a leading '/' is left on the old Url::join path since some callers rely on its
+            // "absolute segment replaces the whole path" behavior deliberately (see mount.rs's
+            // out-of-convention absolute entryname handling)
+            Self::Remote(url) if segment.starts_with('/') => {
                 let base = if url.path().ends_with('/') {
                     url.clone()
                 } else {
@@ -217,6 +232,31 @@ impl StoragePath {
                 };
 
                 Ok(Self::Remote(base.join(segment)?))
+            }
+            Self::Remote(url) => {
+                // append as literal path segments rather than Url::join: a segment containing ':'
+                // (e.g. `stdout: re:sult`) would otherwise parse as its own absolute URL
+                // (scheme:opaque), and Url::join would discard base entirely
+                let mut base = url.clone();
+                {
+                    let mut segments = base
+                        .path_segments_mut()
+                        .map_err(|()| anyhow::anyhow!("base_url cannot be a base"))?;
+                    for part in segment.split('/') {
+                        match part {
+                            //handle . and .. in paths
+                            "." => {}
+                            ".." => {
+                                segments.pop();
+                            }
+                            part => {
+                                segments.push(part);
+                            }
+                        }
+                    }
+                }
+
+                Ok(Self::Remote(base))
             }
         }
     }
@@ -264,5 +304,50 @@ impl Drop for RemoteTempDir {
                 tracing::warn!("Failed to clean up temp dir {path}: {e}");
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn remote(s: &str) -> StoragePath {
+        StoragePath::Remote(Url::parse(s).unwrap())
+    }
+
+    #[test]
+    fn join_appends_per_task_segment_without_trailing_slash_on_base() {
+        let base = remote("s3://bucket/prefix/ab12cd34");
+        let joined = base.join("inputs/x").unwrap();
+        assert_eq!(
+            joined.as_url().unwrap().as_str(),
+            "s3://bucket/prefix/ab12cd34/inputs/x"
+        );
+    }
+
+    #[test]
+    fn join_preserves_trailing_slash_for_directory_segments() {
+        let base = remote("s3://bucket/prefix/ab12cd34");
+        let joined = base.join("out/").unwrap();
+        assert!(joined.as_url().unwrap().as_str().ends_with('/'));
+    }
+
+    #[test]
+    fn join_does_not_misinterpret_colon_segment_as_scheme() {
+        let base = remote("s3://bucket/prefix");
+        let joined = base.join("re:sult").unwrap();
+        let url = joined.as_url().unwrap();
+        assert_eq!(url.scheme(), "s3");
+        assert_eq!(url.as_str(), "s3://bucket/prefix/re:sult");
+    }
+
+    #[test]
+    fn join_resolves_parent_segment() {
+        let base = remote("s3://bucket/dir/sub");
+        let joined = base.join("../other.txt").unwrap();
+        assert_eq!(
+            joined.as_url().unwrap().as_str(),
+            "s3://bucket/dir/other.txt"
+        );
     }
 }

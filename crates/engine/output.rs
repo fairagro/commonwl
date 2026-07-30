@@ -1,7 +1,7 @@
 use crate::{
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     io::{
-        file::{PathOrFile, handle_secondary_file_schema},
+        file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
         unique_path,
     },
     schema::{format_validation::FormatValidator, validation::validate_type},
@@ -23,7 +23,6 @@ use cwl_core::{
     types::{CWLType, SecondaryFileSchema},
 };
 use cwl_engine_storage::{Storage, StorageBackend, StoragePath};
-use dircpy::copy_dir;
 use futures_util::{FutureExt, future::BoxFuture};
 use std::{
     collections::HashMap,
@@ -59,7 +58,9 @@ pub(crate) async fn collect_command_outputs(
             match value {
                 DefaultValue::FileOrDirectory(FileOrDirectory::File(f)) => {
                     let path = f.path.clone().or(f.location.clone()).ok_or_else(|| {
-                        anyhow::anyhow!("cwl.output.json file entry has neither 'path' nor 'location'")
+                        anyhow::anyhow!(
+                            "cwl.output.json file entry has neither 'path' nor 'location'"
+                        )
                     })?;
                     let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
@@ -68,7 +69,9 @@ pub(crate) async fn collect_command_outputs(
                 }
                 DefaultValue::FileOrDirectory(FileOrDirectory::Directory(d)) => {
                     let path = d.path.clone().or(d.location.clone()).ok_or_else(|| {
-                        anyhow::anyhow!("cwl.output.json directory entry has neither 'path' nor 'location'")
+                        anyhow::anyhow!(
+                            "cwl.output.json directory entry has neither 'path' nor 'location'"
+                        )
                     })?;
                     let path = string_url_to_path_string(&path).unwrap_or(path);
                     let path = correct_output_path(Path::new(&path), context);
@@ -92,6 +95,86 @@ pub(crate) async fn collect_command_outputs(
     Ok(output_map)
 }
 
+/// Resolves a `File`/`Directory`'s raw `path`/`location` value into an absolute `Url`.
+fn resolve_output_source_location(
+    source_location: &str,
+    context: &OutputCollectionContext,
+) -> anyhow::Result<Url> {
+    if let Ok(url) = Url::parse(source_location) {
+        return Ok(url);
+    }
+    if let StoragePath::Remote(_) = context.source_dir {
+        let base_path = context.source_dir.path();
+        if let Some(stripped) = source_location.strip_prefix(&base_path) {
+            return context
+                .source_dir
+                .join(stripped.trim_start_matches('/'))?
+                .as_url();
+        }
+    }
+    Url::from_file_path(source_location)
+        .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))
+}
+
+/// A glob built from `$(runtime.outdir)` carries a bare remote path prefix; remote `Storage::glob` only matches relative patterns, so strip it back off.
+fn relativize_glob_pattern(glob: String, source_dir: &StoragePath) -> String {
+    if let StoragePath::Remote(_) = source_dir {
+        let base_path = source_dir.path();
+        if let Some(stripped) = glob.strip_prefix(&base_path) {
+            return stripped.trim_start_matches('/').to_string();
+        }
+    }
+    glob
+}
+
+/// Builds a directory listing from remote storage without downloading file contents
+fn list_remote_listing<'a>(
+    dir_url: &'a Url,
+    recursive: bool,
+    storage: &'a StorageBackend,
+) -> BoxFuture<'a, anyhow::Result<Vec<FileOrDirectory>>> {
+    async move {
+        let mut entries = vec![];
+        for child in storage.glob(dir_url, "*").await? {
+            if child.file_name().as_deref() == Some(crate::backend::mount::EMPTY_DIR_MARKER) {
+                continue;
+            }
+            if child.is_dir() {
+                let child_url = child.as_url()?;
+                let mut dir = Directory::builder()
+                    .path(child.path())
+                    .location(child_url.clone())
+                    .maybe_basename(child.file_name())
+                    .build();
+                if recursive {
+                    dir.listing = Some(list_remote_listing(&child_url, true, storage).await?);
+                }
+                entries.push(FileOrDirectory::Directory(dir));
+            } else {
+                let mut file = File::builder()
+                    .maybe_basename(child.file_name())
+                    .location(child.as_url()?)
+                    .path(child.path())
+                    .build();
+                let FilePathMetaData {
+                    basename,
+                    nameroot,
+                    nameext,
+                    dirname,
+                } = get_path_metadata(Path::new(&child.path()));
+                file.basename = basename;
+                file.nameext = nameext;
+                file.nameroot = nameroot;
+                file.dirname = dirname;
+                entries.push(FileOrDirectory::File(file));
+            }
+        }
+        entries.sort_by_key(|e| e.basename().cloned());
+        Ok(entries)
+    }
+    .boxed()
+}
+
 fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> StoragePath {
     match &context.source_dir {
         StoragePath::Local(base) => {
@@ -106,11 +189,14 @@ fn correct_output_path(path: &Path, context: &OutputCollectionContext) -> Storag
                 StoragePath::Local(base.join(path))
             }
         }
-        StoragePath::Remote(base_url) => {
+        StoragePath::Remote(_) => {
             // path here came from cwl.output.json which uses container paths
             // strip container workdir prefix and rebase onto S3
             let stripped = path.strip_prefix(context.workdir).unwrap_or(path);
-            StoragePath::from_url(base_url.join(&stripped.to_string_lossy()).unwrap())
+            context
+                .source_dir
+                .join(&stripped.to_string_lossy())
+                .unwrap()
         }
     }
 }
@@ -127,7 +213,12 @@ async fn evaluate_command_binding(
     //collect items via globs
     if let Some(globs) = &binding.glob {
         for glob_ in get_globs(globs, context.eval_context) {
+            let glob_ = relativize_glob_pattern(glob_, context.source_dir);
             for item in storage.glob(&context.source_dir.as_url()?, &glob_).await? {
+                // never surface S3-empty-directory placeholder as it were real tool output - it can end up glob-matched here directly
+                if item.file_name().as_deref() == Some(crate::backend::mount::EMPTY_DIR_MARKER) {
+                    continue;
+                }
                 let fod = if item.is_dir() {
                     let basename = item.file_name();
                     let mut dir = Directory::builder()
@@ -135,11 +226,27 @@ async fn evaluate_command_binding(
                         .location(item.as_url()?)
                         .maybe_basename(basename)
                         .build();
-                    //handle load_listing
-                    if let Some(load_listing) = binding.load_listing {
-                        dir.load_listing(load_listing)?;
+                    if item.is_local() {
+                        // listing needs a real local path to walk
+                        if let Some(load_listing) = binding.load_listing {
+                            dir.load_listing(load_listing)?;
+                        } else {
+                            dir.load_listing(LoadListingEnum::DeepListing)?;
+                        }
                     } else {
-                        dir.load_listing(LoadListingEnum::DeepListing)?;
+                        match binding.load_listing.unwrap_or(LoadListingEnum::DeepListing) {
+                            LoadListingEnum::NoListing => {}
+                            LoadListingEnum::ShallowListing => {
+                                dir.listing = Some(
+                                    list_remote_listing(&item.as_url()?, false, &storage).await?,
+                                );
+                            }
+                            LoadListingEnum::DeepListing => {
+                                dir.listing = Some(
+                                    list_remote_listing(&item.as_url()?, true, &storage).await?,
+                                );
+                            }
+                        }
                     }
                     FileOrDirectory::Directory(dir)
                 } else {
@@ -200,7 +307,9 @@ async fn evaluate_command_binding(
                     ..*context.eval_context
                 };
                 file.secondary_files =
-                    handle_secondary_files(file, secondary_files, &eval_context).ok();
+                    handle_secondary_files(file, secondary_files, &eval_context, &storage)
+                        .await
+                        .ok();
             }
         }
     }
@@ -208,10 +317,11 @@ async fn evaluate_command_binding(
     Ok(results)
 }
 
-fn handle_secondary_files(
+async fn handle_secondary_files(
     file: &File,
     secondary_files: &OneOrMany<SecondaryFileSchema>,
-    context: &EvaluationContext,
+    context: &EvaluationContext<'_>,
+    storage: &StorageBackend,
 ) -> anyhow::Result<Vec<FileOrDirectory>> {
     if file.location.is_none() {
         debug!("Can not evaluate secondary_files as location is not set");
@@ -219,22 +329,45 @@ fn handle_secondary_files(
     }
     let mut secondaries = vec![];
     for item in &secondary_files.as_many() {
-        let Some(secondary_file) = handle_secondary_file_schema(file, item, context)? else {
+        let Some(secondary_file) =
+            handle_secondary_file_schema(file, item, context, storage).await?
+        else {
             continue;
         };
         for item in secondary_file {
             match item {
-                PathOrFile::Path(secondary_path) => {
-                    if secondary_path.is_file() {
-                        let file = File::new_from_path(&secondary_path)?;
-                        secondaries.push(FileOrDirectory::File(file));
-                    } else if secondary_path.is_dir() {
-                        let mut dir = Directory::new_from_path(&secondary_path)?;
-                        dir.load_listing(LoadListingEnum::DeepListing)?;
+                PathOrFile::Location(url) => {
+                    let basename = Path::new(url.path())
+                        .file_name()
+                        .map(|s| s.to_string_lossy().into_owned());
+                    if storage.is_dir(&url).await? {
+                        let mut dir = Directory {
+                            location: Some(url.to_string()),
+                            basename,
+                            ..Default::default()
+                        };
+                        if url.scheme() == "file" {
+                            dir.path = url
+                                .to_file_path()
+                                .ok()
+                                .map(|p| p.to_string_lossy().into_owned());
+                            dir.load_listing(LoadListingEnum::DeepListing)?;
+                        }
                         secondaries.push(FileOrDirectory::Directory(dir));
+                    } else {
+                        // metadata (size/checksum) and staging into the output dir happen later
+                        let file = File {
+                            location: Some(url.to_string()),
+                            basename,
+                            ..Default::default()
+                        };
+                        secondaries.push(FileOrDirectory::File(file));
                     }
                 }
-                PathOrFile::File(fod) => secondaries.push(*fod),
+                PathOrFile::File(mut fod) => {
+                    resolve_location_from_primary(file, &mut fod)?;
+                    secondaries.push(*fod);
+                }
             }
         }
     }
@@ -288,9 +421,7 @@ async fn validate_file(
     if let Some(source_location) = &location
         && let Some(dest_path) = &path
     {
-        let u_source_location = Url::parse(source_location)
-            .or_else(|_| Url::from_file_path(source_location))
-            .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))?;
+        let u_source_location = resolve_output_source_location(source_location, context)?;
         if storage.exists(&u_source_location).await? {
             if copy {
                 let parent = dest_path.parent().unwrap();
@@ -366,23 +497,35 @@ async fn validate_dir(
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
         .map(|p| if copy { unique_path(&p, None) } else { p });
 
-    if let Some(source_path) = &dir.path
+    let location = dir.location.as_ref().or(dir.path.as_ref());
+
+    if let Some(source_location) = &location
         && let Some(dest_path) = &path
     {
-        let mut source_path = source_path.to_owned();
-        if !Path::new(&source_path).exists() {
-            debug!("Path field contains container path. Trying to use location: {dir:?}");
-            source_path = string_url_to_path_string(dir.location.as_ref().unwrap())?;
+        let u_source_location = resolve_output_source_location(source_location, context)?;
+
+        let mut downloaded = false;
+
+        if storage.exists(&u_source_location).await? || storage.is_dir(&u_source_location).await? {
+            if copy {
+                let parent = dest_path.parent().unwrap();
+                if !parent.exists() {
+                    fs::create_dir_all(parent)?;
+                }
+                storage.download(&u_source_location, dest_path).await?;
+                downloaded = true;
+            }
+        } else {
+            anyhow::bail!("Source location {source_location} does not exist for output directory");
         }
 
-        let parent = dest_path.parent().unwrap();
-        if !parent.exists() {
-            fs::create_dir_all(parent)?;
-        }
-        if copy {
-            copy_dir(&source_path, dest_path).with_context(|| {
-                format!("Could not copy {source_path} to {}", dest_path.display())
-            })?;
+        if downloaded && u_source_location.scheme() != "file" {
+            // any listing built before download (e.g. `list_remote_listing`) points at remote
+            // locations, not the paths just downloaded to - always regenerate from the real copy
+            dir.path = Some(dest_path.to_string_lossy().into_owned());
+            dir.load_listing(LoadListingEnum::DeepListing)?;
+
+            filter_empty_dir_markers(dir);
         }
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
@@ -407,6 +550,22 @@ async fn validate_dir(
     }
 
     Ok(())
+}
+
+/// Recursively drops any `S3_EMPTY_DIR_MARKER` placeholder entries from a directory's
+/// listing, without touching the files themselves on disk.
+fn filter_empty_dir_markers(dir: &mut Directory) {
+    if let Some(listing) = &mut dir.listing {
+        listing.retain(|item| {
+            item.basename()
+                .is_none_or(|b| b != crate::backend::mount::EMPTY_DIR_MARKER)
+        });
+        for item in listing {
+            if let FileOrDirectory::Directory(d) = item {
+                filter_empty_dir_markers(d);
+            }
+        }
+    }
 }
 
 /// creates the new output path by stripping prefixes of known folders
@@ -842,16 +1001,19 @@ fn validate_output_type(r#type: &OneOrMany<OutputType>, value: &DefaultValue) ->
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_handle_secondary_files_missing_location_does_not_panic() {
+    #[tokio::test]
+    async fn test_handle_secondary_files_missing_location_does_not_panic() {
         let file = File::default();
         let schema = OneOrMany::One(SecondaryFileSchema {
             pattern: ".idx".to_string(),
             required: None,
         });
         let context = EvaluationContext::default();
+        let storage = StorageBackend::new();
 
-        let result = handle_secondary_files(&file, &schema, &context).unwrap();
+        let result = handle_secondary_files(&file, &schema, &context, &storage)
+            .await
+            .unwrap();
         assert!(result.is_empty());
     }
 }

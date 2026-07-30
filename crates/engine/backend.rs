@@ -66,6 +66,8 @@ pub mod mount;
 #[cfg(feature = "tes")]
 pub mod tes;
 
+pub(crate) const DEFAULT_DOCKER_CONTAINER: &str = "ubuntu:noble";
+
 #[async_trait]
 pub trait TaskBackend: Send + Sync + 'static {
     async fn run(
@@ -231,6 +233,14 @@ pub(crate) fn resolve_output_location(
     }
 }
 
+/// Resolves the path to expose as `runtime.outdir`/`runtime.tmpdir` to CWL expressions
+pub(crate) fn resolve_runtime_path(storage_path: &StoragePath) -> PathBuf {
+    match storage_path {
+        StoragePath::Local(path) => path.clone(),
+        StoragePath::Remote(_) => PathBuf::from(storage_path.path()),
+    }
+}
+
 ///Executes a `CWLDocument`
 /// # Panics
 ///  Panics if `Operation` is used as this anstract type is not meant to be executed
@@ -280,7 +290,9 @@ pub async fn execute_workflow(
         Path::new(""),
         llr,
         Some(&fv),
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
 
     let collection_dir = tempdir()?;
 
@@ -297,7 +309,9 @@ pub async fn execute_workflow(
         &mut inputs,
         eval_context,
         &request.working_dir,
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
 
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
@@ -635,7 +649,9 @@ pub async fn execute_commandline_tool(
         stage_dir,
         llr,
         Some(&fv),
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),
         ijsr,
@@ -665,7 +681,9 @@ pub async fn execute_commandline_tool(
         &mut inputs,
         eval_context,
         &request.working_dir,
-    )?;
+        backend.storage().as_ref(),
+    )
+    .await?;
 
     let eval_context = &mut EvaluationContext {
         inputs: Some(&inputs.clone()),
@@ -792,11 +810,7 @@ pub async fn execute_commandline_tool(
         //update runtime
         let mut runtime = runtime.clone();
         runtime.exit_code = Some(first_code);
-        runtime.outdir = outdir
-            .storage_path()
-            .as_url()?
-            .to_file_path()
-            .map_err(|()| anyhow::anyhow!("Could not create file path from URL for outdir"))?; //is this smart?
+        runtime.outdir = resolve_runtime_path(outdir.storage_path());
 
         let eval_context = eval_context.clone().with_runtime(&runtime);
 
@@ -935,7 +949,9 @@ mod tests {
 
     #[test]
     fn test_resolve_docker_requirement_pull() {
-        let dr = DockerRequirement::builder().docker_pull("my/image:1.0").build();
+        let dr = DockerRequirement::builder()
+            .docker_pull("my/image:1.0")
+            .build();
         let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
         assert_eq!(resolved.image_id, "my/image:1.0");
         assert!(resolved.dockerfile.is_none());
@@ -943,7 +959,9 @@ mod tests {
 
     #[test]
     fn test_resolve_docker_requirement_image_id_only() {
-        let dr = DockerRequirement::builder().docker_image_id("my-built-image").build();
+        let dr = DockerRequirement::builder()
+            .docker_image_id("my-built-image")
+            .build();
         let resolved = resolve_docker_requirement(Some(&dr), "default:tag");
         assert_eq!(resolved.image_id, "my-built-image");
         assert!(resolved.dockerfile.is_none());
@@ -976,14 +994,18 @@ mod tests {
         let tmpdir = StoragePath::from_local(Path::new("/tmp"));
         let eval_context = EvaluationContext::default();
 
-        let resolved = resolve_output_location(None, "stdout", &outdir, &tmpdir, &eval_context)
-            .unwrap();
+        let resolved =
+            resolve_output_location(None, "stdout", &outdir, &tmpdir, &eval_context).unwrap();
         let StoragePath::Local(path) = resolved else {
             panic!("expected a local path")
         };
         assert_eq!(path.parent().unwrap(), Path::new("/tmp"));
         assert!(
-            path.file_name().unwrap().to_str().unwrap().starts_with("stdout_"),
+            path.file_name()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .starts_with("stdout_"),
             "expected a generated stdout_<uuid> name, got {path:?}"
         );
     }
@@ -998,6 +1020,23 @@ mod tests {
         let resolved =
             resolve_output_location(Some(&name), "stdout", &outdir, &tmpdir, &eval_context)
                 .unwrap();
-        assert_eq!(resolved, StoragePath::Local(PathBuf::from("/out/my-output.log")));
+        assert_eq!(
+            resolved,
+            StoragePath::Local(PathBuf::from("/out/my-output.log"))
+        );
+    }
+
+    #[test]
+    fn test_resolve_runtime_path_local() {
+        let path = resolve_runtime_path(&StoragePath::from_local(Path::new("/out/workdir")));
+        assert_eq!(path, PathBuf::from("/out/workdir"));
+    }
+
+    #[test]
+    fn test_resolve_runtime_path_remote_does_not_error() {
+        let url =
+            url::Url::parse("http://localhost:9000/commonwl-bucket/tmp/abcd1234/workdir").unwrap();
+        let path = resolve_runtime_path(&StoragePath::from_url(url));
+        assert_eq!(path, PathBuf::from("/commonwl-bucket/tmp/abcd1234/workdir"));
     }
 }

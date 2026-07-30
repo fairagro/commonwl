@@ -17,7 +17,7 @@ path = "lib.rs"
 all-features = true
 
 [features]
-tes = [] # TES Feature is experimental!
+tes = [] 
 
 [dependencies]
 # serialization
@@ -41,7 +41,6 @@ base16ct.workspace = true
 pathdiff.workspace = true
 tempfile.workspace = true
 tar.workspace = true
-dircpy.workspace = true
 url.workspace = true
 same-file.workspace = true
 cwl_engine_storage.workspace = true

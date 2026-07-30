@@ -1,6 +1,6 @@
 use crate::{
     backend::{
-        TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     string_url_to_path_string,
@@ -75,7 +75,8 @@ impl TaskBackend for TesBackend {
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
         //handle docker requirement
-        let resolved = crate::backend::resolve_docker_requirement(request.docker, "ubuntu");
+        let resolved =
+            crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
         if resolved.dockerfile.is_some() {
             anyhow::bail!(
                 "TES backend does not support building images from a Dockerfile; provide dockerPull or a pre-built dockerImageId"
@@ -104,6 +105,8 @@ impl TaskBackend for TesBackend {
             .collect::<Vec<_>>();
 
         //build crankshaft task object
+        // Deliberately not wired to `Execution::stdin` as TES implementations may truncate the file
+        // appended to args as trailing in backend.rs
         #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
             .name(request.id)
@@ -117,7 +120,22 @@ impl TaskBackend for TesBackend {
                     .image(container)
                     .stdout(stdout_file)
                     .stderr(stderr_file)
-                    //.maybe_stdin(request.stdin_file)
+                    .build(),
+                // mark all created empty dirs with the s3 marker
+                Execution::builder()
+                    .work_dir(request.execution_path)
+                    .program("find")
+                    .args([
+                        ".".to_string(),
+                        "-type".to_string(),
+                        "d".to_string(),
+                        "-empty".to_string(),
+                        "-exec".to_string(),
+                        "touch".to_string(),
+                        format!("{{}}/{}", crate::backend::mount::EMPTY_DIR_MARKER),
+                        ";".to_string(),
+                    ])
+                    .image(DEFAULT_DOCKER_CONTAINER)
                     .build()
             ])
             .resources(
@@ -145,10 +163,12 @@ impl TaskBackend for TesBackend {
         for mount in request.mounts.iter().cloned() {
             let outdir = request.outdir.to_owned();
             let workdir = request.execution_path.to_owned();
+            // represents if there is a docker requirement
+            // a container in tes is always used but cwl e.g. only allows absolute path in iwdr when docker requirement is specified
             let use_container = request.use_container;
             let storage = self.storage();
             let permit = sem.clone().acquire_owned().await?;
-            
+
             set.spawn(async move {
                 let _permit = permit;
                 mount_workdir_item(
@@ -157,7 +177,9 @@ impl TaskBackend for TesBackend {
                     &workdir,
                     use_container,
                     storage,
-                    MountStrategy::Remote { base_url: outdir.as_url()? },
+                    MountStrategy::Remote {
+                        base_url: outdir.as_url()?,
+                    },
                 )
                 .await
             });
@@ -169,6 +191,24 @@ impl TaskBackend for TesBackend {
             }
         }
 
+        task.add_output(
+            Output::builder()
+                .name("workdir")
+                .path(request.execution_path)
+                .url(outdir.clone())
+                .ty(output::Type::Directory)
+                .build(),
+        );
+
+        task.add_output(
+            Output::builder()
+                .name("tmpdir")
+                .path(self.container_tmp_dir())
+                .url(request.tmpdir.as_url()?)
+                .ty(output::Type::Directory)
+                .build(),
+        );
+
         //handle stderr output
         let stderr_path = crate::backend::resolve_output_location(
             request.stderr_file,
@@ -177,6 +217,7 @@ impl TaskBackend for TesBackend {
             request.tmpdir,
             request.eval_context,
         )?;
+
         task.add_output(
             Output::builder()
                 .name("stderr")
@@ -185,16 +226,6 @@ impl TaskBackend for TesBackend {
                 .ty(output::Type::File)
                 .build(),
         );
-
-        task.add_output(
-            Output::builder()
-                .name("workdir")
-                .path(CONTAINER_WORKDIR)
-                .url(outdir.clone())
-                .ty(output::Type::Directory)
-                .build(),
-        );
-
         //handle stdout output
         let stdout_path = crate::backend::resolve_output_location(
             request.stdout_file,
@@ -220,6 +251,16 @@ impl TaskBackend for TesBackend {
             request.eval_context,
         )
         .await?;
+
+        // evaluate side task exit status
+        if let Some(cleanup_status) = exit_status.get(1)
+            && !cleanup_status.success()
+        {
+            tracing::warn!(
+                "empty-directory marker cleanup step exited with {cleanup_status}; \
+                 empty output directories may be missing from results"
+            );
+        }
 
         Ok(TaskExecutionResult {
             exit_status,

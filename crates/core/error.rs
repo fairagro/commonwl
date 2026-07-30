@@ -16,7 +16,7 @@ pub enum Error {
     #[diagnostic(code(serde_saphyr::ser::Error))]
     Serialization(#[from] serde_saphyr::ser::Error),
 
-    #[error("Serialization Error")]
+    #[error("{0}")]
     #[diagnostic(code(commonwl::Error::Guard))]
     Guard(&'static str),
 
