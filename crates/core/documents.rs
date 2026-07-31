@@ -11,9 +11,9 @@ use crate::outputs::{
     WorkflowOutputParameter,
 };
 use crate::requirements::{
-    DockerRequirement, EnvVarRequirement, EnvironmentDef, InitialWorkDirRequirement, ListingItems,
-    NetworkAccess, StringOrInclude, SubworkflowFeatureRequirement, ToolHints, ToolRequirements,
-    WorkDirItems, WorkflowHints, WorkflowRequirements,
+    DockerRequirement, EnvVarRequirement, EnvironmentDef, Include, InitialWorkDirRequirement,
+    ListingItems, NetworkAccess, StringOrInclude, SubworkflowFeatureRequirement, ToolHints,
+    ToolRequirements, WorkDirItems, WorkflowHints, WorkflowRequirements,
 };
 use crate::validate::{CWL_VERSION, validate_expression};
 use crate::{BoolOrExpression, OneOrMany, Result, guard};
@@ -455,7 +455,9 @@ impl CommandLineTool {
     pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
         self.append_requirement_mut(ToolRequirements::DockerRequirement(
             DockerRequirement::builder()
-                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_file(StringOrInclude::Include(
+                    Include::builder().include(dockerfile).build(),
+                ))
                 .docker_image_id(tag.into())
                 .build(),
         ));
@@ -632,7 +634,9 @@ impl ExpressionTool {
     pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
         self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
             DockerRequirement::builder()
-                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_file(StringOrInclude::Include(
+                    Include::builder().include(dockerfile).build(),
+                ))
                 .docker_image_id(tag.into())
                 .build(),
         ));
@@ -775,7 +779,9 @@ impl Operation {
     pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
         self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
             DockerRequirement::builder()
-                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_file(StringOrInclude::Include(
+                    Include::builder().include(dockerfile).build(),
+                ))
                 .docker_image_id(tag.into())
                 .build(),
         ));
@@ -1123,7 +1129,9 @@ impl Workflow {
     pub fn use_docker_file_mut(&mut self, dockerfile: impl Into<String>, tag: impl Into<String>) {
         self.append_requirement_mut(WorkflowRequirements::DockerRequirement(
             DockerRequirement::builder()
-                .docker_file(StringOrInclude::String(dockerfile.into()))
+                .docker_file(StringOrInclude::Include(
+                    Include::builder().include(dockerfile).build(),
+                ))
                 .docker_image_id(tag.into())
                 .build(),
         ));
