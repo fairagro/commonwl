@@ -200,7 +200,6 @@ make_shorthand_impl!(WorkflowOutputParameter, "id", "type");
     PartialEq,
     Hash,
     Clone,
-    Default,
     Builder,
     Identifiable,
     Eq,
@@ -244,6 +243,20 @@ pub struct OperationOutputParameter {
 
 make_shorthand_impl!(OperationOutputParameter, "id", "type");
 
+impl Default for OperationOutputParameter {
+    fn default() -> Self {
+        Self {
+            r#type: default_output_type(),
+            label: None,
+            secondary_files: None,
+            streamable: None,
+            doc: None,
+            id: None,
+            format: None,
+        }
+    }
+}
+
 #[derive(
     Serialize,
     Deserialize,
@@ -251,7 +264,6 @@ make_shorthand_impl!(OperationOutputParameter, "id", "type");
     PartialEq,
     Hash,
     Clone,
-    Default,
     Builder,
     Identifiable,
     Eq,
@@ -294,6 +306,20 @@ pub struct ExpressionToolOutputParameter {
 }
 
 make_shorthand_impl!(ExpressionToolOutputParameter, "id", "type");
+
+impl Default for ExpressionToolOutputParameter {
+    fn default() -> Self {
+        Self {
+            r#type: default_output_type(),
+            label: None,
+            secondary_files: None,
+            streamable: None,
+            doc: None,
+            id: None,
+            format: None,
+        }
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Copy, PartialEq, Hash, Clone, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -388,10 +414,8 @@ impl Default for OutputType {
     }
 }
 
-impl Default for OneOrMany<OutputType> {
-    fn default() -> Self {
-        OneOrMany::One(OutputType::default())
-    }
+fn default_output_type() -> OneOrMany<OutputType> {
+    OneOrMany::One(OutputType::default())
 }
 
 impl From<CommandOutputType> for OutputType {
@@ -402,15 +426,6 @@ impl From<CommandOutputType> for OutputType {
                 OutputType::OutputSchema(Box::new((*schema).into()))
             }
             CommandOutputType::String(s) => OutputType::String(s),
-        }
-    }
-}
-
-impl From<OneOrMany<CommandOutputType>> for OneOrMany<OutputType> {
-    fn from(value: OneOrMany<CommandOutputType>) -> Self {
-        match value {
-            OneOrMany::One(t) => OneOrMany::One(t.into()),
-            OneOrMany::Many(v) => OneOrMany::Many(v.into_iter().map(Into::into).collect()),
         }
     }
 }

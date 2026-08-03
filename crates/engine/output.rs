@@ -617,7 +617,7 @@ async fn collect_output_item(
 
     //validate output to schema
     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
-        let valid = validate_output_type(&r#type.clone().into(), &value);
+        let valid = validate_output_type(&r#type.clone().map(Into::into), &value);
         if !valid {
             anyhow::bail!("Output value {value:?} does not match output type {type:?}")
         }
@@ -919,7 +919,7 @@ pub(crate) async fn collect_workflow_outputs(
                         if let CommandOutputParameterType::CommandOutputType(r#type) =
                             &output.r#type
                         {
-                            let valid = validate_output_type(&r#type.clone().into(), &value);
+                            let valid = validate_output_type(&r#type.clone().map(Into::into), &value);
                             if !valid {
                                 anyhow::bail!(
                                     "Invalid value for {output_id}. {type:?} does not match {value:?}",
@@ -962,7 +962,7 @@ pub(crate) async fn collect_workflow_outputs(
                     )
                     .await?;
                     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
-                        let valid = validate_output_type(&r#type.clone().into(), &value);
+                        let valid = validate_output_type(&r#type.clone().map(Into::into), &value);
                         if !valid {
                             anyhow::bail!(
                                 "Invalid value for {output_id}. {type:?} does not match {value:?}"

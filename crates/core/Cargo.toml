@@ -25,6 +25,7 @@ thiserror.workspace = true
 validator.workspace = true
 miette.workspace = true
 regex.workspace = true
+oneormany.workspace = true
 
 [lib]
 path = "lib.rs"

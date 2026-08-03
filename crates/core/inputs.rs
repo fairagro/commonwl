@@ -252,7 +252,6 @@ make_shorthand_impl!(CommandInputParameter, "id", "type");
     PartialEq,
     Hash,
     Clone,
-    Default,
     Builder,
     Identifiable,
     Eq,
@@ -313,9 +312,22 @@ pub struct WorkflowInputParameter {
 
 make_shorthand_impl!(WorkflowInputParameter, "id", "type");
 
-impl Default for OneOrMany<InputType> {
+#[allow(deprecated)]
+impl Default for WorkflowInputParameter {
     fn default() -> Self {
-        OneOrMany::One(InputType::CWLType(CWLType::Null))
+        Self {
+            r#type: default_input_type(),
+            label: None,
+            secondary_files: None,
+            streamable: None,
+            doc: None,
+            id: None,
+            format: None,
+            load_contents: None,
+            load_listing: None,
+            default: None,
+            input_binding: None,
+        }
     }
 }
 
@@ -327,7 +339,6 @@ impl Default for OneOrMany<InputType> {
     PartialEq,
     Hash,
     Clone,
-    Default,
     Builder,
     Identifiable,
     Eq,
@@ -382,6 +393,23 @@ pub struct OperationInputParameter {
 }
 
 make_shorthand_impl!(OperationInputParameter, "id", "type");
+
+impl Default for OperationInputParameter {
+    fn default() -> Self {
+        Self {
+            r#type: default_input_type(),
+            label: None,
+            secondary_files: None,
+            streamable: None,
+            doc: None,
+            id: None,
+            format: None,
+            load_contents: None,
+            load_listing: None,
+            default: None,
+        }
+    }
+}
 
 impl From<WorkflowInputParameter> for OperationInputParameter {
     fn from(value: WorkflowInputParameter) -> Self {
@@ -520,6 +548,10 @@ impl Default for InputType {
     fn default() -> Self {
         InputType::CWLType(CWLType::Null)
     }
+}
+
+fn default_input_type() -> OneOrMany<InputType> {
+    OneOrMany::One(InputType::default())
 }
 
 impl From<CommandInputType> for InputType {

@@ -28,6 +28,7 @@ pub use cwl_salad::Identifiable;
 pub use load::from_str;
 pub use load::load_cwl_file;
 pub use load::preprocess_cwl_file;
+pub use oneormany::OneOrMany;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
@@ -147,85 +148,6 @@ impl Integer {
         match self {
             Self::Int(i) => i64::from(*i),
             Self::Long(l) => *l,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
-#[serde(untagged)]
-pub enum OneOrMany<T> {
-    One(T),
-    Many(Vec<T>),
-}
-
-impl<T> From<T> for OneOrMany<T> {
-    fn from(value: T) -> Self {
-        OneOrMany::One(value)
-    }
-}
-
-impl<T> From<Vec<T>> for OneOrMany<T> {
-    fn from(value: Vec<T>) -> Self {
-        OneOrMany::Many(value)
-    }
-}
-
-impl<'a> From<&'a str> for OneOrMany<String> {
-    fn from(value: &'a str) -> Self {
-        OneOrMany::One(value.into())
-    }
-}
-
-impl<'a> From<&'a [&'a str]> for OneOrMany<String> {
-    fn from(value: &[&str]) -> Self {
-        if value.len() == 1 {
-            return OneOrMany::One(value[0].to_string());
-        }
-        OneOrMany::Many(value.iter().map(ToString::to_string).collect())
-    }
-}
-
-impl<'a, const N: usize> From<&'a [&'a str; N]> for OneOrMany<String> {
-    fn from(value: &'a [&'a str; N]) -> Self {
-        value.as_ref().into()
-    }
-}
-
-impl<T: Clone> OneOrMany<T> {
-    pub fn map<U, F>(self, mut f: F) -> OneOrMany<U>
-    where
-        F: FnMut(T) -> U,
-    {
-        match self {
-            OneOrMany::One(t) => OneOrMany::One(f(t)),
-            OneOrMany::Many(ts) => OneOrMany::Many(ts.into_iter().map(f).collect()),
-        }
-    }
-
-    /// Returns `OneOrMany` as One
-    /// # Panics
-    /// if many
-    pub fn as_one(&self) -> &T {
-        match self {
-            OneOrMany::One(t) => t,
-            OneOrMany::Many(v) => v.first().expect("Called as_one on an empty Many"),
-        }
-    }
-
-    /// Returns `OneOrMany` as Many
-    pub fn as_many(&self) -> Vec<T> {
-        match self {
-            OneOrMany::One(t) => vec![t.clone()],
-            OneOrMany::Many(v) => v.clone(),
-        }
-    }
-}
-
-impl Display for OneOrMany<String> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            OneOrMany::One(s) => write!(f, "{s}"),
-            OneOrMany::Many(vec) => write!(f, "{}", vec.join(" ")),
         }
     }
 }
