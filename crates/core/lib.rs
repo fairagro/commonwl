@@ -25,9 +25,7 @@ pub mod validate;
 mod load;
 pub use crate::error::*;
 pub use cwl_salad::Identifiable;
-pub use load::from_str;
-pub use load::load_cwl_file;
-pub use load::preprocess_cwl_file;
+pub use load::{from_str, load_cwl_file, packed_from_str, preprocess_cwl_file};
 pub use oneormany::OneOrMany;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]

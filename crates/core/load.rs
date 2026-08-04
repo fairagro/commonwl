@@ -49,6 +49,20 @@ pub fn from_str(contents: &str) -> Result<CWLDocument> {
     Ok(doc)
 }
 
+/// Loads a `PackedCWL` from a string
+/// # Errors
+/// If the string is not valid CWL
+pub fn packed_from_str(contents: &str) -> Result<PackedCWL> {
+    if !contents.contains("$graph") {
+        return Err(crate::Error::Guard("Document is not packed".to_string()));
+    }
+
+    Ok(
+        serde_saphyr::from_str_with_options_validate::<PackedCWL>(contents, saphyr_options())
+            .context("Could not parse to packed CWL")?,
+    )
+}
+
 fn load_cwl_from_url(path: &Path, preprocess: bool) -> Result<CWLDocument> {
     let absolute_path = if path.is_absolute() {
         path
@@ -218,6 +232,17 @@ mod tests {
         tool.validate()
             .expect_err("malformed cwlVersion should fail validation");
     }
+
+    #[test]
+    #[cfg(not(target_os = "windows"))] //cwl submodule is not available on windows
+    fn packed_load() {
+        let file = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../testdata/cwl/tests/search.cwl");
+        let contents = fs::read_to_string(file).unwrap();
+
+        let res = packed_from_str(&contents);
+        assert!(res.is_ok())
+    }
+
 
     #[test]
     fn missing_input_id_fails() {

@@ -18,7 +18,8 @@ use crate::{
 use anyhow::ensure;
 use cwl_salad::Identifiable;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::Path};
+use serde_json::Value;
+use std::{collections::HashMap, fs, path::Path};
 use url::Url;
 use validator::Validate;
 
@@ -29,6 +30,8 @@ pub struct PackedCWL {
     pub graph: Vec<CWLDocument>,
     #[validate(regex(path = *CWL_VERSION))]
     pub cwl_version: Option<String>,
+    #[serde(flatten)]
+    pub extension_fields: HashMap<String, Value>,
 }
 
 impl PackedCWL {
@@ -303,7 +306,11 @@ pub fn pack_workflow(
     graph.push(CWLDocument::Workflow(wf.clone()));
     graph.sort_by(|a, b| a.get_id().unwrap().cmp(b.get_id().unwrap()));
 
-    Ok(PackedCWL { graph, cwl_version })
+    Ok(PackedCWL {
+        graph,
+        cwl_version,
+        extension_fields: HashMap::new(),
+    })
 }
 
 fn pack_tool(
