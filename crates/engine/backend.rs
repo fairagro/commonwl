@@ -25,6 +25,7 @@ use crate::{
 };
 use anyhow::Context;
 use async_trait::async_trait;
+use chrono::Local;
 use crankshaft::engine::service::runner::backend::TaskRunError;
 use cwl_core::IntegerOrExpression;
 use cwl_core::{
@@ -98,6 +99,8 @@ pub struct ExecutionResult {
     pub stdout: String,
     pub stderr: String,
     pub outputs: HashMap<String, DefaultValue>,
+    pub started_at: Option<chrono::NaiveDateTime>,
+    pub finished_at: Option<chrono::NaiveDateTime>,
 }
 
 #[derive(Debug)]
@@ -271,6 +274,8 @@ pub async fn execute_workflow(
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
+    let started_at = Local::now().naive_local();
+
     //create validator
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
     let cwl_version = cwl_version(&request.specification)?;
@@ -547,11 +552,14 @@ pub async fn execute_workflow(
         collect_workflow_outputs(&wf.outputs, &completed_outputs, &cc, mir, backend.storage())
             .await?;
 
+    let finished_at = Local::now().naive_local();
     Ok(ExecutionResult {
         exit_status: NonEmpty::new(ExitStatus::default()),
         stdout: String::new(),
         stderr: String::new(),
         outputs,
+        started_at: Some(started_at),
+        finished_at: Some(finished_at),
     })
 }
 
@@ -864,6 +872,8 @@ pub async fn execute_commandline_tool(
             stdout,
             stderr,
             outputs,
+            started_at: result.started_at,
+            finished_at: result.finished_at,
         })
     } else if let CWLDocument::ExpressionTool(tool) = &request.specification {
         let expression = &tool.expression;
@@ -876,6 +886,8 @@ pub async fn execute_commandline_tool(
                 expression_lib: None,
             });
         }
+
+        let started_at = Local::now().naive_local();
 
         let result = do_eval(expression, eval_context)?;
         let outputs = collect_expression_outputs(
@@ -892,11 +904,15 @@ pub async fn execute_commandline_tool(
         )
         .await?;
 
+        let finished_at = Local::now().naive_local();
+
         Ok(ExecutionResult {
             exit_status: NonEmpty::new(ExitStatus::default()),
             stdout: String::new(),
             stderr: String::new(),
             outputs,
+            started_at: Some(started_at),
+            finished_at: Some(finished_at),
         })
     } else {
         anyhow::bail!("Unsupported document type for execution")
