@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{Context, ensure};
 use async_trait::async_trait;
-use chrono::Local;
+use chrono::Utc;
 use crankshaft::engine::{
     Task,
     task::{
@@ -65,7 +65,7 @@ impl TaskBackend for LocalBackend {
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
-        let started_at = Local::now().naive_local();
+        let started_at = Utc::now().naive_utc();
         let stdout_file = if let Some(s) = request.stdout_file {
             &format!("{}/{s}", self.container_tmp_dir())
         } else {
@@ -277,7 +277,7 @@ impl TaskBackend for LocalBackend {
         )
         .await?;
 
-        let finished_at = Local::now().naive_local();
+        let finished_at = Utc::now().naive_utc();
         Ok(TaskExecutionResult {
             exit_status,
             stdout_file: stdout_out,

@@ -25,7 +25,7 @@ use crate::{
 };
 use anyhow::Context;
 use async_trait::async_trait;
-use chrono::Local;
+use chrono::Utc;
 use crankshaft::engine::service::runner::backend::TaskRunError;
 use cwl_core::IntegerOrExpression;
 use cwl_core::{
@@ -297,7 +297,7 @@ pub async fn execute_workflow(
     request: &ExecutionRequest,
     token: CancellationToken,
 ) -> anyhow::Result<ExecutionResult> {
-    let started_at = Local::now().naive_local();
+    let started_at = Utc::now().naive_utc();
 
     //create validator
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
@@ -582,7 +582,7 @@ pub async fn execute_workflow(
         collect_workflow_outputs(&wf.outputs, &completed_outputs, &cc, mir, backend.storage())
             .await?;
 
-    let finished_at = Local::now().naive_local();
+    let finished_at = Utc::now().naive_utc();
     Ok(ExecutionResult {
         exit_status: NonEmpty::new(ExitStatus::default()),
         stdout: String::new(),
@@ -919,7 +919,7 @@ pub async fn execute_commandline_tool(
             });
         }
 
-        let started_at = Local::now().naive_local();
+        let started_at = Utc::now().naive_utc();
 
         let result = do_eval(expression, eval_context)?;
         let outputs = collect_expression_outputs(
@@ -936,7 +936,7 @@ pub async fn execute_commandline_tool(
         )
         .await?;
 
-        let finished_at = Local::now().naive_local();
+        let finished_at = Utc::now().naive_utc();
 
         Ok(ExecutionResult {
             exit_status: NonEmpty::new(ExitStatus::default()),

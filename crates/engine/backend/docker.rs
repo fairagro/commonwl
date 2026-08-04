@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::ensure;
 use async_trait::async_trait;
-use chrono::Local;
+use chrono::Utc;
 use crankshaft::{
     config::backend::docker::Config,
     docker::Docker,
@@ -82,7 +82,7 @@ impl TaskBackend for DockerBackend {
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
-        let started_at = Local::now().naive_local();
+        let started_at = Utc::now().naive_utc();
         //handle docker requirement
         let resolved =
             crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
@@ -243,7 +243,7 @@ impl TaskBackend for DockerBackend {
         )
         .await?;
 
-        let finished_at = Local::now().naive_local();
+        let finished_at = Utc::now().naive_utc();
         Ok(TaskExecutionResult {
             exit_status,
             stdout_file: stdout_out,
