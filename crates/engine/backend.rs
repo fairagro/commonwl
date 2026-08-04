@@ -101,6 +101,7 @@ pub struct ExecutionResult {
     pub outputs: HashMap<String, DefaultValue>,
     pub started_at: Option<chrono::NaiveDateTime>,
     pub finished_at: Option<chrono::NaiveDateTime>,
+    pub step_timings: Option<Vec<StepTiming>>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -360,6 +361,8 @@ pub async fn execute_workflow(
     let has_scatter_steps = wf.steps.iter().any(|i| i.scatter.is_some());
 
     let mut scatter_meta: HashMap<String, (ScatterMethod, Vec<usize>)> = HashMap::new();
+    let mut step_timings = vec![];
+
     for wave in waves {
         let mut handles = Vec::new();
 
@@ -529,6 +532,11 @@ pub async fn execute_workflow(
             let (step_id, exec_result) = join_result
                 .context("Step task panicked")?
                 .context("Step execution failed")?;
+            step_timings.push(StepTiming::new(
+                step_id,
+                exec_result.started_at,
+                exec_result.finished_at,
+            ));
             for (output_name, value) in exec_result.outputs {
                 let key = format!("{step_id}/{output_name}");
                 if scattered_step_ids.contains(&step_id) && sfr.is_some() {
@@ -582,6 +590,7 @@ pub async fn execute_workflow(
         outputs,
         started_at: Some(started_at),
         finished_at: Some(finished_at),
+        step_timings: Some(step_timings),
     })
 }
 
@@ -896,6 +905,7 @@ pub async fn execute_commandline_tool(
             outputs,
             started_at: result.started_at,
             finished_at: result.finished_at,
+            step_timings: None,
         })
     } else if let CWLDocument::ExpressionTool(tool) = &request.specification {
         let expression = &tool.expression;
@@ -935,6 +945,7 @@ pub async fn execute_commandline_tool(
             outputs,
             started_at: Some(started_at),
             finished_at: Some(finished_at),
+            step_timings: None,
         })
     } else {
         anyhow::bail!("Unsupported document type for execution")
