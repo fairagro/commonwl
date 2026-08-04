@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.0
+### Added
+- Report timings by Engine
+
 ## 0.10.0
 ### Added
 - Ergonomic functions for all `CWLDocument` types
