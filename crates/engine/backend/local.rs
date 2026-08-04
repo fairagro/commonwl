@@ -1,10 +1,14 @@
 use crate::{
     backend::{
-        DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult, local::command::CommandBackend, mount::{MountStrategy, mount_input, mount_workdir_item},
-    }, docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
+        DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
+        local::command::CommandBackend,
+        mount::{MountStrategy, mount_input, mount_workdir_item},
+    },
+    docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
 };
 use anyhow::{Context, ensure};
 use async_trait::async_trait;
+use chrono::Local;
 use crankshaft::engine::{
     Task,
     task::{
@@ -61,6 +65,7 @@ impl TaskBackend for LocalBackend {
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
+        let started_at = Local::now().naive_local();
         let stdout_file = if let Some(s) = request.stdout_file {
             &format!("{}/{s}", self.container_tmp_dir())
         } else {
@@ -120,7 +125,10 @@ impl TaskBackend for LocalBackend {
 
         //handle docker requirement
         if request.docker.is_some() {
-            let resolved = crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
+            let resolved = crate::backend::resolve_docker_requirement(
+                request.docker,
+                DEFAULT_DOCKER_CONTAINER,
+            );
 
             let df = match &resolved.dockerfile {
                 Some(StringOrInclude::Include(include)) => Some(include.include.clone()),
@@ -268,10 +276,14 @@ impl TaskBackend for LocalBackend {
             request.eval_context,
         )
         .await?;
+
+        let finished_at = Local::now().naive_local();
         Ok(TaskExecutionResult {
             exit_status,
             stdout_file: stdout_out,
             stderr_file: stderr_out,
+            started_at: Some(started_at),
+            finished_at: Some(finished_at),
         })
     }
 

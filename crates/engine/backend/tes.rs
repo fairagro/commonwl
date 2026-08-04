@@ -6,6 +6,7 @@ use crate::{
     string_url_to_path_string,
 };
 use async_trait::async_trait;
+use chrono::Local;
 use crankshaft::{
     config::backend::tes::Config,
     engine::{
@@ -74,6 +75,7 @@ impl TaskBackend for TesBackend {
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
     ) -> anyhow::Result<TaskExecutionResult> {
+        let started_at = Local::now().naive_local();
         //handle docker requirement
         let resolved =
             crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
@@ -262,10 +264,13 @@ impl TaskBackend for TesBackend {
             );
         }
 
+        let finished_at = Local::now().naive_local();
         Ok(TaskExecutionResult {
             exit_status,
             stdout_file: stdout_path,
             stderr_file: stderr_path,
+            started_at: Some(started_at),
+            finished_at: Some(finished_at),
         })
     }
 

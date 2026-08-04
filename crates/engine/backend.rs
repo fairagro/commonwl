@@ -137,6 +137,8 @@ pub struct TaskExecutionResult {
     pub exit_status: NonEmpty<ExitStatus>,
     pub stdout_file: StoragePath,
     pub stderr_file: StoragePath,
+    pub started_at: Option<chrono::NaiveDateTime>,
+    pub finished_at: Option<chrono::NaiveDateTime>,
 }
 
 /// Runs `task` on `backend`, enforcing `timelimit`
