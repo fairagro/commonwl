@@ -276,6 +276,23 @@ async fn execute_conformance_test<T: TaskBackend + Clone + Send + 'static>(
             }
             assert!(result.is_ok());
             let result = result.unwrap();
+            if let Some(finished_at) = result.finished_at
+                && let Some(started_at) = result.started_at
+            {
+                let duration = finished_at - started_at;
+                eprintln!("Test {} took {}ms", test.id, duration.num_milliseconds());
+                if let Some(timings) = &result.step_timings {
+                    eprintln!("Timings:");
+                    for item in timings {
+                        if let Some(finished_at) = item.finished_at
+                            && let Some(started_at) = item.started_at
+                        {
+                            let duration = finished_at - started_at;
+                            eprintln!("\t{}:\t{}", item.step_id, duration.num_milliseconds());
+                        }
+                    }
+                }
+            }
             evaluate_result(&test.output.clone().unwrap(), result);
         }
     }
