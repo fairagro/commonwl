@@ -8,6 +8,7 @@ pub(crate) mod backend;
 pub(crate) mod command;
 pub(crate) mod docker;
 pub(crate) mod environment;
+pub(crate) mod error;
 pub(crate) mod expression;
 pub(crate) mod input;
 pub(crate) mod io;
@@ -19,7 +20,9 @@ pub(crate) mod schema;
 pub(crate) mod tree;
 pub(crate) mod workflow;
 
-pub(crate) fn cwl_version(doc: &CWLDocument) -> anyhow::Result<Version> {
+pub use error::{Result, RunnerError};
+
+pub(crate) fn cwl_version(doc: &CWLDocument) -> crate::Result<Version> {
     let default = "v1.2".to_string();
     let version = doc.cwl_version().unwrap_or(&default);
     let version = version.trim_start_matches('v');
@@ -28,7 +31,7 @@ pub(crate) fn cwl_version(doc: &CWLDocument) -> anyhow::Result<Version> {
     } else {
         version.to_owned()
     };
-    Ok(Version::parse(&version)?)
+    Ok(Version::parse(&version).map_err(anyhow::Error::from)?)
 }
 
 pub(crate) const V1_2_0: Version = Version::new(1, 2, 0);
@@ -52,16 +55,16 @@ pub use request::{
     load_input_file_from_file,
 };
 
-pub(crate) fn string_url_to_file_path(url: &str) -> anyhow::Result<PathBuf> {
+pub(crate) fn string_url_to_file_path(url: &str) -> crate::Result<PathBuf> {
     let url = Url::parse(url)?;
     if url.scheme() != "file" {
-        anyhow::bail!("URL scheme is not 'file'");
+        crate::bail!("URL scheme is not 'file'");
     }
     url.to_file_path()
-        .map_err(|()| anyhow::anyhow!("Invalid file URL"))
+        .map_err(|()| RunnerError::Guard("Invalid file URL".to_string()))
 }
 
-pub(crate) fn string_url_to_path_string(url: &str) -> anyhow::Result<String> {
+pub(crate) fn string_url_to_path_string(url: &str) -> crate::Result<String> {
     let path = string_url_to_file_path(url)?;
     Ok(path.to_string_lossy().to_string())
 }

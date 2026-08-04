@@ -2,7 +2,6 @@ use crate::{
     environment::workdir::{self, WorkDirMount},
     string_url_to_file_path,
 };
-use anyhow::ensure;
 use bollard::{Docker, body_full, query_parameters::BuildImageOptions};
 use bon::Builder;
 use cwl_core::files::FileOrDirectory;
@@ -20,7 +19,7 @@ pub(crate) async fn build_container(
     client: &Docker,
     docker_file: impl AsRef<Path>,
     tag: &str,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let mut archive = tar::Builder::new(vec![]);
 
     archive.append_path_with_name(docker_file, "Dockerfile")?;
@@ -40,7 +39,7 @@ pub(crate) async fn build_container(
             tracing::info!("{stream}");
         }
         if let Some(error) = msg.error {
-            anyhow::bail!("Docker build error: {error}");
+            crate::bail!("Docker build error: {error}");
         }
     }
 
@@ -99,7 +98,7 @@ pub fn build_container_command(
     inputs: &[FileOrDirectory],
     options: ContainerBuildOptions,
     specificationdir: &Path,
-) -> anyhow::Result<Vec<String>> {
+) -> crate::Result<Vec<String>> {
     if let Some(df) = &options.docker_file {
         build_docker_file(df, specificationdir, &options)?;
     }
@@ -161,7 +160,10 @@ pub fn build_container_command(
             .map_err(|()| anyhow::anyhow!("{loc} is not a path"))?;
         let loc = safe_mount(&loc)?;
 
-        ensure!(mount.target.scheme() == "file");
+        crate::ensure!(
+            mount.target.scheme() == "file",
+            "mount target must be a file:// URL"
+        );
         let target = mount
             .target
             .to_file_path()
@@ -204,7 +206,7 @@ fn build_docker_file(
     df: &str,
     specificationdir: &Path,
     options: &ContainerBuildOptions,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let path = specificationdir.join(df);
     let dockerfile_path = safe_mount(&path)?;
 
@@ -265,7 +267,7 @@ fn build_docker_file(
             use std::io::Read;
             err.read_to_string(&mut stderr)?;
         }
-        anyhow::bail!("Docker build failed: {stderr}");
+        crate::bail!("Docker build failed: {stderr}");
     }
 }
 
@@ -275,7 +277,7 @@ fn get_user_flag() -> String {
     format!("--user={}:{}", getuid().as_raw(), getgid().as_raw())
 }
 
-fn safe_mount(input: impl AsRef<Path>) -> anyhow::Result<String> {
+fn safe_mount(input: impl AsRef<Path>) -> crate::Result<String> {
     let path = input.as_ref();
 
     let input = if path.exists() {

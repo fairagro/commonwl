@@ -52,7 +52,7 @@ pub(crate) fn get_location(path: &str, work_dir: &Path) -> String {
     }
 }
 
-fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<PathBuf> {
+fn get_relative_path(location: &Url, work_dir: &Path) -> crate::Result<PathBuf> {
     let mut relative_part = location.path_segments().unwrap().next_back().unwrap();
 
     if location.scheme() != "file" {
@@ -76,22 +76,22 @@ fn get_relative_path(location: &Url, work_dir: &Path) -> anyhow::Result<PathBuf>
     Ok(path.to_path_buf())
 }
 
-pub fn load_file_contents(dv: &mut DefaultValue) -> anyhow::Result<()> {
+pub fn load_file_contents(dv: &mut DefaultValue) -> crate::Result<()> {
     match dv {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
             let Some(location) = &file.location else {
-                anyhow::bail!("Can not load file contents: file has no location");
+                crate::bail!("Can not load file contents: file has no location");
             };
 
             match &file.size {
                 Some(size) if size.as_i64() < 64 * 1024 => {
                     file.contents = Some(fs::read_to_string(&string_url_to_file_path(location)?)?);
                 }
-                Some(_) => anyhow::bail!(
+                Some(_) => crate::bail!(
                     "Can not load file contents if file is larger than {} bytes.",
                     64 * 1024
                 ),
-                None => anyhow::bail!("Can not load file contents: file size is unknown"),
+                None => crate::bail!("Can not load file contents: file size is unknown"),
             }
         }
         DefaultValue::Any(serde_json::Value::Array(vec)) => {

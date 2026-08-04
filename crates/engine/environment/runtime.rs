@@ -40,7 +40,7 @@ pub(crate) fn build_runtime(
     req: Option<&ResourceRequirement>,
     context: &EvaluationContext,
     cwl_version: &Version,
-) -> anyhow::Result<Runtime> {
+) -> crate::Result<Runtime> {
     let mut runtime = Runtime::default();
     if let Some(req) = req {
         runtime.cores = resolve_min_max(
@@ -84,7 +84,7 @@ fn resolve_min_max(
     default: u64,
     context: &EvaluationContext,
     cwl_version: &Version,
-) -> anyhow::Result<u64> {
+) -> crate::Result<u64> {
     Ok(
         match (
             min.map(|v| handle_value(v, context, cwl_version)),
@@ -103,13 +103,13 @@ fn handle_value(
     val: &NumberOrExpression,
     context: &EvaluationContext,
     cwl_version: &Version,
-) -> anyhow::Result<u64> {
+) -> crate::Result<u64> {
     Ok(match val {
         NumberOrExpression::Int(i) => *i as u64,
         NumberOrExpression::Long(l) => *l as u64,
         NumberOrExpression::Float(f) => {
             if cwl_version < &V1_2_0 {
-                anyhow::bail!(
+                crate::bail!(
                     "Floating points are not supported for runtime values in {cwl_version}"
                 )
             }

@@ -45,7 +45,7 @@ pub(crate) fn stage_work_dir(
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
-) -> anyhow::Result<Vec<WorkDirMount>> {
+) -> crate::Result<Vec<WorkDirMount>> {
     match &iwdr.listing {
         WorkDirItems::Expression(expression) => {
             let evaluated = do_eval(expression, context)?;
@@ -87,7 +87,7 @@ fn stage_item(
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
     readonly: Option<bool>,
-) -> anyhow::Result<Vec<WorkDirMount>> {
+) -> crate::Result<Vec<WorkDirMount>> {
     match item {
         ListingItems::Expression(expression) => {
             let evaluated = do_eval(expression, context)?;
@@ -135,13 +135,13 @@ fn stage_item(
     }
 }
 
-fn get_entryname(dirent: &Dirent, context: &EvaluationContext) -> anyhow::Result<String> {
+fn get_entryname(dirent: &Dirent, context: &EvaluationContext) -> crate::Result<String> {
     //get entryname
     let entryname = dirent.clone().entryname.unwrap();
     let entryname = do_eval_to_string(&entryname, context);
     if entryname.contains("..") {
         //illegal
-        anyhow::bail!("dirent.entryname must not contain ..")
+        crate::bail!("dirent.entryname must not contain ..")
     }
     Ok(entryname)
 }
@@ -153,7 +153,7 @@ fn stage_dirent(
     context: &EvaluationContext,
     container_workdir: &str,
     inputs: &mut HashMap<String, DefaultValue>,
-) -> anyhow::Result<Vec<WorkDirMount>> {
+) -> crate::Result<Vec<WorkDirMount>> {
     if let StringOrInclude::Include(include) = &dirent.entry {
         let mut path = PathBuf::from(&include.include);
 
@@ -279,7 +279,7 @@ fn stage_files(
     stagedir: &StoragePath,
     entryname: Option<&String>,
     readonly: bool,
-) -> anyhow::Result<Vec<WorkDirMount>> {
+) -> crate::Result<Vec<WorkDirMount>> {
     let mut mounts = vec![];
     let staged_path = if let Some(entryname) = &entryname {
         stagedir.join(entryname)?
@@ -372,7 +372,7 @@ fn update_inputs(
 pub(crate) async fn handle_inplace_update(
     mounts: Vec<WorkDirMount>,
     backend: Arc<StorageBackend>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for mount in mounts {
         if !mount.readonly
             && let Source::Url(src_path) = &mount.source

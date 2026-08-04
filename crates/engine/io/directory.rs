@@ -24,7 +24,7 @@ pub(crate) fn locate_dir<'a>(
     stage_dir: &'a Path,
     load_listing: Option<LoadListingEnum>,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         let mut visited = HashSet::new();
         locate_dir_impl(dir, work_dir, stage_dir, load_listing, &mut visited, storage).await
@@ -39,7 +39,7 @@ fn locate_dir_impl<'a>(
     load_listing: Option<LoadListingEnum>,
     visited: &'a mut HashSet<PathBuf>,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         if let Some(path) = &dir.path
             && dir.location.is_none()
@@ -123,7 +123,7 @@ fn read_dir<'a>(
     stage_dir: &'a Path,
     visited: &'a mut HashSet<PathBuf>,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<Vec<FileOrDirectory>>> {
+) -> BoxFuture<'a, crate::Result<Vec<FileOrDirectory>>> {
     async move {
         let mut entries = Vec::new();
         let read_dir = fs::read_dir(path)

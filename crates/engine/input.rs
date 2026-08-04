@@ -29,7 +29,7 @@ pub async fn collect_inputs(
     llr: Option<&LoadListingRequirement>,
     fv: Option<&FormatValidator>,
     storage: &StorageBackend,
-) -> anyhow::Result<HashMap<String, DefaultValue>> {
+) -> crate::Result<HashMap<String, DefaultValue>> {
     let mut values = HashMap::new();
     for input in &doc.get_inputs() {
         // collect the actual value
@@ -40,7 +40,7 @@ pub async fn collect_inputs(
             CWLDocument::CommandLineTool(clt) => {
                 //can have stdin...
                 let Some(command_input) = clt.inputs.iter().find(|i| i.id == input.id) else {
-                    anyhow::bail!(
+                    crate::bail!(
                         "Could not find input `{}`",
                         input.id.clone().unwrap_or_default()
                     )
@@ -57,7 +57,7 @@ pub async fn collect_inputs(
         };
         //error if validity can not be confirmed
         if !valid {
-            anyhow::bail!(
+            crate::bail!(
                 "Value {value:?} is not valid for `{}`, expected {:?}",
                 input.id.clone().unwrap_or_default(),
                 input.r#type
@@ -93,7 +93,7 @@ fn load_input<'a>(
     load_listing: Option<LoadListingEnum>,
     load_contents: bool,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         match value {
             DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {

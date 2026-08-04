@@ -7,7 +7,7 @@ pub(crate) fn gather_jobs(
     scatter_inputs: &[Vec<serde_json::Value>],
     scatter_keys: &[String],
     method: ScatterMethod,
-) -> anyhow::Result<Vec<HashMap<String, serde_json::Value>>> {
+) -> crate::Result<Vec<HashMap<String, serde_json::Value>>> {
     match method {
         ScatterMethod::Dotproduct => {
             //return empty if no scatter
@@ -17,8 +17,8 @@ pub(crate) fn gather_jobs(
 
             let len = scatter_inputs[0].len();
             if scatter_inputs.iter().any(|arr| arr.len() != len) {
-                return Err(anyhow::anyhow!(
-                    "All scatter inputs must be the same length for dotproduct."
+                return Err(crate::RunnerError::Guard(
+                    "All scatter inputs must be the same length for dotproduct.".to_string(),
                 ));
             }
 
@@ -78,7 +78,7 @@ pub(crate) fn gather_jobs(
 pub(crate) fn gather_inputs(
     scatter_keys: &[String],
     input_values: &InputObject,
-) -> anyhow::Result<Vec<Vec<serde_json::Value>>> {
+) -> crate::Result<Vec<Vec<serde_json::Value>>> {
     scatter_keys
         .iter()
         .map(|k| {
@@ -89,9 +89,13 @@ pub(crate) fn gather_inputs(
                     DefaultValue::Any(serde_json::Value::Array(arr)) => Some(arr.clone()),
                     _ => None,
                 })
-                .ok_or_else(|| anyhow::anyhow!("Input {k} must be of type array to scatter!"))
+                .ok_or_else(|| {
+                    crate::RunnerError::Guard(format!(
+                        "Input {k} must be of type array to scatter!"
+                    ))
+                })
         })
-        .collect::<anyhow::Result<Vec<Vec<serde_json::Value>>>>()
+        .collect::<crate::Result<Vec<Vec<serde_json::Value>>>>()
 }
 
 pub(crate) fn nest_results(flat: &[serde_json::Value], dims: &[usize]) -> serde_json::Value {

@@ -51,7 +51,7 @@ impl TesBackend {
         config: Config,
         storage: Arc<StorageBackend>,
         data_store: StoragePath,
-    ) -> anyhow::Result<Self> {
+    ) -> crate::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
@@ -74,13 +74,13 @@ impl TaskBackend for TesBackend {
         &self,
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
-    ) -> anyhow::Result<TaskExecutionResult> {
+    ) -> crate::Result<TaskExecutionResult> {
         let started_at = Utc::now().naive_utc();
         //handle docker requirement
         let resolved =
             crate::backend::resolve_docker_requirement(request.docker, DEFAULT_DOCKER_CONTAINER);
         if resolved.dockerfile.is_some() {
-            anyhow::bail!(
+            crate::bail!(
                 "TES backend does not support building images from a Dockerfile; provide dockerPull or a pre-built dockerImageId"
             );
         }
@@ -304,7 +304,7 @@ impl TesBackend {
         &self,
         inputs: &[FileOrDirectory],
         outdir: &Url,
-    ) -> anyhow::Result<HashMap<usize, Url>> {
+    ) -> crate::Result<HashMap<usize, Url>> {
         //create a list of upload tasks (the new urls)
         let upload_tasks: Vec<(usize, String, Url)> = inputs
             .iter()

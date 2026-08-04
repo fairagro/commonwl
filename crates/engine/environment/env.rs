@@ -18,7 +18,7 @@ pub(crate) fn handle_environment(
     input_env: IndexMap<String, String>,
     evr: Option<&EnvVarRequirement>,
     eval_context: &EvaluationContext,
-) -> anyhow::Result<IndexMap<String, String>> {
+) -> crate::Result<IndexMap<String, String>> {
     let mut environment = input_env;
 
     for value in &mut environment.values_mut() {
@@ -38,12 +38,12 @@ pub(crate) fn handle_environment(
     Ok(environment)
 }
 
-fn eval_as_string(value: &str, context: &EvaluationContext) -> anyhow::Result<String> {
+fn eval_as_string(value: &str, context: &EvaluationContext) -> crate::Result<String> {
     if let Ok(value) = do_eval(value, context) {
-        value
+        Ok(value
             .as_str()
             .context("Expected string value")
-            .map(ToString::to_string)
+            .map(ToString::to_string)?)
     } else {
         Ok(value.to_string())
     }

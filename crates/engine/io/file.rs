@@ -25,7 +25,7 @@ use url::Url;
 fn read_metadata_and_contents(
     path: &Path,
     load_contents: bool,
-) -> anyhow::Result<(Option<FileMetaData>, Option<String>)> {
+) -> crate::Result<(Option<FileMetaData>, Option<String>)> {
     let Ok(meta) = get_file_metadata(path) else {
         return Ok((None, None));
     };
@@ -33,7 +33,7 @@ fn read_metadata_and_contents(
         if meta.size < 64 * 1024 {
             Some(fs::read_to_string(path)?)
         } else {
-            anyhow::bail!(
+            crate::bail!(
                 "Can not load file contents if file is larger than {} bytes.",
                 64 * 1024
             )
@@ -51,7 +51,7 @@ pub(crate) fn locate_file<'a>(
     stage_dir: &'a Path,
     load_contents: bool,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         if let Some(path) = &file.path
             && file.location.is_none()
@@ -146,7 +146,7 @@ pub(crate) async fn collect_secondary_files_for_inputs(
     context: &EvaluationContext<'_>,
     work_dir: &Path,
     storage: &StorageBackend,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in doc.get_inputs() {
         let value = values.get_mut(&input.id.unwrap());
         if let Some(value) = value {
@@ -198,7 +198,7 @@ fn handle_secondary_files_for_input<'a>(
     context: &'a EvaluationContext<'a>,
     work_dir: &'a Path,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         match value {
             DefaultValue::FileOrDirectory(FileOrDirectory::File(file)) => {
@@ -239,7 +239,7 @@ fn handle_secondary_files_for_input<'a>(
     .boxed()
 }
 
-fn set_secondary_files_empty(value: &mut DefaultValue) -> anyhow::Result<()> {
+fn set_secondary_files_empty(value: &mut DefaultValue) -> crate::Result<()> {
     match value {
         DefaultValue::FileOrDirectory(FileOrDirectory::File(file))
             if file.secondary_files.is_none() =>
@@ -288,7 +288,7 @@ pub(crate) async fn handle_secondary_files(
     work_dir: &Path,
     context: &EvaluationContext<'_>,
     storage: &StorageBackend,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let Some(location) = &file.location else {
         debug!("Can not evaluate secondary_files as location is not set");
         return Ok(());
@@ -357,7 +357,7 @@ pub(crate) async fn handle_secondary_files(
 pub(crate) fn resolve_location_from_primary(
     primary: &File,
     item: &mut FileOrDirectory,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     if item.location().is_none()
         && let Some(path) = item.path().cloned()
     {
@@ -379,7 +379,7 @@ pub(crate) async fn handle_secondary_file_schema(
     item: &SecondaryFileSchema,
     context: &EvaluationContext<'_>,
     storage: &StorageBackend,
-) -> anyhow::Result<Option<Vec<PathOrFile>>> {
+) -> crate::Result<Option<Vec<PathOrFile>>> {
     let location = file.location.as_ref().unwrap();
     let url = Url::parse(location)?;
 
@@ -410,12 +410,12 @@ pub(crate) async fn handle_secondary_file_schema(
             .iter()
             .any(|f| f.location().unwrap() == &secondary_url.to_string())
     {
-        anyhow::bail!("required secondary file not found {pattern} for {file:?}");
+        crate::bail!("required secondary file not found {pattern} for {file:?}");
     }
 
     if !storage.exists(&secondary_url).await? && !storage.is_dir(&secondary_url).await? {
         if is_required {
-            anyhow::bail!("required secondary file not found {pattern}");
+            crate::bail!("required secondary file not found {pattern}");
         }
         debug!("secondary file not found {pattern}");
         return Ok(None);
@@ -443,7 +443,7 @@ fn apply_secondary_pattern(url: &Url, pattern: &str) -> Url {
 fn handle_secondary_file_from_expression(
     dv: DefaultValue,
     base_url: &Url,
-) -> anyhow::Result<Option<Vec<PathOrFile>>> {
+) -> crate::Result<Option<Vec<PathOrFile>>> {
     match dv {
         DefaultValue::FileOrDirectory(fod) => Ok(Some(vec![PathOrFile::File(Box::new(fod))])),
         DefaultValue::Any(serde_json::Value::String(filename)) => {

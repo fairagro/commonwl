@@ -75,7 +75,7 @@ pub trait TaskBackend: Send + Sync + 'static {
         &self,
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
-    ) -> anyhow::Result<TaskExecutionResult>;
+    ) -> crate::Result<TaskExecutionResult>;
 
     fn task_scoped(&self) -> Arc<dyn TaskBackend>;
     fn storage(&self) -> Arc<StorageBackend>;
@@ -174,7 +174,7 @@ pub(crate) async fn run_with_timelimit(
     token: CancellationToken,
     timelimit: Option<&ToolTimeLimit>,
     eval_context: &EvaluationContext<'_>,
-) -> anyhow::Result<NonEmpty<ExitStatus>> {
+) -> crate::Result<NonEmpty<ExitStatus>> {
     let timeout = timelimit.and_then(|ttl| match &ttl.timelimit {
         IntegerOrExpression::Int(i) => Some(i64::from(*i)),
         IntegerOrExpression::Long(i) => Some(*i),
@@ -251,13 +251,13 @@ pub(crate) fn resolve_output_location(
     outdir: &StoragePath,
     tmpdir: &StoragePath,
     eval_context: &EvaluationContext<'_>,
-) -> anyhow::Result<StoragePath> {
+) -> crate::Result<StoragePath> {
     if let Some(name) = explicit_name {
         let name = do_eval_to_string(name, eval_context);
-        outdir.join(&name)
+        Ok(outdir.join(&name)?)
     } else {
         let name = format!("{prefix}_{}", &Uuid::new_v4().to_string()[..8]);
-        tmpdir.join(&name)
+        Ok(tmpdir.join(&name)?)
     }
 }
 
@@ -276,7 +276,7 @@ pub fn execute(
     backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
-) -> BoxFuture<'_, anyhow::Result<ExecutionResult>> {
+) -> BoxFuture<'_, crate::Result<ExecutionResult>> {
     match &request.specification {
         CWLDocument::Workflow(_) => execute_workflow(backend, request, token).boxed(),
         CWLDocument::CommandLineTool(_) | CWLDocument::ExpressionTool(_) => {
@@ -296,7 +296,7 @@ pub async fn execute_workflow(
     backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
-) -> anyhow::Result<ExecutionResult> {
+) -> crate::Result<ExecutionResult> {
     let started_at = Utc::now().naive_utc();
 
     //create validator
@@ -419,12 +419,12 @@ pub async fn execute_workflow(
                     let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
                     if let Some(when) = &step.when {
                         if cwl_version < V1_2_0 {
-                            anyhow::bail!(
+                            crate::bail!(
                                 "Conditional execution with when is not supported for CWL version {cwl_version}",
                             );
                         }
                         let serde_json::Value::Bool(result) = do_eval(when, &eval_context)? else {
-                            anyhow::bail!("Condition {when} did not evaluate to boolean");
+                            crate::bail!("Condition {when} did not evaluate to boolean");
                         };
                         if !result {
                             let null_outputs = step
@@ -477,12 +477,12 @@ pub async fn execute_workflow(
                 let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
                 if let Some(when) = &step.when {
                     if cwl_version < V1_2_0 {
-                        anyhow::bail!(
+                        crate::bail!(
                             "Conditional execution with when is not supported for CWL version {cwl_version}",
                         );
                     }
                     let serde_json::Value::Bool(result) = do_eval(when, &eval_context)? else {
-                        anyhow::bail!("Condition {when} did not evaluate to boolean");
+                        crate::bail!("Condition {when} did not evaluate to boolean");
                     };
                     if !result {
                         debug!("Step skipped because when evaluated to false in {step_id_clone}",);
@@ -602,7 +602,7 @@ fn execute_step(
     inputs: InputObject,
     token: CancellationToken,
     request: &ExecutionRequest,
-) -> anyhow::Result<JoinHandle<anyhow::Result<(String, ExecutionResult)>>> {
+) -> crate::Result<JoinHandle<crate::Result<(String, ExecutionResult)>>> {
     let step_id_clone = step.id.clone().unwrap();
     match &step.run {
         StringOrDocument::String(s) => {
@@ -616,7 +616,7 @@ fn execute_step(
             )?;
 
             let span = tracing::Span::current();
-            let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
+            let handle: tokio::task::JoinHandle<crate::Result<(String, ExecutionResult)>> =
                 tokio::spawn(
                     async move {
                         let result = execute(backend, &request, token).await?;
@@ -636,7 +636,7 @@ fn execute_step(
             )?;
 
             let span = tracing::Span::current();
-            let handle: tokio::task::JoinHandle<anyhow::Result<(String, ExecutionResult)>> =
+            let handle: tokio::task::JoinHandle<crate::Result<(String, ExecutionResult)>> =
                 tokio::spawn(
                     async move {
                         let result = execute(backend, &request, token).await?;
@@ -657,7 +657,7 @@ pub async fn execute_commandline_tool(
     backend: Arc<dyn TaskBackend>,
     request: &ExecutionRequest,
     token: CancellationToken,
-) -> anyhow::Result<ExecutionResult> {
+) -> crate::Result<ExecutionResult> {
     //create validator
     let fv = get_format_validator(&request.specification, &request.working_dir)?;
     let cwl_version = cwl_version(&request.specification)?;
@@ -948,7 +948,7 @@ pub async fn execute_commandline_tool(
             step_timings: None,
         })
     } else {
-        anyhow::bail!("Unsupported document type for execution")
+        crate::bail!("Unsupported document type for execution")
     }
 }
 

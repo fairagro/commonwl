@@ -15,7 +15,7 @@ pub(crate) fn collect_raw_inputs(
     step: &WorkflowStep,
     completed_outputs: &HashMap<String, DefaultValue>,
     mir: Option<&MultipleInputFeatureRequirement>,
-) -> anyhow::Result<InputObject> {
+) -> crate::Result<InputObject> {
     Ok(input_object(
         step,
         collect_workflow_step_inputs(completed_outputs, step, mir)?,
@@ -46,7 +46,7 @@ fn collect_workflow_step_inputs(
     completed_outputs: &HashMap<String, DefaultValue>,
     step: &WorkflowStep,
     mir: Option<&MultipleInputFeatureRequirement>,
-) -> anyhow::Result<HashMap<String, DefaultValue>> {
+) -> crate::Result<HashMap<String, DefaultValue>> {
     let mut inputs: HashMap<String, DefaultValue> = HashMap::with_capacity(step.r#in.len());
 
     for workflow_step_input in &step.r#in {
@@ -58,12 +58,11 @@ fn collect_workflow_step_inputs(
                 let resolved = sources
                     .iter()
                     .map(|s| {
-                        completed_outputs
-                            .get(s)
-                            .cloned()
-                            .ok_or_else(|| anyhow::anyhow!("Could not find input {s}"))
+                        completed_outputs.get(s).cloned().ok_or_else(|| {
+                            crate::RunnerError::Guard(format!("Could not find input {s}"))
+                        })
                     })
-                    .collect::<anyhow::Result<Vec<_>>>()?;
+                    .collect::<crate::Result<Vec<_>>>()?;
                 let link_merge = workflow_step_input
                     .link_merge
                     .unwrap_or(LinkMergeMethod::MergeNested);
@@ -124,7 +123,7 @@ pub(crate) fn eval_inputs(
     step: &WorkflowStep,
     raw_inputs: InputObject,
     eval_context: &EvaluationContext,
-) -> anyhow::Result<InputObject> {
+) -> crate::Result<InputObject> {
     let mut transformed = HashMap::with_capacity(step.r#in.len());
     let inputs = &raw_inputs.inputs;
     for workflow_step_input in &step.r#in {
@@ -154,7 +153,7 @@ pub(crate) fn eval_inputs(
 pub(crate) fn handle_link_merge(
     link_merge: LinkMergeMethod,
     values: Vec<DefaultValue>,
-) -> anyhow::Result<Vec<DefaultValue>> {
+) -> crate::Result<Vec<DefaultValue>> {
     match link_merge {
         LinkMergeMethod::MergeNested => Ok(values),
         LinkMergeMethod::MergeFlattened => {
@@ -179,7 +178,7 @@ pub(crate) fn handle_pick_value(
     output_id: &str,
     pick_value: PickValueMethod,
     values: Vec<DefaultValue>,
-) -> anyhow::Result<DefaultValue> {
+) -> crate::Result<DefaultValue> {
     match pick_value {
         PickValueMethod::AllNonNull => {
             let filtered = values.into_iter().filter(|v| !v.is_null()).collect::<Vec<_>>();
@@ -189,14 +188,14 @@ pub(crate) fn handle_pick_value(
             values
                 .into_iter()
                 .find(|v| !v.is_null())
-                .ok_or_else(|| anyhow::anyhow!(
+                .ok_or_else(|| crate::RunnerError::Guard(format!(
                     "No output for {output_id}, pick value `FirstNonNull` requires at least one non-null value"
-                ))
+                )))
         }
         PickValueMethod::TheOnlyNonNull => {
             let non_null: Vec<_> = values.into_iter().filter(|v| !v.is_null()).collect();
             if non_null.len() != 1 {
-                anyhow::bail!(
+                crate::bail!(
                     "Output {output_id}: pick value `TheOnlyNonNull` requires exactly one non-null value, found {}",
                     non_null.len()
                 );

@@ -52,6 +52,8 @@ horned-owl.workspace = true
 # util
 chrono.workspace = true
 anyhow.workspace = true
+thiserror.workspace = true
+miette.workspace = true
 bon.workspace = true
 tracing.workspace = true
 async-trait.workspace = true

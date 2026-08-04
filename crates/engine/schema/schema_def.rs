@@ -16,7 +16,7 @@ use std::collections::HashMap;
 pub(crate) fn replace_schema_definitions(
     doc: &mut CWLDocument,
     requirements: &[ProcessRequirements],
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let schema_defs = if let Some(sdr) = requirements
         .iter()
         .map(|i| {
@@ -59,7 +59,7 @@ pub(crate) fn replace_schema_definitions(
 fn add_schema_defs_to_command_inputs(
     inputs: &mut Vec<CommandInputParameter>,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in inputs {
         match &mut input.r#type {
             CommandInputParameterType::CommandInputType(OneOrMany::One(ty)) => {
@@ -79,7 +79,7 @@ fn add_schema_defs_to_command_inputs(
 fn add_schema_defs_to_command_inputs_impl(
     r#type: &mut CommandInputType,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     match r#type {
         CommandInputType::CommandInputSchema(schema) => match &mut **schema {
             CommandInputSchema::Record(rec) => {
@@ -135,7 +135,7 @@ fn add_schema_defs_to_command_inputs_impl(
 fn add_schema_defs_to_inputs(
     inputs: &mut Vec<WorkflowInputParameter>,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in inputs {
         match &mut input.r#type {
             OneOrMany::One(ty) => add_schema_defs_to_inputs_impl(ty, defs)?,
@@ -152,7 +152,7 @@ fn add_schema_defs_to_inputs(
 fn add_schema_defs_to_inputs_impl(
     r#type: &mut InputType,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     match r#type {
         InputType::InputSchema(schema) => match &mut **schema {
             InputSchema::Record(rec) => {
@@ -209,7 +209,7 @@ fn add_schema_defs_to_inputs_impl(
 fn add_schema_defs_to_command_outputs(
     inputs: &mut Vec<CommandOutputParameter>,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in inputs {
         if let CommandOutputParameterType::CommandOutputType(OneOrMany::One(
             CommandOutputType::String(s),
@@ -226,7 +226,7 @@ fn add_schema_defs_to_command_outputs(
 fn add_schema_defs_to_expression_outputs(
     inputs: &mut Vec<ExpressionToolOutputParameter>,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in inputs {
         if let OneOrMany::One(OutputType::String(s)) = &mut input.r#type
             && let Some(def) = defs.get(&format!("#{s}"))
@@ -241,7 +241,7 @@ fn add_schema_defs_to_expression_outputs(
 fn add_schema_defs_to_outputs(
     inputs: &mut Vec<WorkflowOutputParameter>,
     defs: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in inputs {
         if let CommandOutputParameterType::CommandOutputType(OneOrMany::One(
             CommandOutputType::String(s),
@@ -257,7 +257,7 @@ fn add_schema_defs_to_outputs(
 
 pub(crate) fn get_schema_definitions(
     value: &serde_json::Value,
-) -> anyhow::Result<HashMap<String, serde_json::Value>> {
+) -> crate::Result<HashMap<String, serde_json::Value>> {
     let mut defs = extract_schema_definitions(value);
 
     if !defs.is_empty() {
@@ -305,7 +305,7 @@ fn extract_schema_definitions(value: &serde_json::Value) -> HashMap<String, serd
 fn replace_schema_references(
     value: &mut serde_json::Value,
     schemas: &HashMap<String, serde_json::Value>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     match value {
         serde_json::Value::String(s) => {
             if s.starts_with('#') && schemas.contains_key(s) {

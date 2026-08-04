@@ -43,7 +43,7 @@ impl FormatValidator {
     pub(crate) fn new(
         namespaces: &HashMap<String, String>,
         ontologies: Vec<impl AsRef<Path> + std::fmt::Debug>,
-    ) -> anyhow::Result<Self> {
+    ) -> crate::Result<Self> {
         let mut ontos = vec![];
         for path in ontologies {
             if path.as_ref().extension().is_some_and(|ext| ext == "ttl") {
@@ -212,7 +212,7 @@ impl FormatValidator {
 pub(crate) fn get_format_validator(
     doc: &CWLDocument,
     working_dir: &Path,
-) -> anyhow::Result<FormatValidator> {
+) -> crate::Result<FormatValidator> {
     let extension_fields = match doc {
         CWLDocument::CommandLineTool(clt) => &clt.extension_fields,
         CWLDocument::ExpressionTool(et) => &et.extension_fields,

@@ -6,7 +6,7 @@ use crate::{
     },
     docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
 };
-use anyhow::{Context, ensure};
+use anyhow::Context;
 use async_trait::async_trait;
 use chrono::Utc;
 use crankshaft::engine::{
@@ -64,7 +64,7 @@ impl TaskBackend for LocalBackend {
         &self,
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
-    ) -> anyhow::Result<TaskExecutionResult> {
+    ) -> crate::Result<TaskExecutionResult> {
         let started_at = Utc::now().naive_utc();
         let stdout_file = if let Some(s) = request.stdout_file {
             &format!("{}/{s}", self.container_tmp_dir())
@@ -81,9 +81,15 @@ impl TaskBackend for LocalBackend {
         let mut inputs = request.inputs.to_vec();
 
         //this is a local only backend so we assume outdir is local
-        ensure!(request.outdir.is_local());
+        crate::ensure!(
+            request.outdir.is_local(),
+            "local backend requires a local outdir"
+        );
         let outdir = request.outdir.as_local_path()?;
-        ensure!(request.tmpdir.is_local());
+        crate::ensure!(
+            request.tmpdir.is_local(),
+            "local backend requires a local tmpdir"
+        );
         let tmpdir = request.tmpdir.as_local_path()?;
 
         //lock in file literals

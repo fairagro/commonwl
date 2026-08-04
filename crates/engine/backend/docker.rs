@@ -5,7 +5,6 @@ use crate::{
     },
     docker::build_container,
 };
-use anyhow::ensure;
 use async_trait::async_trait;
 use chrono::Utc;
 use crankshaft::{
@@ -54,7 +53,7 @@ impl DockerBackend {
         config: Config,
         storage: Arc<StorageBackend>,
         data_store: StoragePath,
-    ) -> anyhow::Result<Self> {
+    ) -> crate::Result<Self> {
         const NAME_BUFFER_LEN: usize = 4096;
         let names = Arc::new(Mutex::new(GeneratorIterator::new(
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
@@ -81,7 +80,7 @@ impl TaskBackend for DockerBackend {
         &self,
         request: &TaskExecutionRequest<'_>,
         token: CancellationToken,
-    ) -> anyhow::Result<TaskExecutionResult> {
+    ) -> crate::Result<TaskExecutionResult> {
         let started_at = Utc::now().naive_utc();
         //handle docker requirement
         let resolved =
@@ -114,9 +113,15 @@ impl TaskBackend for DockerBackend {
         };
 
         //this is a local only backend so we assume outdir is local
-        ensure!(request.outdir.is_local());
+        crate::ensure!(
+            request.outdir.is_local(),
+            "docker backend requires a local outdir"
+        );
         let outdir = request.outdir.as_local_path()?;
-        ensure!(request.tmpdir.is_local());
+        crate::ensure!(
+            request.tmpdir.is_local(),
+            "docker backend requires a local tmpdir"
+        );
         let tmpdir = request.tmpdir.as_local_path()?;
 
         let mut args = request
@@ -284,7 +289,7 @@ impl DockerBackend {
         &self,
         container: &str,
         token: CancellationToken,
-    ) -> anyhow::Result<Option<Vec<String>>> {
+    ) -> crate::Result<Option<Vec<String>>> {
         //ensure image
         self.client.ensure_image(container, token).await?;
         let info = self.client.inner().inspect_image(container).await?;

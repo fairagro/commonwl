@@ -4,7 +4,7 @@ use cwl_core::{
 };
 use std::collections::{HashMap, HashSet, VecDeque};
 
-pub(crate) fn build_execution_tree(workflow: &Workflow) -> anyhow::Result<Vec<Vec<&WorkflowStep>>> {
+pub(crate) fn build_execution_tree(workflow: &Workflow) -> crate::Result<Vec<Vec<&WorkflowStep>>> {
     let step_map = workflow
         .steps
         .iter()
@@ -74,7 +74,7 @@ pub(crate) fn build_execution_tree(workflow: &Workflow) -> anyhow::Result<Vec<Ve
     }
 
     if visited != step_map.len() {
-        anyhow::bail!("Cycle detected in workflow step dependencies");
+        crate::bail!("Cycle detected in workflow step dependencies");
     }
 
     Ok(waves)

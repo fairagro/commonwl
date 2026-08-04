@@ -35,7 +35,7 @@ pub fn build_command(
     tool: &CommandLineTool,
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
-) -> anyhow::Result<Vec<String>> {
+) -> crate::Result<Vec<String>> {
     let mut args: Vec<String> = vec![];
 
     let ijsr = tool.get_requirement_or_hint::<InlineJavascriptRequirement>();
@@ -104,7 +104,7 @@ pub fn build_command(
     for input in &tool.inputs {
         //check input id is present (should always be the case!)
         let Some(input_id) = &input.id else {
-            anyhow::bail!("No input id");
+            crate::bail!("No input id");
         };
         //check for value given
         let value = inputs
@@ -115,7 +115,7 @@ pub fn build_command(
             && !input.r#type.is_null_allowed()
         {
             //We have null value and type is not nullable!
-            anyhow::bail!("No input for `{}` given!", input.id.as_ref().unwrap());
+            crate::bail!("No input for `{}` given!", input.id.as_ref().unwrap());
         }
 
         //do not flags if false
@@ -178,7 +178,7 @@ fn collect_input_bindings(
     name: &str,
     base_sort_key: &[SortKey],
     bindings: &mut Vec<BoundBinding>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let matched_schema =
         if let CommandInputParameterType::CommandInputType(OneOrMany::Many(types)) = schema {
             types
@@ -269,7 +269,7 @@ fn collect_input_bindings(
                                 )?;
                             } else if !is_optional {
                                 //not found but not optional
-                                anyhow::bail!(
+                                crate::bail!(
                                     "input did not provide input for struct field {}",
                                     field.name.clone()
                                 );
@@ -374,11 +374,11 @@ pub(crate) fn generate_arg(
     runtime: &Runtime,
     inputs: Option<&HashMap<String, DefaultValue>>,
     ijsr: Option<&InlineJavascriptRequirement>,
-) -> anyhow::Result<Vec<String>> {
+) -> crate::Result<Vec<String>> {
     let sep = binding.separate.unwrap_or(true);
 
     if binding.prefix.is_none() && !sep {
-        anyhow::bail!("if `separate` is false a prefix is mandatory.")
+        crate::bail!("if `separate` is false a prefix is mandatory.")
     }
 
     if let Some(value_from) = &binding.value_from {
@@ -465,7 +465,7 @@ fn use_value_from(
     inputs: &HashMap<String, DefaultValue>,
     runtime: &Runtime,
     ijsr: Option<&InlineJavascriptRequirement>,
-) -> anyhow::Result<Vec<String>> {
+) -> crate::Result<Vec<String>> {
     //evaluate first
     let mut value = DefaultValue::Any(serde_json::Value::String(
         binding.value_from.clone().unwrap_or_default(),
@@ -489,7 +489,7 @@ fn use_value_from(
         }
         value = dv;
     } else {
-        anyhow::bail!("Expression evaluation failed!")
+        crate::bail!("Expression evaluation failed!")
     }
 
     let values = match value {

@@ -1,4 +1,5 @@
 use crate::{
+    RunnerError,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
     io::{
         file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
@@ -49,7 +50,7 @@ pub(crate) async fn collect_command_outputs(
     stderr_file: &StoragePath,
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<HashMap<String, DefaultValue>> {
+) -> crate::Result<HashMap<String, DefaultValue>> {
     let cwl_output_json = &context.source_dir.join("cwl.output.json")?.as_url()?;
     if storage.exists(cwl_output_json).await? {
         let contents = storage.read_file(cwl_output_json).await?;
@@ -99,21 +100,21 @@ pub(crate) async fn collect_command_outputs(
 fn resolve_output_source_location(
     source_location: &str,
     context: &OutputCollectionContext,
-) -> anyhow::Result<Url> {
+) -> crate::Result<Url> {
     if let Ok(url) = Url::parse(source_location) {
         return Ok(url);
     }
     if let StoragePath::Remote(_) = context.source_dir {
         let base_path = context.source_dir.path();
         if let Some(stripped) = source_location.strip_prefix(&base_path) {
-            return context
+            return Ok(context
                 .source_dir
                 .join(stripped.trim_start_matches('/'))?
-                .as_url();
+                .as_url()?);
         }
     }
     Url::from_file_path(source_location)
-        .map_err(|()| anyhow::anyhow!("invalid source location: {source_location}"))
+        .map_err(|()| RunnerError::Guard(format!("invalid source location: {source_location}")))
 }
 
 /// A glob built from `$(runtime.outdir)` carries a bare remote path prefix; remote `Storage::glob` only matches relative patterns, so strip it back off.
@@ -132,7 +133,7 @@ fn list_remote_listing<'a>(
     dir_url: &'a Url,
     recursive: bool,
     storage: &'a StorageBackend,
-) -> BoxFuture<'a, anyhow::Result<Vec<FileOrDirectory>>> {
+) -> BoxFuture<'a, crate::Result<Vec<FileOrDirectory>>> {
     async move {
         let mut entries = vec![];
         for child in storage.glob(dir_url, "*").await? {
@@ -207,7 +208,7 @@ async fn evaluate_command_binding(
     secondary_files: Option<&OneOrMany<SecondaryFileSchema>>,
     output_id: &String,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<Vec<DefaultValue>> {
+) -> crate::Result<Vec<DefaultValue>> {
     let mut results = vec![];
 
     //collect items via globs
@@ -291,9 +292,9 @@ async fn evaluate_command_binding(
                     .collect(),
                 single_value => vec![serde_json::from_value(single_value)?],
             },
-            Err(e) => anyhow::bail!(
-                "Failed to evaluate outputEval expression for output {output_id}: {e}"
-            ),
+            Err(e) => {
+                crate::bail!("Failed to evaluate outputEval expression for output {output_id}: {e}")
+            }
         };
     }
 
@@ -322,7 +323,7 @@ async fn handle_secondary_files(
     secondary_files: &OneOrMany<SecondaryFileSchema>,
     context: &EvaluationContext<'_>,
     storage: &StorageBackend,
-) -> anyhow::Result<Vec<FileOrDirectory>> {
+) -> crate::Result<Vec<FileOrDirectory>> {
     if file.location.is_none() {
         debug!("Can not evaluate secondary_files as location is not set");
         return Ok(vec![]);
@@ -382,7 +383,7 @@ fn validate_output_item<'a>(
     base_path: &'a Path,
     copy: bool, // indicates whether we need to copy file and dir
     storage: Arc<StorageBackend>,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         match item {
             FileOrDirectory::File(file) => {
@@ -406,7 +407,7 @@ async fn validate_file(
     base_path: &Path,
     copy: bool,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let path =
         get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref()).map(|p| {
             if copy {
@@ -437,7 +438,7 @@ async fn validate_file(
                 file.size = Some(Integer::Long(size.cast_signed()));
             }
         } else {
-            anyhow::bail!("Source location {source_location} does not exist for output file");
+            crate::bail!("Source location {source_location} does not exist for output file");
         }
     } else if let Some(dest_path) = &path
         && let Some(contents) = &file.contents
@@ -493,7 +494,7 @@ async fn validate_dir(
     base_path: &Path,
     copy: bool,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
         .map(|p| if copy { unique_path(&p, None) } else { p });
 
@@ -516,7 +517,7 @@ async fn validate_dir(
                 downloaded = true;
             }
         } else {
-            anyhow::bail!("Source location {source_location} does not exist for output directory");
+            crate::bail!("Source location {source_location} does not exist for output directory");
         }
 
         if downloaded && u_source_location.scheme() != "file" {
@@ -592,7 +593,7 @@ async fn collect_output_item(
     stderr_file: &StoragePath,
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<DefaultValue> {
+) -> crate::Result<DefaultValue> {
     let format = output.format.as_ref().map(|f| f.as_one().clone());
     let value = match &output.r#type {
         CommandOutputParameterType::Stdout => {
@@ -619,7 +620,7 @@ async fn collect_output_item(
     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
         let valid = validate_output_type(&r#type.clone().map(Into::into), &value);
         if !valid {
-            anyhow::bail!("Output value {value:?} does not match output type {type:?}")
+            crate::bail!("Output value {value:?} does not match output type {type:?}")
         }
     }
 
@@ -635,7 +636,7 @@ fn collect_item<'a>(
     secondary_files: Option<&'a OneOrMany<SecondaryFileSchema>>,
     context: &'a OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> BoxFuture<'a, anyhow::Result<DefaultValue>> {
+) -> BoxFuture<'a, crate::Result<DefaultValue>> {
     async move {
     let output_id = output.id.clone().unwrap_or_default();
 
@@ -732,7 +733,7 @@ fn validate_output_item_recurse<'a>(
     format: Option<&'a String>,
     context: &'a OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> BoxFuture<'a, anyhow::Result<()>> {
+) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         match item {
             DefaultValue::FileOrDirectory(fod) => {
@@ -795,7 +796,7 @@ async fn handle_file(
     format: Option<String>,
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<DefaultValue> {
+) -> crate::Result<DefaultValue> {
     let filename = path.file_name().unwrap();
     let filename = Path::new(&filename);
 
@@ -813,7 +814,7 @@ async fn handle_dir(
     path: &StoragePath,
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<DefaultValue> {
+) -> crate::Result<DefaultValue> {
     let url = path.as_url()?.clone();
     let relative_path = url
         .path()
@@ -850,7 +851,7 @@ pub(crate) async fn collect_expression_outputs(
     value: &serde_json::Value,
     context: &OutputCollectionContext<'_>,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<HashMap<String, DefaultValue>> {
+) -> crate::Result<HashMap<String, DefaultValue>> {
     let mut output_map = HashMap::new();
     for output in outputs {
         let output_id = output.id.clone().unwrap_or_default();
@@ -881,7 +882,7 @@ pub(crate) async fn collect_workflow_outputs(
     context: &OutputCollectionContext<'_>,
     mir: Option<&MultipleInputFeatureRequirement>,
     storage: Arc<StorageBackend>,
-) -> anyhow::Result<HashMap<String, DefaultValue>> {
+) -> crate::Result<HashMap<String, DefaultValue>> {
     let mut output_map = HashMap::new();
 
     for output in outputs {
@@ -896,7 +897,7 @@ pub(crate) async fn collect_workflow_outputs(
                                 DefaultValue::Any(serde_json::Value::Array(arr)) => arr
                                     .into_iter()
                                     .map(|v| serde_json::from_value(v).map_err(Into::into))
-                                    .collect::<anyhow::Result<Vec<DefaultValue>>>()?,
+                                    .collect::<crate::Result<Vec<DefaultValue>>>()?,
                                 other => vec![other],
                             };
                             let merged = handle_link_merge(
@@ -921,7 +922,7 @@ pub(crate) async fn collect_workflow_outputs(
                         {
                             let valid = validate_output_type(&r#type.clone().map(Into::into), &value);
                             if !valid {
-                                anyhow::bail!(
+                                crate::bail!(
                                     "Invalid value for {output_id}. {type:?} does not match {value:?}",
                                 );
                             }
@@ -948,7 +949,7 @@ pub(crate) async fn collect_workflow_outputs(
                     } else if mir.is_some() {
                         DefaultValue::Any(serde_json::to_value(merged)?)
                     } else {
-                        anyhow::bail!(
+                        crate::bail!(
                             "Needs to use either pick_value or MultipleInputFeatureRequirement with multiple output_sources"
                         );
                     };
@@ -964,7 +965,7 @@ pub(crate) async fn collect_workflow_outputs(
                     if let CommandOutputParameterType::CommandOutputType(r#type) = &output.r#type {
                         let valid = validate_output_type(&r#type.clone().map(Into::into), &value);
                         if !valid {
-                            anyhow::bail!(
+                            crate::bail!(
                                 "Invalid value for {output_id}. {type:?} does not match {value:?}"
                             );
                         }

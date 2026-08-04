@@ -117,7 +117,7 @@ pub fn create_execution_request(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     inputs_path: impl AsRef<Path> + std::fmt::Debug,
     outputs_path: Option<&Path>,
-) -> anyhow::Result<ExecutionRequest> {
+) -> crate::Result<ExecutionRequest> {
     let working_dir = env::current_dir()?;
     let base_path = base_path(&specification_path, working_dir)?;
 
@@ -133,7 +133,7 @@ pub fn create_execution_request_with_inputs(
     inputs: InputObject,
     outputs_path: Option<&Path>,
     parent: Option<&ExecutionRequest>,
-) -> anyhow::Result<ExecutionRequest> {
+) -> crate::Result<ExecutionRequest> {
     let doc = load_cwl_file(&specification_path, true)?;
 
     let working_dir = env::current_dir()?;
@@ -151,7 +151,7 @@ pub fn create_execution_request_from_document(
     base_path: impl AsRef<Path>,
     outputs_path: Option<&Path>,
     parent: Option<&ExecutionRequest>,
-) -> anyhow::Result<ExecutionRequest> {
+) -> crate::Result<ExecutionRequest> {
     let environment = build_environment(&inputs);
 
     let mut requirements = collect_requirements(&specification, &inputs);
@@ -191,7 +191,7 @@ pub fn create_execution_request_from_document(
 pub fn load_input_file_from_file(
     path: impl AsRef<Path> + std::fmt::Debug,
     base_path: impl AsRef<Path>,
-) -> anyhow::Result<InputObject> {
+) -> crate::Result<InputObject> {
     //if not absolute it should be relative to the current working directory
     let path = if path.as_ref().is_absolute() {
         dunce::canonicalize(path)?
@@ -288,7 +288,7 @@ fn adjust_path_to_base(
 fn base_path(
     specification_path: impl AsRef<Path> + std::fmt::Debug,
     working_dir: impl AsRef<Path>,
-) -> anyhow::Result<PathBuf> {
+) -> crate::Result<PathBuf> {
     let p = specification_path
         .as_ref()
         .parent()

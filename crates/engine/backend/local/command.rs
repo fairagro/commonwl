@@ -50,7 +50,9 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
         let storage = self.storage.clone();
         Ok(async move {
             let mut statuses = Vec::new();
-            stage_inputs(storage, task.inputs()).await?;
+            stage_inputs(storage, task.inputs())
+                .await
+                .map_err(|e| TaskRunError::Other(e.into()))?;
 
             for execution in task.executions() {
                 if token.is_cancelled() {
@@ -118,7 +120,9 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
                 statuses.push(status);
             }
 
-            stage_outputs(task.outputs()).await?;
+            stage_outputs(task.outputs())
+                .await
+                .map_err(|e| TaskRunError::Other(e.into()))?;
 
             Ok(NonEmpty::from_vec(statuses).unwrap())
         }
@@ -129,7 +133,7 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
 async fn stage_inputs(
     storage: Arc<StorageBackend>,
     inputs: impl Iterator<Item = &Input>,
-) -> anyhow::Result<()> {
+) -> crate::Result<()> {
     for input in inputs {
         let dest = Path::new(input.path());
         if let Some(parent) = dest.parent() {
@@ -179,7 +183,7 @@ async fn stage_inputs(
     Ok(())
 }
 
-async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result<()> {
+async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> crate::Result<()> {
     for output in outputs {
         let src = Path::new(output.path());
         if let Some(parent) = src.parent() {
@@ -191,7 +195,7 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
         let dest = output.url();
         let dest_url = Url::parse(dest)?;
         if dest_url.scheme() != "file" {
-            anyhow::bail!(
+            crate::bail!(
                 "Schema {} is not yet supported for outputs",
                 dest_url.scheme()
             );
@@ -225,7 +229,7 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> anyhow::Result
 }
 
 /// Hardlinks `src` to `dest` when possible, falling back to a real copy when linking isn't possibru
-async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
+async fn link_or_copy_file(src: &Path, dest: &Path) -> crate::Result<()> {
     if is_same_file(src, dest) {
         return Ok(());
     }
@@ -242,17 +246,17 @@ async fn link_or_copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
         }
     }
 
-    fs::copy(src, dest).await.map(|_| ()).with_context(|| {
+    Ok(fs::copy(src, dest).await.map(|_| ()).with_context(|| {
         format!(
             "Could not copy from {} to {}",
             src.display(),
             dest.display()
         )
-    })
+    })?)
 }
 
 /// Directory analogue of [`link_or_copy_file`]
-fn link_or_copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::Result<()>> {
+fn link_or_copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         fs::create_dir_all(dest)
             .await

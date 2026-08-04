@@ -3,7 +3,7 @@ use crate::{
     io::normalize_url,
     string_url_to_path_string,
 };
-use anyhow::{Context, ensure};
+use anyhow::Context;
 use crankshaft::engine::{
     Task,
     task::{
@@ -21,7 +21,7 @@ use url::Url;
 /// wherever a downloaded remote directory's listing gets generated (see `output.rs`).
 pub(crate) const EMPTY_DIR_MARKER: &str = ".cwl_empty_dir";
 
-pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> anyhow::Result<()> {
+pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> crate::Result<()> {
     let ty = match input {
         FileOrDirectory::File(_) => input::Type::File,
         FileOrDirectory::Directory(_) => input::Type::Directory,
@@ -84,7 +84,7 @@ pub(crate) async fn mount_workdir_item(
     use_container: bool,
     backend: Arc<StorageBackend>,
     strategy: MountStrategy,
-) -> anyhow::Result<Vec<Input>> {
+) -> crate::Result<Vec<Input>> {
     match strategy {
         MountStrategy::Local => {
             mount_workdir_item_local(mount, outdir, use_container, backend).await
@@ -101,11 +101,14 @@ async fn mount_workdir_item_local(
     outdir: &Url,
     use_container: bool,
     backend: Arc<StorageBackend>,
-) -> anyhow::Result<Vec<Input>> {
+) -> crate::Result<Vec<Input>> {
     let mut inputs = vec![];
     //strategy is local to we can assume that target is, too
-    ensure!(mount.target.scheme() == "file");
-    ensure!(outdir.scheme() == "file");
+    crate::ensure!(
+        mount.target.scheme() == "file",
+        "mount target must be a file:// URL"
+    );
+    crate::ensure!(outdir.scheme() == "file", "outdir must be a file:// URL");
     let target = mount
         .target
         .to_file_path()
@@ -159,7 +162,7 @@ async fn mount_workdir_item_local(
                 .build(),
         );
     } else {
-        anyhow::bail!(
+        crate::bail!(
             "Workdir item target {} is outside of working directory and container is not used, can not stage",
             target.display()
         );
@@ -174,7 +177,7 @@ async fn mount_workdir_item_remote(
     use_container: bool,
     backend: Arc<StorageBackend>,
     base_url: &Url,
-) -> anyhow::Result<Vec<Input>> {
+) -> crate::Result<Vec<Input>> {
     let mut inputs = vec![];
     //mounting here is "uploading", so if the file is already remote crankshaft should be able to handle it
     let target = mount.target.as_str();
@@ -200,7 +203,7 @@ async fn mount_workdir_item_remote(
         // out-of-convention absolute entryname: mount at just its path, not the full staging URL
         mount.target.path().to_string()
     } else {
-        anyhow::bail!(
+        crate::bail!(
             "Workdir item target {target} is outside of working directory and container is not used, can not stage"
         );
     };

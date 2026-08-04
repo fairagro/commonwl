@@ -18,7 +18,7 @@ use std::{
 static EXPRESSION_LIB_CACHE: LazyLock<Mutex<HashMap<PathBuf, (SystemTime, String)>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-fn read_expression_lib_include(path: &Path) -> anyhow::Result<String> {
+fn read_expression_lib_include(path: &Path) -> crate::Result<String> {
     let modified = fs::metadata(path).and_then(|m| m.modified()).ok();
 
     if let Some(modified) = modified
@@ -105,7 +105,7 @@ pub(crate) fn do_eval_to_string(expression: &str, eval_context: &EvaluationConte
 pub fn do_eval(
     expression: &str,
     eval_context: &EvaluationContext,
-) -> anyhow::Result<serde_json::Value> {
+) -> crate::Result<serde_json::Value> {
     let expressions = parse_expressions(expression);
 
     if expressions.is_empty() {
@@ -152,7 +152,7 @@ pub fn do_eval(
 fn simple_expression_eval(
     expression: &str,
     map: &HashMap<&str, serde_json::Value>,
-) -> anyhow::Result<serde_json::Value> {
+) -> crate::Result<serde_json::Value> {
     let mut context = Context::default();
 
     for (key, value) in map {
@@ -173,7 +173,7 @@ fn simple_expression_eval(
     if let Some(value) = &mut json {
         normalize_json_numbers(value);
     } else {
-        anyhow::bail!("Expression did not evaluate to a value");
+        crate::bail!("Expression did not evaluate to a value");
     }
 
     Ok(serde_json::to_value(json)?)
@@ -184,7 +184,7 @@ fn js_eval(
     map: &HashMap<&str, serde_json::Value>,
     ijsr: &InlineJavascriptRequirement,
     workdir: Option<&Path>,
-) -> anyhow::Result<serde_json::Value> {
+) -> crate::Result<serde_json::Value> {
     let mut context = Context::default();
     for (key, value) in map {
         let value = JsValue::from_json(value, &mut context).map_err(|e| anyhow::anyhow!("{e}"))?;
@@ -232,7 +232,7 @@ fn js_eval(
     if let Some(value) = &mut json {
         normalize_json_numbers(value);
     } else {
-        anyhow::bail!("Expression did not evaluate to a value");
+        crate::bail!("Expression did not evaluate to a value");
     }
 
     Ok(serde_json::to_value(json)?)
@@ -272,7 +272,7 @@ fn replace_expressions(
     map: &HashMap<&str, serde_json::Value>,
     ijsr: Option<&InlineJavascriptRequirement>,
     workdir: Option<&Path>,
-) -> anyhow::Result<serde_json::Value> {
+) -> crate::Result<serde_json::Value> {
     let evaluations = expressions
         .iter()
         .map(|e| {
@@ -282,7 +282,7 @@ fn replace_expressions(
                 simple_expression_eval(&e.expression(), map)
             }
         })
-        .collect::<anyhow::Result<Vec<serde_json::Value>>>()?;
+        .collect::<crate::Result<Vec<serde_json::Value>>>()?;
 
     let mut result = String::new();
     let mut last_end = 0;
