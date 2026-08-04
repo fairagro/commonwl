@@ -533,7 +533,7 @@ pub async fn execute_workflow(
                 .context("Step task panicked")?
                 .context("Step execution failed")?;
             step_timings.push(StepTiming::new(
-                step_id,
+                &step_id,
                 exec_result.started_at,
                 exec_result.finished_at,
             ));
