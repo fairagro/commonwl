@@ -103,6 +103,28 @@ pub struct ExecutionResult {
     pub finished_at: Option<chrono::NaiveDateTime>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct StepTiming {
+    pub step_id: String,
+    pub started_at: Option<chrono::NaiveDateTime>,
+    pub finished_at: Option<chrono::NaiveDateTime>,
+}
+
+impl StepTiming {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        started_at: Option<chrono::NaiveDateTime>,
+        finished_at: Option<chrono::NaiveDateTime>,
+    ) -> Self {
+        Self {
+            step_id: id.into(),
+            started_at,
+            finished_at,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TaskExecutionRequest<'a> {
     pub id: &'a str,
