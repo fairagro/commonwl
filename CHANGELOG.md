@@ -1,4 +1,7 @@
 # Changelog
+## 0.12.0
+### Added
+- Added RunnerError
 
 ## 0.11.0
 ### Added
