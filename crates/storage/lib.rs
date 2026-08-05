@@ -294,16 +294,32 @@ impl RemoteTempDir {
 
 impl Drop for RemoteTempDir {
     fn drop(&mut self) {
+        let Ok(url) = self.path.as_url() else {
+            return;
+        };
         let storage = self.storage.clone();
-        let path = self.path.clone().as_url().ok();
 
-        tokio::spawn(async move {
-            if let Some(path) = path
-                && let Err(e) = storage.delete(&path).await
-            {
-                tracing::warn!("Failed to clean up temp dir {path}: {e}");
-            }
+        // Drop can't `.await`, and a detached `tokio::spawn` here can lose the race
+        // against process exit (e.g. nextest, where each test is its own short-lived
+        // process) leaving the dir behind. Block this thread on a throwaway runtime
+        // instead, so cleanup has actually finished by the time `drop` returns -
+        // regardless of the calling runtime's flavor (current_thread or multi_thread).
+        let result = std::thread::scope(|scope| {
+            scope
+                .spawn(|| {
+                    tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()?
+                        .block_on(storage.delete(&url))
+                })
+                .join()
         });
+
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => tracing::warn!("Failed to clean up temp dir {url}: {e}"),
+            Err(_) => tracing::warn!("Panicked while cleaning up temp dir {url}"),
+        }
     }
 }
 

@@ -152,7 +152,24 @@ impl TaskBackend for DockerBackend {
                     .stdout(stdout_file)
                     .stderr(stderr_file)
                     .maybe_stdin(request.stdin_file)
-                    .build()
+                    .build(),
+                #[cfg(unix)]
+                {
+                    // containers commonly run as root, so files/dirs the task wrote can end up
+                    // un-removable by the host user afterwards; reopen permissions here (as root,
+                    // while we still have a container) so host-side cleanup of outdir/tmpdir succeeds
+                    Execution::builder()
+                        .work_dir(request.execution_path)
+                        .program("chmod")
+                        .args([
+                            "-R".to_string(),
+                            "a+rwX".to_string(),
+                            request.execution_path.to_string(),
+                            CONTAINER_TMPDIR.to_string(),
+                        ])
+                        .image(DEFAULT_DOCKER_CONTAINER)
+                        .build()
+                }
             ])
             .resources(
                 Resources::builder()
@@ -247,6 +264,19 @@ impl TaskBackend for DockerBackend {
             request.eval_context,
         )
         .await?;
+
+        #[cfg(unix)]
+        {
+            // evaluate permission-cleanup step exit status
+            if let Some(cleanup_status) = exit_status.get(1)
+                && !cleanup_status.success()
+            {
+                tracing::warn!(
+                    "permission cleanup step exited with {cleanup_status}; \
+                 outdir/tmpdir may be left behind under the host temp directory"
+                );
+            }
+        }
 
         let finished_at = Utc::now().naive_utc();
         Ok(TaskExecutionResult {
