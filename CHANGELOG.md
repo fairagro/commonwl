@@ -1,5 +1,5 @@
 # Changelog
-## Unreleased
+## 0.12.1
 ### Fixed
 Format validator improved
 
