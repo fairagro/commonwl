@@ -300,7 +300,7 @@ pub async fn execute_workflow(
     let started_at = Utc::now().naive_utc();
 
     //create validator
-    let fv = get_format_validator(&request.specification, &request.working_dir)?;
+    let fv = get_format_validator(&request.specification, &request.working_dir).await?;
     let cwl_version = cwl_version(&request.specification)?;
 
     let CWLDocument::Workflow(wf) = &request.specification else {
@@ -659,7 +659,7 @@ pub async fn execute_commandline_tool(
     token: CancellationToken,
 ) -> crate::Result<ExecutionResult> {
     //create validator
-    let fv = get_format_validator(&request.specification, &request.working_dir)?;
+    let fv = get_format_validator(&request.specification, &request.working_dir).await?;
     let cwl_version = cwl_version(&request.specification)?;
 
     //get neccessary requirements

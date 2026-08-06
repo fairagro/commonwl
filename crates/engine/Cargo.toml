@@ -42,6 +42,7 @@ pathdiff.workspace = true
 tempfile.workspace = true
 tar.workspace = true
 url.workspace = true
+reqwest.workspace = true
 same-file.workspace = true
 cwl_engine_storage.workspace = true
 

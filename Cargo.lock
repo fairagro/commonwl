@@ -1492,6 +1492,7 @@ dependencies = [
  "pathdiff",
  "rdf",
  "regex",
+ "reqwest",
  "same-file",
  "semver 1.0.28",
  "serde",

@@ -1,0 +1,7 @@
+{
+    "file1": {
+        "class": "File",
+        "location": "hello.txt",
+        "format": "http://edamontology.org/format_1929"
+    }
+}

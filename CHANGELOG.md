@@ -1,4 +1,8 @@
 # Changelog
+## Unreleased
+### Fixed
+Format validator improved
+
 ## 0.12.0
 ### Added
 - Added RunnerError

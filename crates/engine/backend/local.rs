@@ -354,8 +354,9 @@ impl Drop for LocalBackend {
 #[cfg(test)]
 mod tests {
     use crate::{
-        ContainerEngine, InputObject, LocalBackend, create_execution_request_from_document,
-        create_execution_request_with_inputs, execute, execute_commandline_tool,
+        ContainerEngine, InputObject, LocalBackend, create_execution_request,
+        create_execution_request_from_document, create_execution_request_with_inputs, execute,
+        execute_commandline_tool,
     };
     use cwl_core::{
         OneOrMany,
@@ -443,6 +444,57 @@ mod tests {
         let result = crate::execute(backend, &request, cancellation_token).await;
         dbg!(&result);
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_format_validation_with_schema_succeeds() {
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/"))
+                .unwrap();
+        let specification_path =
+            dunce::canonicalize(base_dir.join("format-edam-tool.cwl")).unwrap();
+        let inputs_path = base_dir.join("format-edam-job.json");
+
+        let storage = Arc::new(StorageBackend::new());
+        let data_store = StoragePath::from_local(&env::temp_dir());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            data_store,
+        ));
+        let tmpdir = tempdir().unwrap();
+        let request =
+            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+
+        let cancellation_token = CancellationToken::new();
+        let result = execute(backend, &request, cancellation_token).await;
+        dbg!(&result);
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_format_validation_without_schema_fails() {
+        let base_dir =
+            dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/"))
+                .unwrap();
+        let specification_path =
+            dunce::canonicalize(base_dir.join("format-edam-tool-no-schema.cwl")).unwrap();
+        let inputs_path = base_dir.join("format-edam-job.json");
+
+        let storage = Arc::new(StorageBackend::new());
+        let data_store = StoragePath::from_local(&env::temp_dir());
+        let backend = Arc::new(LocalBackend::new(
+            ContainerEngine::Docker,
+            storage,
+            data_store,
+        ));
+        let tmpdir = tempdir().unwrap();
+        let request =
+            create_execution_request(specification_path, inputs_path, Some(tmpdir.path())).unwrap();
+
+        let cancellation_token = CancellationToken::new();
+        let result = execute(backend, &request, cancellation_token).await;
+        assert!(result.is_err());
     }
 
     #[tokio::test]
