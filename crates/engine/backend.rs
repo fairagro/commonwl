@@ -788,6 +788,16 @@ pub async fn execute_commandline_tool(
             args.push(stdin.clone());
         }
 
+        //evaluate stdout/stderr filename expressions
+        let stdout_name = tool
+            .stdout
+            .as_ref()
+            .map(|name| do_eval_to_string(name, eval_context));
+        let stderr_name = tool
+            .stderr
+            .as_ref()
+            .map(|name| do_eval_to_string(name, eval_context));
+
         info!("Executing: {}", args.join(" "));
 
         let network_access = if let Some(na) = na {
@@ -805,6 +815,7 @@ pub async fn execute_commandline_tool(
         } else {
             false
         };
+        debug!("Network Access is set to {network_access}");
 
         let doc = tool.doc.as_ref().map(|d| docstring(d.clone()));
         let id = tool.id.clone().unwrap_or("Unnamed".to_owned())
@@ -834,8 +845,8 @@ pub async fn execute_commandline_tool(
                     use_container: tool.has_requirement::<DockerRequirement>(), //hints no sufficient
 
                     stdin_file: stdin.as_ref(),
-                    stdout_file: tool.stdout.as_ref(),
-                    stderr_file: tool.stderr.as_ref(),
+                    stdout_file: stdout_name.as_ref(),
+                    stderr_file: stderr_name.as_ref(),
 
                     outdir: outdir.storage_path(),
                     tmpdir: tmpdir.storage_path(),
