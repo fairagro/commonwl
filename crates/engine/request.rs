@@ -172,13 +172,15 @@ pub fn create_execution_request_from_document(
     let cwd = env::current_dir()?;
     let working_dir = dunce::canonicalize(base_path.as_ref())?;
 
+    let outputs_path = outputs_path.and_then(|o| dunce::canonicalize(o).ok());
+
     let ctx = ExecutionRequest {
         requirements,
         hints,
         specification,
         inputs: inputs.inputs,
         working_dir,
-        out_dir: outputs_path.unwrap_or(&cwd).to_path_buf(),
+        out_dir: outputs_path.unwrap_or(cwd),
         environment,
     };
 
