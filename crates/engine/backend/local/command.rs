@@ -81,6 +81,12 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
                 // stdout: open/create the file to write into
                 if let Some(stdout_path) = execution.stdout() {
                     debug!("Redirecting stdout to {stdout_path}");
+                    if let Some(parent) = Path::new(stdout_path).parent() {
+                        fs::create_dir_all(parent)
+                            .await
+                            .with_context(|| format!("Could not create dir: {}", parent.display()))
+                            .map_err(|e| TaskRunError::Other(e.into()))?;
+                    }
                     let file = File::create(stdout_path)
                         .await
                         .map_err(|e| TaskRunError::Other(e.into()))?;
@@ -91,6 +97,12 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
 
                 // stderr: open/create the file to write into
                 if let Some(stderr_path) = execution.stderr() {
+                    if let Some(parent) = Path::new(stderr_path).parent() {
+                        fs::create_dir_all(parent)
+                            .await
+                            .with_context(|| format!("Could not create dir: {}", parent.display()))
+                            .map_err(|e| TaskRunError::Other(e.into()))?;
+                    }
                     let file = File::create(stderr_path)
                         .await
                         .map_err(|e| TaskRunError::Other(e.into()))?;
