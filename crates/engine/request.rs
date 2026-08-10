@@ -172,7 +172,15 @@ pub fn create_execution_request_from_document(
     let cwd = env::current_dir()?;
     let working_dir = dunce::canonicalize(base_path.as_ref())?;
 
-    let outputs_path = outputs_path.and_then(|o| dunce::canonicalize(o).ok());
+    let outputs_path = outputs_path
+        .map(|o| -> crate::Result<PathBuf> {
+            Ok(if o.is_absolute() {
+                dunce::canonicalize(o).unwrap_or_else(|_| o.to_path_buf())
+            } else {
+                std::path::absolute(o)?
+            })
+        })
+        .transpose()?;
 
     let ctx = ExecutionRequest {
         requirements,
@@ -305,6 +313,29 @@ fn base_path(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_relative_nonexistent_outdir_resolves_relative_to_cwd() {
+        let manifest_dir = dunce::canonicalize(env!("CARGO_MANIFEST_DIR")).unwrap();
+        let spec_path = manifest_dir.join("../../testdata/cat-tool.cwl");
+        let inputs_path = manifest_dir.join("../../testdata/cat-job.json");
+
+        let relative_outdir = PathBuf::from("request_rs_test_output_dir_9f3a/nested");
+        assert!(
+            !relative_outdir.exists(),
+            "test path must not exist to exercise the non-canonicalizable case"
+        );
+
+        let ctx = create_execution_request(&spec_path, &inputs_path, Some(relative_outdir.as_path())).unwrap();
+
+        let expected = std::path::absolute(&relative_outdir).unwrap();
+        assert_eq!(ctx.out_dir, expected);
+        assert_ne!(
+            ctx.out_dir,
+            env::current_dir().unwrap(),
+            "must not silently fall back to cwd when the relative outdir doesn't exist yet"
+        );
+    }
 
     #[test]
     fn test_load_execution_context() {
