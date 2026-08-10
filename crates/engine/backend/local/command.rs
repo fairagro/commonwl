@@ -218,6 +218,11 @@ async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> crate::Result<
             .map_err(|()| anyhow::anyhow!("Could not convert output url to file path: {dest}"))?;
         match output.ty() {
             output::Type::File => {
+                if let Some(parent) = dest_path.parent() {
+                    fs::create_dir_all(parent)
+                        .await
+                        .with_context(|| format!("Could not create dir: {}", parent.display()))?;
+                }
                 link_or_copy_file(src, &dest_path).await.with_context(|| {
                     format!(
                         "Could not copy from {} to {}",
@@ -303,8 +308,36 @@ fn is_same_file(src: &Path, dest: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crankshaft::engine::{Task, service::runner::backend::Backend as _, task::Execution};
+    use crankshaft::engine::{
+        Task,
+        service::runner::backend::Backend as _,
+        task::{Execution, Output},
+    };
     use nonempty::nonempty;
+
+    #[tokio::test]
+    async fn test_stage_outputs_creates_missing_dest_parent_dir() {
+        let src_dir = tempfile::tempdir().unwrap();
+        let dest_dir = tempfile::tempdir().unwrap();
+
+        let src_path = src_dir.path().join("nested/sub/sbom.json");
+        fs::create_dir_all(src_path.parent().unwrap())
+            .await
+            .unwrap();
+        fs::write(&src_path, b"{}").await.unwrap();
+
+        let dest_path = dest_dir.path().join("nested/sub/sbom.json");
+        let output = Output::builder()
+            .name("stdout")
+            .path(src_path.to_string_lossy().into_owned())
+            .url(Url::from_file_path(&dest_path).unwrap())
+            .ty(output::Type::File)
+            .build();
+
+        stage_outputs(std::iter::once(&output)).await.unwrap();
+
+        assert_eq!(fs::read_to_string(&dest_path).await.unwrap(), "{}");
+    }
 
     #[tokio::test]
     async fn test_stdout_creates_missing_parent_dir() {
