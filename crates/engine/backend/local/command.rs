@@ -303,6 +303,32 @@ fn is_same_file(src: &Path, dest: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crankshaft::engine::{Task, service::runner::backend::Backend as _, task::Execution};
+    use nonempty::nonempty;
+
+    #[tokio::test]
+    async fn test_stdout_creates_missing_parent_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let stdout_path = dir.path().join("nested/sub/out.txt");
+
+        let task = Task::builder()
+            .name("test")
+            .executions(nonempty![
+                Execution::builder()
+                    .image("unsupported")
+                    .program("echo")
+                    .args(vec!["hello".to_string()])
+                    .stdout(stdout_path.to_string_lossy().into_owned())
+                    .build()
+            ])
+            .build();
+
+        let backend = CommandBackend::new(Arc::new(StorageBackend::new()));
+        let result = backend.run(task, CancellationToken::new()).unwrap().await;
+
+        assert!(result.is_ok(), "expected success, got {:?}", result.err());
+        assert_eq!(fs::read_to_string(&stdout_path).await.unwrap().trim(), "hello");
+    }
 
     #[tokio::test]
     async fn test_link_or_copy_file_survives_source_removal() {
