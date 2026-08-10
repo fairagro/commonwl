@@ -1,4 +1,8 @@
 # Changelog
+## 0.12.2
+### Fixed
+- fixed bug with stdout/stderr in subfolders
+
 ## 0.12.1
 ### Fixed
 Format validator improved

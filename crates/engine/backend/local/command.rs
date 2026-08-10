@@ -85,7 +85,7 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
                         fs::create_dir_all(parent)
                             .await
                             .with_context(|| format!("Could not create dir: {}", parent.display()))
-                            .map_err(|e| TaskRunError::Other(e.into()))?;
+                            .map_err(TaskRunError::Other)?;
                     }
                     let file = File::create(stdout_path)
                         .await
@@ -101,7 +101,7 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
                         fs::create_dir_all(parent)
                             .await
                             .with_context(|| format!("Could not create dir: {}", parent.display()))
-                            .map_err(|e| TaskRunError::Other(e.into()))?;
+                            .map_err(TaskRunError::Other)?;
                     }
                     let file = File::create(stderr_path)
                         .await
@@ -327,7 +327,10 @@ mod tests {
         let result = backend.run(task, CancellationToken::new()).unwrap().await;
 
         assert!(result.is_ok(), "expected success, got {:?}", result.err());
-        assert_eq!(fs::read_to_string(&stdout_path).await.unwrap().trim(), "hello");
+        assert_eq!(
+            fs::read_to_string(&stdout_path).await.unwrap().trim(),
+            "hello"
+        );
     }
 
     #[tokio::test]
