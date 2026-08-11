@@ -1,7 +1,7 @@
 use crate::{Storage, StoragePath};
 use anyhow::{Context, ensure};
 use async_trait::async_trait;
-use dircpy::copy_dir;
+use dircpy::{CopyBuilder, copy_dir};
 use glob::glob;
 use std::path::{Path, PathBuf};
 use url::Url;
@@ -50,13 +50,16 @@ impl Storage for LocalStorage {
                 )
             })?;
         } else {
-            copy_dir(&src, local).with_context(|| {
-                format!(
-                    "Could not copy from {} to {}",
-                    src.display(),
-                    local.display()
-                )
-            })?;
+            CopyBuilder::new(&src, local)
+                .overwrite(true)
+                .run()
+                .with_context(|| {
+                    format!(
+                        "Could not copy from {} to {}",
+                        src.display(),
+                        local.display()
+                    )
+                })?;
         }
         Ok(())
     }

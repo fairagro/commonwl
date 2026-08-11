@@ -1,7 +1,10 @@
 use crate::{
     RunnerError,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
-    io::file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
+    io::{
+        file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
+        unique_path,
+    },
     schema::{format_validation::FormatValidator, validation::validate_type},
     string_url_to_path_string,
     workflow::{handle_link_merge, handle_pick_value},
@@ -405,7 +408,14 @@ async fn validate_file(
     copy: bool,
     storage: Arc<StorageBackend>,
 ) -> crate::Result<()> {
-    let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref());
+    let path =
+        get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref()).map(|p| {
+            if copy {
+                unique_path(&p, file.path.as_ref())
+            } else {
+                p
+            }
+        });
     let dirname = path.as_ref().and_then(|p| p.parent());
     let location = file.location.as_ref().or(file.path.as_ref());
 
@@ -485,6 +495,9 @@ async fn validate_dir(
     copy: bool,
     storage: Arc<StorageBackend>,
 ) -> crate::Result<()> {
+    // Unlike files, colliding directories are merged into the existing one at the same
+    // path (matching cwltool) rather than renamed - see `LocalStorage::download` for the
+    // merge/overwrite semantics.
     let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref());
 
     let location = dir.location.as_ref().or(dir.path.as_ref());
@@ -1005,5 +1018,63 @@ mod tests {
             .await
             .unwrap();
         assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_validate_dir_merges_into_existing_directory_like_cwltool() {
+        let base = tempfile::tempdir().unwrap();
+        let src = tempfile::tempdir().unwrap();
+
+        let dest_dir = base.path().join("mydir");
+        fs::create_dir_all(&dest_dir).unwrap();
+        fs::write(dest_dir.join("existing.txt"), "OLD").unwrap();
+        fs::write(dest_dir.join("old_only.txt"), "OLD_ONLY").unwrap();
+
+        fs::write(src.path().join("existing.txt"), "NEW").unwrap();
+        fs::write(src.path().join("new_only.txt"), "NEW_ONLY").unwrap();
+
+        let mut dir = Directory {
+            location: Some(Url::from_file_path(src.path()).unwrap().to_string()),
+            basename: Some("mydir".to_string()),
+            ..Default::default()
+        };
+
+        let eval_context = EvaluationContext::default();
+        let validator = FormatValidator::new(&HashMap::new(), &[], base.path())
+            .await
+            .unwrap();
+        let storage = Arc::new(StorageBackend::new());
+        let source_dir = StoragePath::from_local(src.path());
+        let context = OutputCollectionContext {
+            source_dir: &source_dir,
+            dest_dir: base.path(),
+            workdir: base.path(),
+            eval_context: &eval_context,
+            validator: &validator,
+        };
+
+        validate_dir(&mut dir, &context, base.path(), true, storage)
+            .await
+            .unwrap();
+
+        assert!(
+            !base.path().join("mydir_2").exists(),
+            "colliding directory must be merged in place, not renamed"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("existing.txt")).unwrap(),
+            "NEW",
+            "file present in both source and dest must be overwritten"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("old_only.txt")).unwrap(),
+            "OLD_ONLY",
+            "file only in dest must be preserved"
+        );
+        assert_eq!(
+            fs::read_to_string(dest_dir.join("new_only.txt")).unwrap(),
+            "NEW_ONLY",
+            "file only in source must be added"
+        );
     }
 }

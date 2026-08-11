@@ -3,6 +3,7 @@ use cwl_core::{files::FileOrDirectory, inputs::DefaultValue};
 use sha1::{Digest, Sha1};
 use std::{
     fs,
+    io::{BufReader, Read},
     path::{Path, PathBuf},
 };
 use url::Url;
@@ -110,6 +111,58 @@ pub fn load_file_contents(dv: &mut DefaultValue) -> crate::Result<()> {
         _ => {}
     }
     Ok(())
+}
+
+pub fn unique_path(dest: &Path, file_source: Option<&String>) -> PathBuf {
+    if !dest.exists() {
+        return dest.to_path_buf();
+    }
+
+    if let Some(source) = file_source
+        && file_checksum(dest).unwrap_or_default()
+            == file_checksum(Path::new(source)).unwrap_or_default()
+    {
+        return dest.to_path_buf();
+    }
+
+    let stem = dest.file_stem().unwrap_or_default();
+    let ext = dest.extension();
+    let parent = dest.parent().unwrap();
+
+    let mut counter = 2;
+    loop {
+        let new_name = match ext {
+            Some(ext) => format!(
+                "{}_{}.{}",
+                stem.to_string_lossy(),
+                counter,
+                ext.to_string_lossy()
+            ),
+            None => format!("{}_{}", stem.to_string_lossy(), counter),
+        };
+        let candidate = parent.join(&new_name);
+        if !candidate.exists() {
+            return candidate;
+        }
+        counter += 1;
+    }
+}
+
+fn file_checksum(path: &Path) -> std::io::Result<[u8; 20]> {
+    let file = std::fs::File::open(path)?;
+    let mut reader = BufReader::with_capacity(64 * 1024, file); // 64KB buffer
+    let mut hasher = Sha1::new();
+    let mut buf = vec![0u8; 64 * 1024];
+
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buf[..n]);
+    }
+
+    Ok(hasher.finalize().into())
 }
 
 pub fn checksum(str: &str) -> String {
