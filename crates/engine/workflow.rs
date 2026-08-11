@@ -98,6 +98,18 @@ fn collect_workflow_step_inputs(
             DefaultValue::Any(serde_json::Value::Null)
         };
 
+        //handle pick_value (e.g. scatter+when produces an array with null entries for skipped iterations)
+        if let Some(pick_value) = workflow_step_input.pick_value {
+            let items = match value {
+                DefaultValue::Any(serde_json::Value::Array(arr)) => arr
+                    .into_iter()
+                    .map(|v| serde_json::from_value(v).map_err(Into::into))
+                    .collect::<crate::Result<Vec<DefaultValue>>>()?,
+                other => vec![other],
+            };
+            value = handle_pick_value(step_input_id, pick_value, items)?;
+        }
+
         //handle input defaults
         if let Some(default) = &workflow_step_input.default
             && value == DefaultValue::Any(serde_json::Value::Null)
