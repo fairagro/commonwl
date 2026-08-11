@@ -317,17 +317,15 @@ fn collect_input_bindings(
 
                         let schema = array.items.clone();
 
-                        let binding = array.input_binding.clone().or_else(|| binding.cloned());
-                        if let Some(binding) = binding {
-                            collect_input_bindings(
-                                &CommandInputParameterType::CommandInputType(schema),
-                                Some(&binding),
-                                &item,
-                                name,
-                                &sort_key,
-                                bindings,
-                            )?;
-                        }
+                        let binding = array.input_binding.clone().unwrap_or_default();
+                        collect_input_bindings(
+                            &CommandInputParameterType::CommandInputType(schema),
+                            Some(&binding),
+                            &item,
+                            name,
+                            &sort_key,
+                            bindings,
+                        )?;
                     }
                 }
             }
@@ -579,13 +577,13 @@ fn apply_shell_quote(arg: &[String]) -> Vec<String> {
 mod tests {
     use super::*;
     use crate::input::collect_inputs;
-    use cwl_engine_storage::StorageBackend;
     use cwl_core::{
         documents::CWLDocument,
         inputs::{CommandInputArraySchema, CommandInputParameter},
         load_cwl_file,
         types::CWLType,
     };
+    use cwl_engine_storage::StorageBackend;
     use std::path::MAIN_SEPARATOR_STR;
     use std::path::{Path, PathBuf};
 
@@ -1058,6 +1056,49 @@ stdout: output.txt"#;
             assert_eq!(res, vec!["-Y", "-X", "a", "-X", "b", "-X", "c"]); //values need to be added recursively respecting the CommandLineBinding of their input schema
         } else {
             unreachable!()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_build_command_array_input_prefix_once() {
+        let yaml = r#"class: CommandLineTool
+cwlVersion: v1.2
+inputs:
+  namespaces:
+    type: string[]
+    inputBinding:
+      prefix: --namespaces
+outputs: []
+baseCommand: [python3, script.py]"#;
+        let doc: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
+
+        let cases = [
+            ("namespaces: [sciwin]", vec!["--namespaces", "sciwin"]),
+            (
+                "namespaces: [sciwin, biocontainers]",
+                vec!["--namespaces", "sciwin", "biocontainers"],
+            ),
+        ];
+
+        for (job, expected_tail) in cases {
+            let input_values = serde_saphyr::from_str(job).unwrap();
+            let inputs = collect_inputs(
+                &doc,
+                &input_values,
+                Path::new("."),
+                Path::new("."),
+                None,
+                None,
+                &StorageBackend::new(),
+            )
+            .await
+            .unwrap();
+
+            let CWLDocument::CommandLineTool(tool) = &doc else {
+                panic!()
+            };
+            let cmd = build_command(tool, &inputs, &Runtime::default()).unwrap();
+            assert_eq!(cmd[2..], expected_tail);
         }
     }
 
