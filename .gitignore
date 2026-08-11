@@ -31,8 +31,5 @@ logs
 funnel-work-dir
 ./funnel-config.yaml
 .dev/.tes-env
-# we dont want AI stuff
-.claude
-CLAUDE.md
 # badge dirs
 badges
