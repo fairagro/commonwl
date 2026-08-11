@@ -1,4 +1,8 @@
 # Changelog
+## 0.13.0
+### Fixed
+- Minor Bugfixes
+
 ## 0.12.2
 ### Fixed
 - fixed bug with stdout/stderr in subfolders
