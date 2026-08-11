@@ -40,13 +40,13 @@ cwl_salad_derive = { version = "0", path = "crates/salad_derive" }
 # serde
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-serde-saphyr = { version = "0.0.29", features = ["miette", "validator"] }
+serde-saphyr = { version = "1.0.1", features = ["miette", "validator"] }
 
 # async
 tokio = { version = "1.53.1", features = ["full"] }
 tokio-util = "0.7.19"
 async-trait = "0.1.91"
-futures-util = "0.3.32"
+futures-util = "0.3.34"
 crankshaft = { version = "0.10.0", features = ["docker"] }
 boa_engine = "0.21.1"
 bollard = "^0.19"
@@ -82,13 +82,13 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 # rdf
 rdf = "0.1.4"
-horned-owl = "2.1.0"
+horned-owl = "3.0.0"
 
 # lsp
 tower-lsp-server = "0.23.0"
 dashmap = "6.2.1"
 ropey = "1.6.1"
-granit-parser = "0.0.7"
+granit-parser = "1.0.1"
 
 # util
 chrono = { version = "0.4.45" }
