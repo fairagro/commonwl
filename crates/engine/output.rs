@@ -1,10 +1,7 @@
 use crate::{
     RunnerError,
     expression::{EvaluationContext, do_eval, do_eval_to_string},
-    io::{
-        file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
-        unique_path,
-    },
+    io::file::{PathOrFile, handle_secondary_file_schema, resolve_location_from_primary},
     schema::{format_validation::FormatValidator, validation::validate_type},
     string_url_to_path_string,
     workflow::{handle_link_merge, handle_pick_value},
@@ -408,14 +405,7 @@ async fn validate_file(
     copy: bool,
     storage: Arc<StorageBackend>,
 ) -> crate::Result<()> {
-    let path =
-        get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref()).map(|p| {
-            if copy {
-                unique_path(&p, file.path.as_ref())
-            } else {
-                p
-            }
-        });
+    let path = get_designated_path(file.path.as_ref(), base_path, file.basename.as_ref());
     let dirname = path.as_ref().and_then(|p| p.parent());
     let location = file.location.as_ref().or(file.path.as_ref());
 
@@ -495,8 +485,7 @@ async fn validate_dir(
     copy: bool,
     storage: Arc<StorageBackend>,
 ) -> crate::Result<()> {
-    let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref())
-        .map(|p| if copy { unique_path(&p, None) } else { p });
+    let path = get_designated_path(dir.path.as_ref(), base_path, dir.basename.as_ref());
 
     let location = dir.location.as_ref().or(dir.path.as_ref());
 
