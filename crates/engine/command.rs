@@ -316,11 +316,13 @@ fn collect_input_bindings(
                         sort_key.push(SortKey::Int(ix as i32));
 
                         let schema = array.items.clone();
-
-                        let binding = array.input_binding.clone().unwrap_or_default();
+                        let item_binding = array
+                            .input_binding
+                            .clone()
+                            .or_else(|| binding.is_some().then(CommandLineBinding::default));
                         collect_input_bindings(
                             &CommandInputParameterType::CommandInputType(schema),
-                            Some(&binding),
+                            item_binding.as_ref(),
                             &item,
                             name,
                             &sort_key,
@@ -1100,6 +1102,49 @@ baseCommand: [python3, script.py]"#;
             let cmd = build_command(tool, &inputs, &Runtime::default()).unwrap();
             assert_eq!(cmd[2..], expected_tail);
         }
+    }
+
+    // An array-typed input with no `inputBinding` anywhere (e.g. a `File[]` used only for
+    // its `secondaryFiles`) must not have its items appear as bare positional arguments -
+    // conflating "array schema has no binding of its own" with "there is no binding at all"
+    // used to make every item fall through to the default (prefix-less, always-emit) case.
+    #[tokio::test]
+    async fn test_build_command_array_input_without_binding_stays_off_command_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("ref.fasta");
+        std::fs::write(&file_path, "content").unwrap();
+
+        let yaml = r#"class: CommandLineTool
+cwlVersion: v1.2
+inputs:
+  fasta_path:
+    type: File[]
+outputs: []
+baseCommand: [echo, hello]"#;
+        let doc: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
+
+        let job = format!(
+            "fasta_path: [{{class: File, path: {:?}}}]",
+            file_path.display()
+        );
+        let input_values = serde_saphyr::from_str(&job).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            dir.path(),
+            Path::new("."),
+            None,
+            None,
+            &StorageBackend::new(),
+        )
+        .await
+        .unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = &doc else {
+            panic!()
+        };
+        let cmd = build_command(tool, &inputs, &Runtime::default()).unwrap();
+        assert_eq!(cmd, vec!["echo", "hello"]);
     }
 
     #[test]
