@@ -45,8 +45,11 @@ enum SchemaKind {
 
 const SUBCLASS_OF: &str = "http://www.w3.org/2000/01/rdf-schema#subclassOf";
 const EQUIVALENT_CLASS: &str = "http://www.w3.org/2002/07/owl#equivalentClass";
-static EDAM_CACHE_PATH: LazyLock<PathBuf> =
-    LazyLock::new(|| env::temp_dir().join("s4n").join("EDAM.owl"));
+static EDAM_CACHE_PATH: LazyLock<PathBuf> = LazyLock::new(|| {
+    env::temp_dir()
+        .join(env!("CARGO_CRATE_NAME"))
+        .join("EDAM.owl")
+});
 const EDAM_REMOTE_PATH: &str = "https://edamontology.org/EDAM.owl";
 
 impl FormatValidator {
