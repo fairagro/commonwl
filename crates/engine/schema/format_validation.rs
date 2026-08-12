@@ -17,12 +17,13 @@ use rdf::{
 };
 use std::{
     collections::{BTreeSet, HashMap, HashSet, VecDeque},
-    fs,
+    env, fs,
     io::{BufReader, Cursor},
-    path::Path,
-    sync::Arc,
+    path::{Path, PathBuf},
+    sync::{Arc, LazyLock},
     vec,
 };
+use tracing::debug;
 use url::Url;
 
 #[derive(Debug)]
@@ -44,6 +45,9 @@ enum SchemaKind {
 
 const SUBCLASS_OF: &str = "http://www.w3.org/2000/01/rdf-schema#subclassOf";
 const EQUIVALENT_CLASS: &str = "http://www.w3.org/2002/07/owl#equivalentClass";
+static EDAM_CACHE_PATH: LazyLock<PathBuf> =
+    LazyLock::new(|| env::temp_dir().join("s4n").join("EDAM.owl"));
+const EDAM_REMOTE_PATH: &str = "https://edamontology.org/EDAM.owl";
 
 impl FormatValidator {
     pub(crate) async fn new(
@@ -109,13 +113,33 @@ impl FormatValidator {
         entry: &str,
         working_dir: &Path,
     ) -> crate::Result<Option<(SchemaKind, Vec<u8>)>> {
+        let entry = if entry == EDAM_REMOTE_PATH && fs::exists(&*EDAM_CACHE_PATH)? {
+            debug!(
+                "Resolving EDAM ontology from cache at {}",
+                EDAM_CACHE_PATH.display()
+            );
+            EDAM_REMOTE_PATH
+        } else {
+            entry
+        };
         let bytes = if Self::is_remote(entry) {
             match reqwest::get(entry)
                 .await
                 .and_then(reqwest::Response::error_for_status)
             {
                 Ok(response) => match response.bytes().await {
-                    Ok(bytes) => bytes.to_vec(),
+                    Ok(bytes) => {
+                        let bytes = bytes.to_vec();
+                        //write tempfile
+                        if entry == EDAM_REMOTE_PATH {
+                            debug!(
+                                "Writing EDAM ontology to cache at {}",
+                                EDAM_CACHE_PATH.display()
+                            );
+                            tokio::fs::write(&*EDAM_CACHE_PATH, &bytes).await?;
+                        }
+                        bytes
+                    }
                     Err(e) => {
                         tracing::warn!("Could not download schema {entry}: {e}");
                         return Ok(None);
