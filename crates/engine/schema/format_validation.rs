@@ -139,6 +139,9 @@ impl FormatValidator {
                                 "Writing EDAM ontology to cache at {}",
                                 EDAM_CACHE_PATH.display()
                             );
+                            if let Some(parent) = EDAM_CACHE_PATH.parent() {
+                                tokio::fs::create_dir_all(parent).await?;
+                            }
                             tokio::fs::write(&*EDAM_CACHE_PATH, &bytes).await?;
                         }
                         bytes
