@@ -27,7 +27,15 @@ pub(crate) fn locate_dir<'a>(
 ) -> BoxFuture<'a, crate::Result<()>> {
     async move {
         let mut visited = HashSet::new();
-        locate_dir_impl(dir, work_dir, stage_dir, load_listing, &mut visited, storage).await
+        locate_dir_impl(
+            dir,
+            work_dir,
+            stage_dir,
+            load_listing,
+            &mut visited,
+            storage,
+        )
+        .await
     }
     .boxed()
 }
@@ -55,7 +63,8 @@ fn locate_dir_impl<'a>(
             let relative_path = get_relative_path(&url, work_dir)?;
             let designated_path = stage_dir.join(&relative_path);
 
-            dir.location = Some(location.clone());
+            // `url` is `location` re-parsed, which resolves any `..`/`.` segments
+            dir.location = Some(url.to_string());
 
             //calculate file metadata for designated path
             let FilePathMetaData {
@@ -151,8 +160,15 @@ fn read_dir<'a>(
                     Some(LoadListingEnum::NoListing)
                 };
 
-                locate_dir_impl(&mut dir, work_dir, stage_dir, load_listing, visited, storage)
-                    .await?;
+                locate_dir_impl(
+                    &mut dir,
+                    work_dir,
+                    stage_dir,
+                    load_listing,
+                    visited,
+                    storage,
+                )
+                .await?;
 
                 entries.push(FileOrDirectory::Directory(dir));
             } else {

@@ -66,7 +66,9 @@ pub(crate) fn locate_file<'a>(
             let url = Url::parse(&location)?;
             let relative_path = get_relative_path(&url, work_dir)?;
             let designated_path = stage_dir.join(&relative_path);
-            file.location = Some(location.clone());
+
+            // `url` is `location` re-parsed, which resolves any `..`/`.` segments
+            file.location = Some(url.to_string());
 
             //calculate file metadata for designated path
             let FilePathMetaData {

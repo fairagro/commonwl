@@ -1,4 +1,8 @@
 # Changelog
+## 0.13.1
+### Fixed
+- Minor Bugfixes
+
 ## 0.13.0
 ### Fixed
 - Minor Bugfixes
