@@ -55,7 +55,7 @@ bollard = "^0.19"
 anyhow = "1.0.104"
 thiserror = "2.0.19"
 miette = "7.6.0"
-validator = { version = "^0.20", features = ["derive"] }
+validator = { version = "0.21.0", features = ["derive"] }
 
 # I/O
 dircpy = "0.3.20"
