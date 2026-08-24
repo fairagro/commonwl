@@ -40,7 +40,7 @@ cwl_salad_derive = { version = "0", path = "crates/salad_derive" }
 # serde
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-serde-saphyr = { version = "1.0.1", features = ["miette", "validator"] }
+serde-saphyr = { version = "1.1.0", features = ["miette", "validator"] }
 
 # async
 tokio = { version = "1.53.1", features = ["full"] }
@@ -53,7 +53,7 @@ bollard = "^0.19"
 
 # error handling
 anyhow = "1.0.104"
-thiserror = "2.0.19"
+thiserror = "2.0.20"
 miette = "7.6.0"
 validator = { version = "0.21.0", features = ["derive"] }
 
@@ -102,7 +102,7 @@ oneormany = { version = "1.0.0", features = ["serde"] }
 sysinfo = "0.39.2"
 nix = { version = "0.31.3", features = ["user"] }
 bon = "3.9.3"
-syn = "3.0.3"
+syn = "3.0.4"
 quote = "1.0.45"
 proc-macro2 = "1.0.106"
 clap = "4.6.4"

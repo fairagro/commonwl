@@ -5,7 +5,7 @@ use crate::{
 };
 use dashmap::DashMap;
 use ropey::Rope;
-use std::sync::Arc;
+use std::{future::Future, sync::Arc};
 use tower_lsp_server::{
     Client, LanguageServer,
     ls_types::{
@@ -95,11 +95,11 @@ impl Backend {
 }
 
 impl LanguageServer for Backend {
-    async fn initialize(
+    fn initialize(
         &self,
         _params: InitializeParams,
-    ) -> tower_lsp_server::jsonrpc::Result<InitializeResult> {
-        Ok(InitializeResult {
+    ) -> impl Future<Output = tower_lsp_server::jsonrpc::Result<InitializeResult>> {
+        std::future::ready(Ok(InitializeResult {
             capabilities: ServerCapabilities {
                 text_document_sync: Some(TextDocumentSyncCapability::Kind(
                     TextDocumentSyncKind::FULL,
@@ -122,11 +122,11 @@ impl LanguageServer for Backend {
                 ..Default::default()
             },
             ..Default::default()
-        })
+        }))
     }
 
-    async fn shutdown(&self) -> tower_lsp_server::jsonrpc::Result<()> {
-        Ok(())
+    fn shutdown(&self) -> impl Future<Output = tower_lsp_server::jsonrpc::Result<()>> {
+        std::future::ready(Ok(()))
     }
 
     async fn did_open(&self, params: tower_lsp_server::ls_types::DidOpenTextDocumentParams) {
@@ -158,37 +158,38 @@ impl LanguageServer for Backend {
             .await;
     }
 
-    async fn formatting(
+    fn formatting(
         &self,
         params: tower_lsp_server::ls_types::DocumentFormattingParams,
-    ) -> tower_lsp_server::jsonrpc::Result<Option<Vec<tower_lsp_server::ls_types::TextEdit>>> {
-        Ok(self.format_text(params))
+    ) -> impl Future<Output = tower_lsp_server::jsonrpc::Result<Option<Vec<tower_lsp_server::ls_types::TextEdit>>>>
+    {
+        std::future::ready(Ok(self.format_text(params)))
     }
 
-    async fn semantic_tokens_full(
+    fn semantic_tokens_full(
         &self,
         params: SemanticTokensParams,
-    ) -> tower_lsp_server::jsonrpc::Result<Option<SemanticTokensResult>> {
+    ) -> impl Future<Output = tower_lsp_server::jsonrpc::Result<Option<SemanticTokensResult>>> {
         let uri = params.text_document.uri;
 
         let Some(doc) = self.documents.get(&uri) else {
-            return Ok(None);
+            return std::future::ready(Ok(None));
         };
 
-        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+        std::future::ready(Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
             result_id: None,
             data: encode(&doc.semantic_tokens),
-        })))
+        }))))
     }
 
-    async fn document_symbol(
+    fn document_symbol(
         &self,
         params: DocumentSymbolParams,
-    ) -> tower_lsp_server::jsonrpc::Result<Option<DocumentSymbolResponse>> {
+    ) -> impl Future<Output = tower_lsp_server::jsonrpc::Result<Option<DocumentSymbolResponse>>> {
         let uri = params.text_document.uri;
 
         let Some(doc) = self.documents.get(&uri) else {
-            return Ok(None);
+            return std::future::ready(Ok(None));
         };
 
         let symbols = doc
@@ -208,6 +209,6 @@ impl LanguageServer for Backend {
             })
             .collect();
 
-        Ok(Some(DocumentSymbolResponse::Flat(symbols)))
+        std::future::ready(Ok(Some(DocumentSymbolResponse::Flat(symbols))))
     }
 }
