@@ -11,16 +11,28 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use validator::Validate;
 
-#[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Hash, Clone, Eq)]
 pub enum CommandOutputParameterType {
     #[doc = include_str!("docs/stdout.md")]
-    #[serde(rename = "stdout")]
     Stdout,
     #[doc = include_str!("docs/stderr.md")]
-    #[serde(rename = "stderr")]
     Stderr,
     CommandOutputType(OneOrMany<CommandOutputType>),
+}
+
+impl Serialize for CommandOutputParameterType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // `#[serde(untagged)]` would silently serialize the unit variants as `null`,
+        // ignoring any `#[serde(rename = "...")]` on them -- so this is written by hand.
+        match self {
+            Self::Stdout => serializer.serialize_str("stdout"),
+            Self::Stderr => serializer.serialize_str("stderr"),
+            Self::CommandOutputType(t) => t.serialize(serializer),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for CommandOutputParameterType {
@@ -796,5 +808,19 @@ mod tests {
         let res = serde_saphyr::from_str::<Bag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_stdout_stderr_type_round_trips_through_json() {
+        for (variant, expected) in [
+            (CommandOutputParameterType::Stdout, "stdout"),
+            (CommandOutputParameterType::Stderr, "stderr"),
+        ] {
+            let json = serde_json::to_value(&variant).unwrap();
+            assert_eq!(json, serde_json::Value::String(expected.to_string()));
+
+            let round_tripped: CommandOutputParameterType = serde_json::from_value(json).unwrap();
+            assert_eq!(round_tripped, variant);
+        }
     }
 }
