@@ -76,7 +76,7 @@ impl Backend {
         let uri = params.text_document.uri;
         let rope = &self.documents.get(&uri)?.text;
 
-        let new_text = cwl_core::format::format_cwl(&rope.to_string()).unwrap_or(rope.to_string());
+        let new_text = commonwl::format::format_cwl(&rope.to_string()).unwrap_or(rope.to_string());
 
         let last_line = rope.len_lines() - 1;
         let last_col = rope.line(last_line).len_chars();
