@@ -1,20 +1,20 @@
-use cwl_core::documents::CWLDocument;
+use commonwl::documents::CWLDocument;
 use tower_lsp_server::ls_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 
 #[must_use] 
 pub fn parse_and_check(text: &str) -> (Option<CWLDocument>, Vec<Diagnostic>) {
-    let result = cwl_core::from_str(text);
+    let result = commonwl::from_str(text);
     match result {
         Ok(doc) => {
             eprintln!("[diag] parsed OK");
             (Some(doc), vec![])
         }
         Err(e) => match e {
-            cwl_core::Error::ParsingFailed(e) => {
+            commonwl::Error::ParsingFailed(e) => {
                 let message = e.to_string();
                 eprintln!("[diag] parsed error {message}");
                 if let Some((start, end)) =
-                    position_from_error(text, cwl_core::Error::ParsingFailed(e))
+                    position_from_error(text, commonwl::Error::ParsingFailed(e))
                 {
                     (
                         None,
@@ -59,9 +59,9 @@ pub fn parse_and_check(text: &str) -> (Option<CWLDocument>, Vec<Diagnostic>) {
     }
 }
 
-fn position_from_error(text: &str, e: cwl_core::Error) -> Option<(Position, Position)> {
+fn position_from_error(text: &str, e: commonwl::Error) -> Option<(Position, Position)> {
     match e {
-        cwl_core::Error::ParsingFailed(error) => {
+        commonwl::Error::ParsingFailed(error) => {
             let rest = error.location()?;
 
             let start_offset = rest.span().offset();

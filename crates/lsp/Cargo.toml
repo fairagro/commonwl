@@ -9,7 +9,7 @@ license.workspace = true
 
 [dependencies]
 tokio.workspace = true
-cwl_core.workspace = true
+commonwl.workspace = true
 tower-lsp-server.workspace = true
 dashmap.workspace = true
 ropey.workspace = true

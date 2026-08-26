@@ -1,6 +1,6 @@
 use crate::semantic::AbsoluteToken;
 use crate::symbols::YamlSymbol;
-use cwl_core::documents::CWLDocument;
+use commonwl::documents::CWLDocument;
 use ropey::Rope;
 
 #[derive(Debug)]
