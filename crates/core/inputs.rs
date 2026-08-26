@@ -19,13 +19,25 @@ use serde_json::Value;
 use std::fmt::Display;
 use validator::Validate;
 
-#[derive(Serialize, Debug, PartialEq, Hash, Clone, Eq)]
-#[serde(untagged)]
+#[derive(Debug, PartialEq, Hash, Clone, Eq)]
 pub enum CommandInputParameterType {
     #[doc = include_str!("docs/stdin.md")]
-    #[serde(rename = "stdin")]
     Stdin,
     CommandInputType(OneOrMany<CommandInputType>),
+}
+
+impl Serialize for CommandInputParameterType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // `#[serde(untagged)]` would silently serialize the unit variant as `null`,
+        // ignoring any `#[serde(rename = "...")]` on it -- so this is written by hand.
+        match self {
+            Self::Stdin => serializer.serialize_str("stdin"),
+            Self::CommandInputType(t) => t.serialize(serializer),
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for CommandInputParameterType {
@@ -1063,5 +1075,15 @@ mod tests {
         let res = serde_saphyr::from_str::<Bag>(contents);
         dbg!(&res);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn test_stdin_type_round_trips_through_json() {
+        let variant = CommandInputParameterType::Stdin;
+        let json = serde_json::to_value(&variant).unwrap();
+        assert_eq!(json, serde_json::Value::String("stdin".to_string()));
+
+        let round_tripped: CommandInputParameterType = serde_json::from_value(json).unwrap();
+        assert_eq!(round_tripped, variant);
     }
 }
