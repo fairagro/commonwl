@@ -945,7 +945,9 @@ impl Workflow {
         self.outputs.push(output);
     }
 
-    /// Adds a new input to an existing step
+    /// Adds a new input to an existing step, or -- if `input_id` already
+    /// names an input on that step -- merges `sources` into its existing
+    /// `source` list instead of adding a second, colliding entry.
     /// # Errors
     /// If no step with `step_id` exists
     pub fn add_workflow_step_input_mut(
@@ -958,12 +960,18 @@ impl Workflow {
             let Some(step) = self.steps.iter_mut().find(|step| step.id == Some(step_id.to_owned())),
             "Failed to find step {step_id} in workflow!"
         );
-        step.r#in.push(
-            WorkflowStepInput::builder()
-                .id(input_id.to_owned())
-                .source(sources)
-                .build(),
-        );
+        if let Some(existing) = step.r#in.iter_mut().find(|i| i.id == Some(input_id.to_owned())) {
+            let mut merged = existing.source.take().map(OneOrMany::into_many).unwrap_or_default();
+            merged.extend(sources.into_many());
+            existing.source = Some(OneOrMany::Many(merged));
+        } else {
+            step.r#in.push(
+                WorkflowStepInput::builder()
+                    .id(input_id.to_owned())
+                    .source(sources)
+                    .build(),
+            );
+        }
         Ok(())
     }
 
@@ -1012,7 +1020,7 @@ impl Workflow {
         Ok(())
     }
 
-    /// Removes an input from an existing step
+    /// Removes an input from an existing step, including every source on it.
     /// # Errors
     /// If no step with `step_id` exists
     pub fn remove_workflow_step_input_mut(&mut self, step_id: &str, input_id: &str) -> Result<()> {
@@ -1021,6 +1029,54 @@ impl Workflow {
             "Failed to find step {step_id} in workflow!"
         );
         step.r#in.retain(|v| v.id != Some(input_id.to_owned()));
+        Ok(())
+    }
+
+    /// Removes one `source` from a step input, leaving any other sources on
+    /// the same slot intact -- unlike `remove_workflow_step_input_mut`, which
+    /// drops the whole slot regardless of how many sources it has. The slot
+    /// itself is only removed once its source list is empty.
+    /// # Errors
+    /// If no step with `step_id`, or no input `input_id` on it, exists
+    pub fn remove_workflow_step_input_source_mut(
+        &mut self,
+        step_id: &str,
+        input_id: &str,
+        source: &str,
+    ) -> Result<()> {
+        guard!(
+            let Some(step) = self.steps.iter_mut().find(|s| s.id == Some(step_id.to_owned())),
+            "Failed to find step {step_id} in workflow!"
+        );
+        guard!(
+            let Some(pos) = step.r#in.iter().position(|i| i.id == Some(input_id.to_owned())),
+            "Failed to find input {input_id} on step {step_id}!"
+        );
+
+        let remaining: Vec<String> = step.r#in[pos]
+            .source
+            .take()
+            .map(OneOrMany::into_many)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|s| s != source)
+            .collect();
+
+        // Collapse back to `One` when only a single source is left, so a
+        // multi-source input that's had all but one connection removed
+        // round-trips as `source: x` rather than the equivalent but noisier
+        // `source: [x]`.
+        match remaining.len() {
+            0 => {
+                step.r#in.remove(pos);
+            }
+            1 => {
+                step.r#in[pos].source = Some(OneOrMany::One(remaining.into_iter().next().unwrap()));
+            }
+            _ => {
+                step.r#in[pos].source = Some(OneOrMany::Many(remaining));
+            }
+        }
         Ok(())
     }
 
@@ -1477,6 +1533,68 @@ mod tests {
         let mut wf = Workflow::builder().steps(vec![]).build();
 
         let result = wf.remove_workflow_step_input_mut("missing", "in1");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_workflow_step_input_mut_merges_second_source_into_existing_slot() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("a".to_string()))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("b".to_string()))
+            .unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert_eq!(step.r#in.len(), 1, "must not create a second, colliding `in` entry");
+        assert_eq!(
+            step.r#in[0].source,
+            Some(OneOrMany::Many(vec!["a".to_string(), "b".to_string()]))
+        );
+    }
+
+    #[test]
+    fn test_remove_workflow_step_input_source_mut_keeps_other_sources() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("a".to_string()))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("b".to_string()))
+            .unwrap();
+
+        wf.remove_workflow_step_input_source_mut("step1", "in1", "a")
+            .unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert_eq!(step.r#in.len(), 1, "the slot itself must survive with `b` still on it");
+        assert_eq!(step.r#in[0].source, Some(OneOrMany::One("b".to_string())));
+    }
+
+    #[test]
+    fn test_remove_workflow_step_input_source_mut_drops_slot_once_empty() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+        wf.add_workflow_step_input_mut("step1", "in1", OneOrMany::One("a".to_string()))
+            .unwrap();
+
+        wf.remove_workflow_step_input_source_mut("step1", "in1", "a")
+            .unwrap();
+
+        let step = wf.get_step("step1").unwrap();
+        assert!(step.r#in.is_empty());
+    }
+
+    #[test]
+    fn test_remove_workflow_step_input_source_mut_missing_input_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+
+        let result = wf.remove_workflow_step_input_source_mut("step1", "missing", "a");
 
         assert!(result.is_err());
     }
