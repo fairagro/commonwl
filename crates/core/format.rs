@@ -26,7 +26,7 @@ pub fn format_cwl(raw_cwl: &str) -> Result<String> {
     let mut formatted_cwl = serde_saphyr::to_string(&formatted_node)?;
     formatted_cwl = add_space_between_main_sections(&formatted_cwl);
 
-    Ok(format!("{comment}{formatted_cwl}"))
+    Ok(format!("{comment}\n{formatted_cwl}"))
 }
 
 fn format_node(cwl: &Value) -> Value {

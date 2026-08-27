@@ -85,7 +85,7 @@ impl Backend {
             range: Range {
                 start: Position::new(0, 0),
                 end: Position::new(
-                    u32::try_from(last_col).unwrap_or_default(),
+                    u32::try_from(last_line).unwrap_or_default(),
                     u32::try_from(last_col).unwrap_or_default(),
                 ),
             },
