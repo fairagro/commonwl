@@ -1038,6 +1038,8 @@ impl Workflow {
     /// itself is only removed once its source list is empty.
     /// # Errors
     /// If no step with `step_id`, or no input `input_id` on it, exists
+    /// # Panics
+    /// impossible
     pub fn remove_workflow_step_input_source_mut(
         &mut self,
         step_id: &str,
