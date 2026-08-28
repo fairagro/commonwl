@@ -190,7 +190,7 @@ pub(crate) async fn run_with_timelimit(
         let limit = Duration::from_secs(timeout.try_into()?); //this is intended to throw!
         let token_clone = token.clone();
         tokio::select! {
-            result = backend.run(task, token)? => Ok(result?),
+            result = backend.run(task, None, token)? => Ok(result?.map(|r| r.status)),
             () = tokio::time::sleep(limit) => {
                 token_clone.cancel();
                 error!("Timelimit reached: {timeout}");
@@ -199,7 +199,7 @@ pub(crate) async fn run_with_timelimit(
         }
     } else {
         //no time constraint
-        Ok(backend.run(task, token)?.await?)
+        Ok(backend.run(task, None, token)?.await?.map(|r| r.status))
     }
 }
 

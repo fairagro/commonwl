@@ -57,7 +57,7 @@ impl TesBackend {
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
             NAME_BUFFER_LEN,
         )));
-        let backend = Arc::new(tes::Backend::initialize(config, names, None).await);
+        let backend = Arc::new(tes::Backend::initialize(config, names).await);
 
         Ok(Self {
             storage,
@@ -119,7 +119,8 @@ impl TaskBackend for TesBackend {
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
-                    .image(container)
+                    .images([&container])
+                    .expect("image list must not be empty")
                     .stdout(stdout_file)
                     .stderr(stderr_file)
                     .build(),
@@ -137,7 +138,8 @@ impl TaskBackend for TesBackend {
                         format!("{{}}/{}", crate::backend::mount::EMPTY_DIR_MARKER),
                         ";".to_string(),
                     ])
-                    .image(DEFAULT_DOCKER_CONTAINER)
+                    .images([DEFAULT_DOCKER_CONTAINER])
+                    .expect("image list must not be empty")
                     .build()
             ])
             .resources(

@@ -4,22 +4,21 @@ use crankshaft::engine::{
     service::runner::backend::TaskRunError,
     task::{
         Input, Output,
+        execution::ExecutionResult,
         input::{self, Contents},
         output,
     },
 };
+use crankshaft::events::Event;
 use cwl_engine_storage::{Storage, StorageBackend};
 use futures_util::{FutureExt, future::BoxFuture};
 use nonempty::NonEmpty;
-use std::{
-    path::Path,
-    process::{ExitStatus, Stdio},
-    sync::Arc,
-};
+use std::{path::Path, process::Stdio, sync::Arc};
 use tokio::{
     fs::{self, File},
     process::Command,
     select,
+    sync::broadcast,
 };
 use tokio_util::sync::CancellationToken;
 use tracing::debug;
@@ -45,8 +44,9 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
     fn run(
         &self,
         task: Task,
+        _events: Option<broadcast::Sender<Event>>,
         token: CancellationToken,
-    ) -> anyhow::Result<BoxFuture<'static, Result<NonEmpty<ExitStatus>, TaskRunError>>> {
+    ) -> anyhow::Result<BoxFuture<'static, Result<NonEmpty<ExecutionResult>, TaskRunError>>> {
         let storage = self.storage.clone();
         Ok(async move {
             let mut statuses = Vec::new();
@@ -129,7 +129,10 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
                         result.map_err(|e| TaskRunError::Other(e.into()))?
                     }
                 };
-                statuses.push(status);
+                statuses.push(ExecutionResult {
+                    image: Some(execution.images().first().clone()),
+                    status,
+                });
             }
 
             stage_outputs(task.outputs())
@@ -348,7 +351,8 @@ mod tests {
             .name("test")
             .executions(nonempty![
                 Execution::builder()
-                    .image("unsupported")
+                    .images(["unsupported"])
+                    .unwrap()
                     .program("echo")
                     .args(vec!["hello".to_string()])
                     .stdout(stdout_path.to_string_lossy().into_owned())
@@ -357,7 +361,10 @@ mod tests {
             .build();
 
         let backend = CommandBackend::new(Arc::new(StorageBackend::new()));
-        let result = backend.run(task, CancellationToken::new()).unwrap().await;
+        let result = backend
+            .run(task, None, CancellationToken::new())
+            .unwrap()
+            .await;
 
         assert!(result.is_ok(), "expected success, got {:?}", result.err());
         assert_eq!(

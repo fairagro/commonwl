@@ -59,8 +59,7 @@ impl DockerBackend {
             UniqueAlphanumeric::default_with_expected_generations(NAME_BUFFER_LEN),
             NAME_BUFFER_LEN,
         )));
-        let backend =
-            Arc::new(docker::Backend::initialize_default_with(config, names, None).await?);
+        let backend = Arc::new(docker::Backend::initialize_default_with(config, names).await?);
 
         let client = Docker::with_defaults()?;
 
@@ -148,7 +147,8 @@ impl TaskBackend for DockerBackend {
                     .env(request.env.clone())
                     .program(&args[0])
                     .args(&args[1..])
-                    .image(container)
+                    .images([&container])
+                    .expect("image list must not be empty")
                     .stdout(stdout_file)
                     .stderr(stderr_file)
                     .maybe_stdin(request.stdin_file)
@@ -167,7 +167,8 @@ impl TaskBackend for DockerBackend {
                             request.execution_path.to_string(),
                             CONTAINER_TMPDIR.to_string(),
                         ])
-                        .image(DEFAULT_DOCKER_CONTAINER)
+                        .images([DEFAULT_DOCKER_CONTAINER])
+                        .expect("image list must not be empty")
                         .build()
                 }
             ])
@@ -321,7 +322,7 @@ impl DockerBackend {
         token: CancellationToken,
     ) -> crate::Result<Option<Vec<String>>> {
         //ensure image
-        self.client.ensure_image(container, token).await?;
+        self.client.ensure_image(container, token, None).await?;
         let info = self.client.inner().inspect_image(container).await?;
         if let Some(cfg) = info.config
             && let Some(entrypoint) = cfg.entrypoint

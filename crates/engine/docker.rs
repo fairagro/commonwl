@@ -38,7 +38,7 @@ pub(crate) async fn build_container(
         if let Some(stream) = msg.stream {
             tracing::info!("{stream}");
         }
-        if let Some(error) = msg.error {
+        if let Some(error) = msg.error_detail.and_then(|d| d.message) {
             crate::bail!("Docker build error: {error}");
         }
     }
