@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::{Arc, OnceLock},
+    sync::Arc,
 };
 use tempfile::NamedTempFile;
 use url::Url;
@@ -292,44 +292,37 @@ impl RemoteTempDir {
     }
 }
 
-/// Runtime dedicated to `RemoteTempDir` cleanup, shared across all drops in the process.
-/// Remote storage backends (e.g. `S3Storage`) cache their client, connection pool included,
-/// in a process-wide `OnceCell` - tearing down and rebuilding a throwaway runtime on every
-/// drop invalidates that pool's connections each time, forcing a reconnect (and any retry
-/// backoff that comes with it) on every single cleanup instead of just the first.
-fn cleanup_runtime() -> &'static tokio::runtime::Runtime {
-    static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-    RUNTIME.get_or_init(|| {
-        tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(2)
-            .enable_all()
-            .build()
-            .expect("failed to build RemoteTempDir cleanup runtime")
-    })
-}
-
 impl Drop for RemoteTempDir {
     fn drop(&mut self) {
         let Ok(url) = self.path.as_url() else {
             return;
         };
         let storage = self.storage.clone();
-        let handle = cleanup_runtime().handle().clone();
 
-        // Drop can't `.await`, and a detached `tokio::spawn` here can lose the race
-        // against process exit (e.g. nextest, where each test is its own short-lived
-        // process) leaving the dir behind. `Handle::block_on` panics if called from a
-        // thread already inside a runtime, so escape to a fresh OS thread first, then
-        // block on the shared cleanup runtime so cleanup has actually finished by the
-        // time `drop` returns - regardless of the calling runtime's flavor.
-        let result = std::thread::scope(|scope| {
-            scope.spawn(|| handle.block_on(storage.delete(&url))).join()
-        });
-
-        match result {
-            Ok(Ok(())) => {}
-            Ok(Err(e)) => tracing::warn!("Failed to clean up temp dir {url}: {e}"),
-            Err(_) => tracing::warn!("Panicked while cleaning up temp dir {url}"),
+        // Remote storage backends (e.g. `S3Storage`) cache their client - pooled HTTP
+        // connections included - keyed to whichever runtime first used it (that runtime
+        // drives the background task that actually reads bytes off the connection).
+        // Deleting from a *different* runtime/thread (as a detached `tokio::spawn` would
+        // avoid, but a separate throwaway runtime previously used here did not) leaves
+        // that driving task unreachable, so the request just hangs until the connection's
+        // own idle timeout eventually kicks in. Reuse the ambient runtime instead via
+        // `block_in_place`, which is only valid on a multi-thread runtime; fall back to a
+        // detached spawn on single-threaded runtimes (e.g. `#[tokio::test]`), accepting
+        // the small risk of losing the race against process exit there.
+        let Ok(handle) = tokio::runtime::Handle::try_current() else {
+            return;
+        };
+        if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread {
+            let result = tokio::task::block_in_place(|| handle.block_on(storage.delete(&url)));
+            if let Err(e) = result {
+                tracing::warn!("Failed to clean up temp dir {url}: {e}");
+            }
+        } else {
+            handle.spawn(async move {
+                if let Err(e) = storage.delete(&url).await {
+                    tracing::warn!("Failed to clean up temp dir {url}: {e}");
+                }
+            });
         }
     }
 }
