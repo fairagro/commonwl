@@ -1020,6 +1020,18 @@ impl Workflow {
         Ok(())
     }
 
+    /// Removes a step from the workflow. 
+    /// # Errors
+    /// If no step with `step_id` exists
+    pub fn remove_workflow_step_mut(&mut self, step_id: &str) -> Result<()> {
+        guard!(
+            let Some(index) = self.steps.iter().position(|s| s.id == Some(step_id.to_string())),
+            "Failed to find step {step_id} in workflow!"
+        );
+        self.steps.remove(index);
+        Ok(())
+    }
+
     /// Removes an input from an existing step, including every source on it.
     /// # Errors
     /// If no step with `step_id` exists
@@ -1512,6 +1524,27 @@ mod tests {
         let mut wf = Workflow::builder().steps(vec![]).build();
 
         let result = wf.remove_workflow_input_mut("missing");
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_remove_workflow_step_mut() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+        wf.add_workflow_step_empty_mut("step1", Path::new("tool.cwl"))
+            .unwrap();
+
+        wf.remove_workflow_step_mut("step1").unwrap();
+
+        assert!(!wf.has_step("step1"));
+        assert!(wf.steps.is_empty());
+    }
+
+    #[test]
+    fn test_remove_workflow_step_mut_missing_step_errs() {
+        let mut wf = Workflow::builder().steps(vec![]).build();
+
+        let result = wf.remove_workflow_step_mut("missing");
 
         assert!(result.is_err());
     }
