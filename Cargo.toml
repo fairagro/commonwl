@@ -47,9 +47,9 @@ tokio = { version = "1.53.1", features = ["full"] }
 tokio-util = "0.7.19"
 async-trait = "0.1.91"
 futures-util = "0.3.34"
-crankshaft = { version = "0.10.0", features = ["docker"] }
+crankshaft = { version = "0.11.0", features = ["docker"] }
 boa_engine = "0.21.1"
-bollard = "^0.19"
+bollard = "^0.21.1"
 
 # error handling
 anyhow = "1.0.104"
