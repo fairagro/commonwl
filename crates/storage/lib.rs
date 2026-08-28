@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 use tempfile::NamedTempFile;
 use url::Url;
@@ -292,27 +292,38 @@ impl RemoteTempDir {
     }
 }
 
+/// Runtime dedicated to `RemoteTempDir` cleanup, shared across all drops in the process.
+/// Remote storage backends (e.g. `S3Storage`) cache their client, connection pool included,
+/// in a process-wide `OnceCell` - tearing down and rebuilding a throwaway runtime on every
+/// drop invalidates that pool's connections each time, forcing a reconnect (and any retry
+/// backoff that comes with it) on every single cleanup instead of just the first.
+fn cleanup_runtime() -> &'static tokio::runtime::Runtime {
+    static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
+    RUNTIME.get_or_init(|| {
+        tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(2)
+            .enable_all()
+            .build()
+            .expect("failed to build RemoteTempDir cleanup runtime")
+    })
+}
+
 impl Drop for RemoteTempDir {
     fn drop(&mut self) {
         let Ok(url) = self.path.as_url() else {
             return;
         };
         let storage = self.storage.clone();
+        let handle = cleanup_runtime().handle().clone();
 
         // Drop can't `.await`, and a detached `tokio::spawn` here can lose the race
         // against process exit (e.g. nextest, where each test is its own short-lived
-        // process) leaving the dir behind. Block this thread on a throwaway runtime
-        // instead, so cleanup has actually finished by the time `drop` returns -
-        // regardless of the calling runtime's flavor (current_thread or multi_thread).
+        // process) leaving the dir behind. `Handle::block_on` panics if called from a
+        // thread already inside a runtime, so escape to a fresh OS thread first, then
+        // block on the shared cleanup runtime so cleanup has actually finished by the
+        // time `drop` returns - regardless of the calling runtime's flavor.
         let result = std::thread::scope(|scope| {
-            scope
-                .spawn(|| {
-                    tokio::runtime::Builder::new_current_thread()
-                        .enable_all()
-                        .build()?
-                        .block_on(storage.delete(&url))
-                })
-                .join()
+            scope.spawn(|| handle.block_on(storage.delete(&url))).join()
         });
 
         match result {

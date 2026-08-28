@@ -1,4 +1,8 @@
 # Changelog
+## 0.14.0
+### Fixed
+- Critical S3 Storage Bug fixes
+
 ## 0.13.2
 ### Fixed
 - Minor Bugfixes
