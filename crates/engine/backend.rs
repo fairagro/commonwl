@@ -307,6 +307,18 @@ pub async fn execute_workflow(
         panic!("Not a Workflow");
     };
 
+    // Validate all steps' `when` up front, before any step is dispatched: steps within a wave
+    // are spawned concurrently and only joined after the whole wave loop completes, so bailing
+    // on this mid-loop would abandon already-spawned sibling steps instead of cancelling them.
+    if cwl_version < V1_2_0
+        && let Some(step) = wf.steps.iter().find(|s| s.when.is_some())
+    {
+        crate::bail!(
+            "Conditional execution with when is not supported for CWL version {cwl_version} (step {})",
+            step.id.clone().unwrap_or_default()
+        );
+    }
+
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
     let ijsr = request.get_requirement_or_hint::<InlineJavascriptRequirement>();
     let sfr = request.get_requirement_or_hint::<ScatterFeatureRequirement>();
@@ -418,11 +430,6 @@ pub async fn execute_workflow(
                     let step_inputs = eval_inputs(step, sub_inputs, eval_context)?;
                     let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
                     if let Some(when) = &step.when {
-                        if cwl_version < V1_2_0 {
-                            crate::bail!(
-                                "Conditional execution with when is not supported for CWL version {cwl_version}",
-                            );
-                        }
                         let serde_json::Value::Bool(result) = do_eval(when, &eval_context)? else {
                             crate::bail!("Condition {when} did not evaluate to boolean");
                         };
@@ -476,11 +483,6 @@ pub async fn execute_workflow(
                 let step_inputs = eval_inputs(step, inputs, eval_context)?;
                 let eval_context = eval_context.clone().with_inputs(&step_inputs.inputs);
                 if let Some(when) = &step.when {
-                    if cwl_version < V1_2_0 {
-                        crate::bail!(
-                            "Conditional execution with when is not supported for CWL version {cwl_version}",
-                        );
-                    }
                     let serde_json::Value::Bool(result) = do_eval(when, &eval_context)? else {
                         crate::bail!("Condition {when} did not evaluate to boolean");
                     };
