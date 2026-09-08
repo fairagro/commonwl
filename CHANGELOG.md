@@ -1,4 +1,8 @@
 # Changelog
+## 0.15.0
+- Added Step started and Step finished Events a client can subscribe to
+- Added configurable S3 Storage options
+
 ## 0.14.0
 ### Fixed
 - Critical S3 Storage Bug fixes
