@@ -136,6 +136,12 @@ pub enum StepEvent {
         step_id: String,
         finished_at: chrono::NaiveDateTime,
     },
+    /// A step's captured stdout/stderr, once it's finished
+    Output {
+        step_id: String,
+        stdout: String,
+        stderr: String,
+    },
 }
 
 #[derive(Debug)]
@@ -659,6 +665,15 @@ fn execute_step(
                     async move {
                         let result = execute(backend, &request, token).await;
                         if let Some(tx) = &request.progress {
+                            if let Ok(r) = &result
+                                && (!r.stdout.is_empty() || !r.stderr.is_empty())
+                            {
+                                let _ = tx.send(StepEvent::Output {
+                                    step_id: step_id_clone.clone(),
+                                    stdout: r.stdout.clone(),
+                                    stderr: r.stderr.clone(),
+                                });
+                            }
                             let _ = tx.send(StepEvent::Finished {
                                 step_id: step_id_clone.clone(),
                                 finished_at: Utc::now().naive_utc(),
@@ -685,6 +700,15 @@ fn execute_step(
                     async move {
                         let result = execute(backend, &request, token).await;
                         if let Some(tx) = &request.progress {
+                            if let Ok(r) = &result
+                                && (!r.stdout.is_empty() || !r.stderr.is_empty())
+                            {
+                                let _ = tx.send(StepEvent::Output {
+                                    step_id: step_id_clone.clone(),
+                                    stdout: r.stdout.clone(),
+                                    stderr: r.stderr.clone(),
+                                });
+                            }
                             let _ = tx.send(StepEvent::Finished {
                                 step_id: step_id_clone.clone(),
                                 finished_at: Utc::now().naive_utc(),
