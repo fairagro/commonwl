@@ -39,7 +39,7 @@ pub(crate) const V1_2_0: Version = Version::new(1, 2, 0);
 #[cfg(feature = "tes")]
 pub use backend::tes::TesBackend;
 pub use backend::{
-    EngineStatus, ExecutionResult, StepTiming, TaskBackend, TaskExecutionRequest,
+    EngineStatus, ExecutionResult, StepEvent, StepTiming, TaskBackend, TaskExecutionRequest,
     TaskExecutionResult,
     docker::DockerBackend,
     evaluate_exitcodes, execute, execute_commandline_tool, execute_workflow,

@@ -126,6 +126,18 @@ impl StepTiming {
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum StepEvent {
+    Started {
+        step_id: String,
+        started_at: chrono::NaiveDateTime,
+    },
+    Finished {
+        step_id: String,
+        finished_at: chrono::NaiveDateTime,
+    },
+}
+
 #[derive(Debug)]
 pub struct TaskExecutionRequest<'a> {
     pub id: &'a str,

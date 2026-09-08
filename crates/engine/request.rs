@@ -1,4 +1,5 @@
 use crate::{
+    backend::StepEvent,
     environment::env::build_environment,
     requirements::{ProcessHints, ProcessRequirements, collect_hints, collect_requirements, merge},
     schema::schema_def::replace_schema_definitions,
@@ -13,6 +14,7 @@ use std::{
     path::{Path, PathBuf},
     ptr,
 };
+use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Debug, Clone)]
 pub struct ExecutionRequest {
@@ -23,6 +25,7 @@ pub struct ExecutionRequest {
     pub requirements: Vec<ProcessRequirements>,
     pub hints: Vec<ProcessHints>,
     pub environment: IndexMap<String, String>,
+    pub progress: Option<UnboundedSender<StepEvent>>,
 }
 
 impl ExecutionRequest {
@@ -190,6 +193,7 @@ pub fn create_execution_request_from_document(
         working_dir,
         out_dir: outputs_path.unwrap_or(cwd),
         environment,
+        progress: parent.and_then(|p| p.progress.clone()),
     };
 
     Ok(ctx)
