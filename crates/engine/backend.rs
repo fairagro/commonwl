@@ -406,12 +406,12 @@ pub async fn execute_workflow(
             let working_dir_clone = request.working_dir.clone();
             let step_outdir = collection_dir.path().join(&step_id_clone);
             info!("Starting execution of step {}", step_id_clone);
-            request.progress.as_ref().map(|tx| {
-                tx.send(StepEvent::Started {
+            if let Some(tx) = &request.progress {
+                let _ = tx.send(StepEvent::Started {
                     step_id: step_id_clone.clone(),
                     started_at: Utc::now().naive_utc(),
-                })
-            });
+                });
+            }
 
             //decide if we need to scatter this step
             if let Some(scatter) = &step.scatter
