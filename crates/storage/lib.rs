@@ -14,6 +14,8 @@ pub mod local_storage;
 pub mod s3_storage;
 pub mod web_storage;
 
+pub use s3_storage::S3Config;
+
 #[async_trait]
 pub trait Storage: Send + Sync + std::fmt::Debug {
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()>;
@@ -37,9 +39,20 @@ pub struct StorageBackend {
 impl StorageBackend {
     #[must_use]
     pub fn new() -> Self {
+        Self::with_s3(S3Storage::new())
+    }
+
+    /// Like [`StorageBackend::new`], but with an explicitly-configured `s3://` backend instead
+    /// of one that reads `S3_ENDPOINT_URL`/the AWS SDK's env-based credential chain
+    #[must_use]
+    pub fn with_s3_config(config: S3Config) -> Self {
+        Self::with_s3(S3Storage::with_config(config))
+    }
+
+    fn with_s3(s3: S3Storage) -> Self {
         let mut backends: HashMap<String, Box<dyn Storage>> = HashMap::new();
         backends.insert("file".to_string(), Box::new(LocalStorage {}));
-        backends.insert("s3".to_string(), Box::new(S3Storage::new()));
+        backends.insert("s3".to_string(), Box::new(s3));
         backends.insert("http".to_string(), Box::new(WebStorage::new()));
         backends.insert("https".to_string(), Box::new(WebStorage::new()));
         Self { inner: backends }

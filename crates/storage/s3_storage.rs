@@ -14,9 +14,23 @@ use tokio::io::AsyncWriteExt;
 use tokio::sync::OnceCell;
 use url::Url;
 
+/// Explicit S3 connection details, for a caller that has its own config source instead of the
+/// environment
+#[derive(Debug, Clone)]
+pub struct S3Config {
+    pub endpoint_url: String,
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub session_token: Option<String>,
+    /// Most S3-compatible (non-AWS) stores ignore this but the SDK still requires one be set;
+    /// defaults to `"us-east-1"` if not given.
+    pub region: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 pub struct S3Storage {
     client: OnceCell<Arc<s3::Client>>,
+    config: Option<S3Config>,
 }
 
 impl S3Storage {
@@ -24,12 +38,47 @@ impl S3Storage {
     pub fn new() -> Self {
         Self {
             client: OnceCell::new(),
+            config: None,
+        }
+    }
+
+    /// Like [`S3Storage::new`], but built from `config` instead of reading
+    /// `S3_ENDPOINT_URL`/the AWS SDK's env-based credential chain.
+    #[must_use]
+    pub fn with_config(config: S3Config) -> Self {
+        Self {
+            client: OnceCell::new(),
+            config: Some(config),
         }
     }
 
     async fn client(&self) -> anyhow::Result<Arc<s3::Client>> {
         self.client
             .get_or_try_init(|| async {
+                if let Some(config) = &self.config {
+                    let credentials = aws_sdk_s3::config::Credentials::new(
+                        config.access_key_id.clone(),
+                        config.secret_access_key.clone(),
+                        config.session_token.clone(),
+                        None,
+                        "sciwin-settings",
+                    );
+                    let region = config
+                        .region
+                        .clone()
+                        .unwrap_or_else(|| "us-east-1".to_string());
+                    return Ok(Arc::new(aws_sdk_s3::Client::from_conf(
+                        s3::config::Builder::new()
+                            .endpoint_url(&config.endpoint_url)
+                            .credentials_provider(credentials)
+                            .region(aws_sdk_s3::config::Region::new(region))
+                            .behavior_version(aws_sdk_s3::config::BehaviorVersion::latest())
+                            .force_path_style(true)
+                            .request_checksum_calculation(RequestChecksumCalculation::WhenRequired)
+                            .build(),
+                    )));
+                }
+
                 dotenvy::dotenv().ok();
 
                 let endpoint_url = std::env::var("S3_ENDPOINT_URL")?;
