@@ -406,6 +406,12 @@ pub async fn execute_workflow(
             let working_dir_clone = request.working_dir.clone();
             let step_outdir = collection_dir.path().join(&step_id_clone);
             info!("Starting execution of step {}", step_id_clone);
+            request.progress.as_ref().map(|tx| {
+                tx.send(StepEvent::Started {
+                    step_id: step_id_clone.clone(),
+                    started_at: Utc::now().naive_utc(),
+                })
+            });
 
             //decide if we need to scatter this step
             if let Some(scatter) = &step.scatter
@@ -428,6 +434,12 @@ pub async fn execute_workflow(
                         let key = format!("{}/{}", step_id_clone, output.id());
                         let empty_result = scatter::empty(*method, &dims);
                         completed_outputs.insert(key, DefaultValue::Any(empty_result));
+                    }
+                    if let Some(tx) = &request.progress {
+                        let _ = tx.send(StepEvent::Finished {
+                            step_id: step_id_clone.clone(),
+                            finished_at: Utc::now().naive_utc(),
+                        });
                     }
                     continue;
                 }
@@ -458,6 +470,12 @@ pub async fn execute_workflow(
                             debug!(
                                 "Scatter step skipped because when evaluated to false in {step_id_clone}"
                             );
+                            if let Some(tx) = &request.progress {
+                                let _ = tx.send(StepEvent::Finished {
+                                    step_id: step_id_clone.clone(),
+                                    finished_at: Utc::now().naive_utc(),
+                                });
+                            }
                             let span = tracing::Span::current();
                             handles.push(tokio::spawn(
                                 async move {
@@ -508,6 +526,12 @@ pub async fn execute_workflow(
                         //spawn the "Null-Job"
                         let step_id = step_id_clone.clone();
                         debug!("Step skipped because when evaluated to false in {step_id_clone}");
+                        if let Some(tx) = &request.progress {
+                            let _ = tx.send(StepEvent::Finished {
+                                step_id: step_id_clone.clone(),
+                                finished_at: Utc::now().naive_utc(),
+                            });
+                        }
 
                         let span = tracing::Span::current();
                         handles.push(tokio::spawn(
@@ -633,8 +657,14 @@ fn execute_step(
             let handle: tokio::task::JoinHandle<crate::Result<(String, ExecutionResult)>> =
                 tokio::spawn(
                     async move {
-                        let result = execute(backend, &request, token).await?;
-                        Ok((step_id_clone, result))
+                        let result = execute(backend, &request, token).await;
+                        if let Some(tx) = &request.progress {
+                            let _ = tx.send(StepEvent::Finished {
+                                step_id: step_id_clone.clone(),
+                                finished_at: Utc::now().naive_utc(),
+                            });
+                        }
+                        Ok((step_id_clone, result?))
                     }
                     .instrument(span),
                 );
@@ -653,8 +683,14 @@ fn execute_step(
             let handle: tokio::task::JoinHandle<crate::Result<(String, ExecutionResult)>> =
                 tokio::spawn(
                     async move {
-                        let result = execute(backend, &request, token).await?;
-                        Ok((step_id_clone, result))
+                        let result = execute(backend, &request, token).await;
+                        if let Some(tx) = &request.progress {
+                            let _ = tx.send(StepEvent::Finished {
+                                step_id: step_id_clone.clone(),
+                                finished_at: Utc::now().naive_utc(),
+                            });
+                        }
+                        Ok((step_id_clone, result?))
                     }
                     .instrument(span),
                 );
