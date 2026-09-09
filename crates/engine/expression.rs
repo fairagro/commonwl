@@ -104,6 +104,7 @@ pub(crate) fn do_eval_to_string(expression: &str, eval_context: &EvaluationConte
 
 /// Evaluates a CWL expression appearing against input map
 #[must_use]
+#[allow(clippy::implicit_hasher)]
 pub fn evaluate_expression_with_inputs(value: &str, inputs: &HashMap<String, DefaultValue>) -> String {
     let eval_context = EvaluationContext::default().with_inputs(inputs);
     match do_eval(value, &eval_context) {
