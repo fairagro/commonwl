@@ -1,4 +1,7 @@
 # Changelog
+## 0.15.1
+- Expose a function from expression module
+
 ## 0.15.0
 - Added Step started and Step finished Events a client can subscribe to
 - Added configurable S3 Storage options

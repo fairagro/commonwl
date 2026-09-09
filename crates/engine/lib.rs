@@ -21,6 +21,7 @@ pub(crate) mod tree;
 pub(crate) mod workflow;
 
 pub use error::{Result, RunnerError};
+pub use expression::evaluate_expression_with_inputs;
 
 pub(crate) fn cwl_version(doc: &CWLDocument) -> crate::Result<Version> {
     let default = "v1.2".to_string();
