@@ -329,11 +329,12 @@ fn unixify_arg(arg: &str) -> String {
     {
         let looks_windows_abs = arg.len() >= 3
             && arg.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
-            && arg[1..].starts_with(":/")
-            || arg[1..].starts_with(":\\");
+            && (arg[1..].starts_with(":/") || arg[1..].starts_with(":\\"));
 
         if looks_windows_abs {
             to_linux_path(Path::new(arg))
+        } else if arg.contains('\\') {
+            arg.replace('\\', "/")
         } else {
             arg.to_string()
         }
