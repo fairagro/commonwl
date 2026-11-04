@@ -75,11 +75,9 @@ impl FormatValidator {
                 }
                 SchemaKind::Owl => {
                     let mut bufreader = BufReader::new(Cursor::new(bytes));
-                    let b = Build::new_arc();
-                    match horned_owl::io::rdf::reader::read_with_build(
+                    match horned_owl::io::rdf::reader::read(
                         &mut bufreader,
-                        &b,
-                        ParserConfiguration::default(),
+                        ParserConfiguration::new(Build::new_arc()).into(),
                     ) {
                         Ok(parsed) => {
                             let output: ParserOutput<ArcStr, Arc<AnnotatedComponent<ArcStr>>> =
