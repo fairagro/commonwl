@@ -214,3 +214,37 @@ fn is_valid_env_name(name: &str) -> bool {
 fn quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
 }
+
+#[cfg(test)]
+#[cfg(unix)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_args_slurm_backend() {
+        let dir = tempdir().unwrap();
+        let sbatch = dir.path().join("sbatch");
+        std::fs::write(
+        &sbatch,
+    r#"#!/bin/sh
+                echo "$@" > "$(dirname "$0")/sbatch.calls"
+                cat > "$(dirname "$0")/sbatch.script"
+                echo 42
+                "#,
+        ).unwrap();
+        std::fs::set_permissions(&sbatch, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = SlurmConfig::builder().sbatch(sbatch.to_string_lossy().into_owned())
+            .sbatch_args(vec!["--partition=test".to_string()]).log_dir("/logs").build();
+        let status = submit(&config, &["--mem=1024M".to_string()], "#!/bin/sh\necho hello\n",
+            &CancellationToken::new()).await.unwrap();
+        assert!(status.success());
+        let calls = std::fs::read_to_string(dir.path().join("sbatch.calls")).unwrap();
+        for arg in ["--partition=test", "--mem=1024M", "--parsable", "--wait", "--output=/logs/cwl-%j.out"] {
+            assert!(calls.contains(arg), "missing {arg} in {calls}");
+        }
+        let script = std::fs::read_to_string(dir.path().join("sbatch.script")).unwrap();
+        assert_eq!(script, "#!/bin/sh\necho hello\n");
+    }
+}

@@ -321,3 +321,56 @@ impl Drop for SlurmBackend {
         }
     }
 }
+
+#[cfg(test)]
+#[cfg(unix)]
+mod tests {
+    use super::*;
+    use crate::{create_execution_request, execute};
+    use std::{os::unix::fs::PermissionsExt, path::Path};
+    use tempfile::tempdir;
+
+    #[tokio::test]
+    async fn test_slurm_backend_runs_tool_as_job() {
+        let dir = dunce::canonicalize(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata")).unwrap();
+        let cluster = tempdir().unwrap();
+        let shared = tempdir().unwrap();
+        let sbatch = cluster.path().join("sbatch");
+        std::fs::write(
+        &sbatch,
+    r#"#!/bin/sh
+                echo "$@" >> "$(dirname "$0")/sbatch.calls"
+                script=$(mktemp)
+                cat > "$script"
+                echo 42
+                sh "$script"
+                status=$?
+                rm -f "$script"
+                exit $status
+                "#,
+        ).unwrap();
+        std::fs::set_permissions(&sbatch, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = SlurmConfig::builder().sbatch(sbatch.to_string_lossy().into_owned())
+            .sbatch_args(vec!["--partition=test".to_string()]).build();
+        let backend = Arc::new(
+            SlurmBackend::new(ContainerEngine::Apptainer, Arc::new(StorageBackend::new()),
+                StoragePath::from_local(shared.path()), config).unwrap()
+        );
+        let outdir = tempdir().unwrap();
+        let request = create_execution_request(dir.join("cat-tool.cwl"), dir.join("cat-job.json"), Some(outdir.path())).unwrap();
+        let result = execute(backend, &request, CancellationToken::new()).await;
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(fs::read_to_string(outdir.path().join("output")).unwrap(), fs::read_to_string(dir.join("hello.txt")).unwrap());
+        let calls = fs::read_to_string(cluster.path().join("sbatch.calls")).unwrap();
+        assert!(calls.contains("--partition=test"), "{calls}");
+        assert!(calls.contains("--wait"), "{calls}");
+    }
+
+    #[test]
+    fn test_slurm_backend_requires_local_data_store() {
+        let url = Url::parse("s3://bucket/prefix/").unwrap();
+        let backend = SlurmBackend::new(ContainerEngine::Apptainer, Arc::new(StorageBackend::new()),
+            StoragePath::from_url(url), SlurmConfig::default());
+        assert!(backend.is_err());
+    }
+}
