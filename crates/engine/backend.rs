@@ -64,6 +64,7 @@ use uuid::Uuid;
 pub mod docker;
 pub mod local;
 pub mod mount;
+pub mod slurm;
 #[cfg(feature = "tes")]
 pub mod tes;
 

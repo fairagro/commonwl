@@ -145,7 +145,7 @@ impl crankshaft::engine::service::runner::backend::Backend for CommandBackend {
     }
 }
 
-async fn stage_inputs(
+pub(crate) async fn stage_inputs(
     storage: Arc<StorageBackend>,
     inputs: impl Iterator<Item = &Input>,
 ) -> crate::Result<()> {
@@ -198,7 +198,7 @@ async fn stage_inputs(
     Ok(())
 }
 
-async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> crate::Result<()> {
+pub(crate) async fn stage_outputs(outputs: impl Iterator<Item = &Output>) -> crate::Result<()> {
     for output in outputs {
         let src = Path::new(output.path());
         if let Some(parent) = src.parent() {
