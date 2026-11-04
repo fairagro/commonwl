@@ -108,7 +108,7 @@ pub fn build_container_command(
 
     let workdir = to_linux_path(&options.workdir);
     let tmpdir_mount = to_linux_path(&options.tmpdir);
-
+    let apptainer = options.engine == ContainerEngine::Singularity || options.engine == ContainerEngine::Apptainer;
     let raw_command = raw_command
         .into_iter()
         .map(|arg| unixify_arg(&arg))
@@ -121,12 +121,9 @@ pub fn build_container_command(
             "exec".to_string(),
             "-H".to_string(),
             format!("{outdir}:{workdir}"),
-            "-B".to_string(),
-            "/tmp/apptainer_tmp:/tmp".to_string(),
+            format!("--mount=type=bind,source={tmpdir},target={tmpdir_mount}"),
             "--pwd".to_string(),
             workdir.clone(),
-            "--env".to_string(),
-            "TMPDIR=/tmp".to_string(),
         ]
     } else {
         let workdir_mount = format!("--mount=type=bind,source={outdir},target={workdir}");
@@ -175,10 +172,13 @@ pub fn build_container_command(
 
     #[cfg(unix)]
     {
-        args.push(get_user_flag());
+        if !apptainer {
+            args.push(get_user_flag());
+        }
     }
-
-    args.push(format!("--env=HOME={workdir}"));
+    if !apptainer {
+        args.push(format!("--env=HOME={workdir}"));
+    }
     args.push(format!("--env=TMPDIR={tmpdir_mount}"));
 
     for (key, val) in options
@@ -190,10 +190,19 @@ pub fn build_container_command(
     }
 
     if !options.network {
-        args.push("--net=none".to_string());
+        if apptainer {
+            args.push("--net=none".to_string());
+            args.push("--network=none".to_string());
+        }
+        else {
+            args.push("--net=none".to_string());
+        }
     }
-
-    args.push(options.docker_image_id);
+    if apptainer && !options.docker_image_id.contains("://") && !Path::new(&options.docker_image_id).exists(){
+        args.push(format!("docker://{}", options.docker_image_id));
+    } else {
+        args.push(options.docker_image_id);
+    }
 
     args.extend(raw_command);
 
