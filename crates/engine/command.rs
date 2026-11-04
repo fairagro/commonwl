@@ -136,7 +136,7 @@ pub fn build_command(
     bindings.sort_by(|a, b| a.sort_key.cmp(&b.sort_key));
 
     if tool.has_requirement_or_hint::<ShellCommandRequirement>() {
-        let mut cmd = args.clone();
+        let mut cmd = apply_shell_quote(&args);
         for bound in bindings {
             let mut arg = if is_argument(&bound) {
                 use_value_from(&bound.binding, inputs, runtime, ijsr)?
