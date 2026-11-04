@@ -143,7 +143,7 @@ pub fn build_command(
             } else {
                 generate_arg(&bound.binding, bound.value, runtime, Some(inputs), ijsr)?
             };
-
+            arg.retain(|s| !s.is_empty());
             if bound.binding.shell_quote.unwrap_or(true) {
                 arg = apply_shell_quote(&arg);
             }
