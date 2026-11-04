@@ -83,9 +83,8 @@ async fn main() -> anyhow::Result<()> {
         let json = serde_json::to_string_pretty(&result.outputs)?;
         println!("{json}");
         exit(0)
-    } else {
-        exit(1)
     }
+    exit(1)
 }
 
 fn cli() -> ArgMatches {
