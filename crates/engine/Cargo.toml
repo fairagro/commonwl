@@ -59,7 +59,6 @@ bon.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
 nonempty.workspace = true
-sysinfo.workspace = true
 semver.workspace = true
 urlencoding.workspace = true
 indexmap.workspace = true

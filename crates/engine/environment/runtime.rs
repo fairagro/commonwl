@@ -1,13 +1,18 @@
 use cwl_core::{NumberOrExpression, requirements::ResourceRequirement};
 use semver::Version;
 use serde::{Deserialize, Serialize};
-use std::{path::PathBuf, sync::LazyLock};
-use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, System};
+use std::path::PathBuf;
 
 use crate::{
     V1_2_0,
     expression::{EvaluationContext, do_eval},
 };
+
+// Used when no ResourceRequirement sets a value, same as Sprocket.
+const DEFAULT_CORES: u64 = 1;
+// In mebibytes
+const DEFAULT_RAM: u64 = 2 * 1024;
+const DEFAULT_DISK: u64 = 1024;
 
 // Runtime Environment like described in CWL Spec
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,10 +30,10 @@ pub struct Runtime {
 impl Default for Runtime {
     fn default() -> Self {
         Self {
-            cores: get_processor_count() as u64,
-            ram: get_available_ram(),
-            outdir_size: get_available_disk_space(),
-            tmpdir_size: get_available_disk_space(),
+            cores: DEFAULT_CORES,
+            ram: DEFAULT_RAM,
+            outdir_size: DEFAULT_DISK,
+            tmpdir_size: DEFAULT_DISK,
             outdir: PathBuf::from("."),
             tmpdir: PathBuf::from("."),
             exit_code: None,
@@ -127,26 +132,4 @@ fn handle_value(
             }
         }
     })
-}
-
-static DISKS: LazyLock<Disks> = LazyLock::new(Disks::new_with_refreshed_list);
-
-static SYSTEM: LazyLock<System> = LazyLock::new(|| {
-    let mut system = System::new();
-    system.refresh_cpu_list(CpuRefreshKind::nothing());
-    system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
-    system
-});
-
-pub(crate) fn get_processor_count() -> usize {
-    SYSTEM.cpus().iter().count()
-}
-
-//Gets available RAM in mebibytes
-pub(crate) fn get_available_ram() -> u64 {
-    SYSTEM.free_memory() / 1024 / 1024
-}
-
-pub(crate) fn get_available_disk_space() -> u64 {
-    DISKS[0].available_space() / 1024 / 1024
 }
