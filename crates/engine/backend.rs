@@ -166,6 +166,7 @@ pub struct TaskExecutionRequest<'a> {
     pub timelimit: Option<&'a ToolTimeLimit>,
     pub network: bool,
     pub use_container: bool,
+    pub resources: Option<&'a ResourceRequirement>,
 
     pub stdin_file: Option<&'a String>,
     pub stdout_file: Option<&'a String>,
@@ -928,6 +929,7 @@ pub async fn execute_commandline_tool(
                     timelimit: ttl,
                     network: network_access,
                     use_container: tool.has_requirement::<DockerRequirement>(), //hints no sufficient
+                    resources: rr,
 
                     stdin_file: stdin.as_ref(),
                     stdout_file: stdout_name.as_ref(),

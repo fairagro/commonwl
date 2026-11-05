@@ -4,6 +4,7 @@ use crate::{
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
     docker::{ContainerBuildOptions, ContainerEngine, build_container_command, find_image_file},
+    environment::runtime::Runtime,
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -16,7 +17,7 @@ use crankshaft::engine::{
         output::{self},
     },
 };
-use cwl_core::{files::FileOrDirectory, requirements::StringOrInclude};
+use cwl_core::{files::FileOrDirectory, requirements::{ResourceRequirement, StringOrInclude}};
 use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
 use std::{env, fs, path::PathBuf, sync::Arc};
@@ -33,7 +34,8 @@ pub const IMAGE_PATH: &str = "SLURM_IMAGE_PATH";
 pub const SHARED_DIR: &str = "SLURM_SHARED_DIR";
 pub const CONTAINER_ENGINE: &str = "SLURM_CONTAINER_ENGINE";
 pub const LOG_DIR: &str = "SLURM_LOG_DIR"; 
-
+const DEFAULT_CORES: u64 = 1; 
+const DEFAULT_RAM: u64 = 256;
 #[derive(Debug)]
 pub struct SlurmBackend {
     uuid: String,
@@ -207,6 +209,7 @@ impl TaskBackend for SlurmBackend {
             }).collect::<crate::Result<Vec<_>>>()?;
             args = build_container_command(args, &staged, options, request.specificationdir)?;
         }
+        let (cores, ram) = get_resources(request.resources, request.runtime);
         //build crankshaft task object
         #[allow(clippy::cast_precision_loss)]
         let mut task = Task::builder()
@@ -227,9 +230,9 @@ impl TaskBackend for SlurmBackend {
             ])
             .resources(
                 Resources::builder()
-                    .cpu(request.runtime.cores as f64)
+                    .cpu(cores as f64)
                     .disk(request.runtime.outdir_size as f64)
-                    .ram(request.runtime.ram as f64 / 1024.0)
+                    .ram(ram as f64 / 1024.0)
                     .build(),
             )
             .build();
@@ -379,6 +382,20 @@ impl Drop for SlurmBackend {
             warn!("Could not remove backend's directory {}: {e}", self.step_dir().display());
         }
     }
+}
+
+fn get_resources(rr: Option<&ResourceRequirement>, rt: &Runtime) -> (u64, u64){
+    let cores = if rr.is_some_and(|rr| rr.cores_min.is_some() || rr.cores_max.is_some()) {
+        rt.cores
+    } else {
+        DEFAULT_CORES
+    };
+    let ram = if rr.is_some_and(|rr| rr.ram_min.is_some() || rr.ram_max.is_some()){
+        rt.ram
+    } else{
+        DEFAULT_RAM
+    };
+    (cores, ram)
 }
 
 #[cfg(test)]
