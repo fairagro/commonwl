@@ -92,6 +92,10 @@ pub trait TaskBackend: Send + Sync + 'static {
 
     /// where files are stored by the backend. e.g. /tmp for local backends or <s3://my-bucket> for remote
     fn data_store(&self) -> &StoragePath;
+
+    fn shared_dir(&self) -> Option<PathBuf>{
+        None
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -355,7 +359,13 @@ pub async fn execute_workflow(
     )
     .await?;
 
-    let collection_dir = tempdir()?;
+    let collection_dir = match backend.data_store().as_local_path() {
+        Ok(dir) if backend.data_store().is_local() => {
+            fs::create_dir_all(&dir)?;
+            tempfile::tempdir_in(dir)?
+        }
+        _ => tempdir()?,
+    };
 
     let eval_context = &mut EvaluationContext {
         workdir: Some(&request.working_dir),

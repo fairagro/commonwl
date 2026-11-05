@@ -118,7 +118,10 @@ pub fn build_container_command(
         || options.engine == ContainerEngine::Apptainer
     {
         vec![
+            "-q".to_string(),
             "exec".to_string(),
+            "--contain".to_string(),
+            "--cleanenv".to_string(),
             "-H".to_string(),
             format!("{outdir}:{workdir}"),
             format!("--mount=type=bind,source={tmpdir},target={tmpdir_mount}"),
@@ -184,7 +187,7 @@ pub fn build_container_command(
     for (key, val) in options
         .env
         .into_iter()
-        .skip_while(|(key, _)| *key == "HOME" || *key == "TMPDIR")
+        .filter(|(key, _)| key != "HOME" && key != "TMPDIR")
     {
         args.push(format!("--env={key}={val}"));
     }
@@ -198,8 +201,13 @@ pub fn build_container_command(
             args.push("--net=none".to_string());
         }
     }
-    if apptainer && !options.docker_image_id.contains("://") && !Path::new(&options.docker_image_id).exists(){
-        args.push(format!("docker://{}", options.docker_image_id));
+    if apptainer && !options.docker_image_id.contains("://") {
+        let path = Path::new(&options.docker_image_id);
+        if path.exists(){
+           args.push(std::path::absolute(path)?.to_string_lossy().into_owned()); 
+        } else {
+             args.push(format!("docker://{}", options.docker_image_id));
+        } 
     } else {
         args.push(options.docker_image_id);
     }

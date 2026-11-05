@@ -143,7 +143,6 @@ pub fn build_command(
             } else {
                 generate_arg(&bound.binding, bound.value, runtime, Some(inputs), ijsr)?
             };
-            arg.retain(|s| !s.is_empty());
             if bound.binding.shell_quote.unwrap_or(true) {
                 arg = apply_shell_quote(&arg);
             }
@@ -440,8 +439,10 @@ pub(crate) fn generate_arg(
     Ok(argl
         .into_iter()
         .flat_map(|j| {
-            if let DefaultValue::Any(serde_json::Value::Null) = j {
+            if let DefaultValue::Any(serde_json::Value::Null | serde_json::Value::Bool(false)) = j {
                 vec![]
+            } else if let DefaultValue::Any(serde_json::Value::Bool(true)) = j {
+                binding.prefix.clone().into_iter().collect()
             } else {
                 let s = to_str(&j);
                 if sep {
@@ -484,7 +485,8 @@ fn use_value_from(
     ) {
         let dv: DefaultValue = serde_json::from_value(result)?;
         //do not add boolenas if false
-        if matches!(dv, DefaultValue::Any(serde_json::Value::Bool(false))) {
+        if matches!(dv, DefaultValue::Any(serde_json::Value::Bool(false))) || 
+            matches!(dv, DefaultValue::Any(serde_json::Value::Null)){
             return Ok(vec![]);
         }
         value = dv;
@@ -497,6 +499,7 @@ fn use_value_from(
             .iter()
             .map(|i| to_str(&DefaultValue::Any(i.clone())))
             .collect::<Vec<_>>(),
+        DefaultValue::Any(serde_json::Value::Bool(true)) => vec![],
         default => vec![to_str(&default)],
     };
 
@@ -1165,5 +1168,42 @@ baseCommand: [echo, hello]"#;
         let args = vec!["hello world".to_string()];
         let res = apply_shell_quote(&args);
         assert_eq!(res, vec!["'hello world'".to_string()])
+    }
+
+        #[tokio::test]
+    async fn test_build_command_shell_empty_string() {
+        let yaml = r"class: CommandLineTool
+cwlVersion: v1.2
+requirements:
+  - class: ShellCommandRequirement
+baseCommand: echo
+inputs:
+  text:
+    type: string
+    inputBinding:
+      prefix: --text
+outputs: []";
+        let doc: CWLDocument = serde_saphyr::from_str(yaml).unwrap();
+
+        let input_values = serde_saphyr::from_str(r#"text: """#).unwrap();
+        let inputs = collect_inputs(
+            &doc,
+            &input_values,
+            Path::new("."),
+            Path::new("."),
+            None,
+            None,
+            &StorageBackend::new(),
+        )
+        .await
+        .unwrap();
+
+        let CWLDocument::CommandLineTool(tool) = doc else {
+            panic!()
+        };
+        let cmd = build_command(&tool, &inputs, &Runtime::default()).unwrap();
+
+        // an explicitly empty string stays an (empty) argument
+        assert_eq!(cmd.last().unwrap(), "'echo' '--text' ''");
     }
 }

@@ -49,12 +49,15 @@ impl SlurmBackend {
         data_store: StoragePath,
         slurm_config: SlurmConfig,
     ) -> crate::Result<Self> {
+        let apptainer = container_engine == ContainerEngine::Apptainer || container_engine == ContainerEngine::Singularity;
         crate::ensure!(data_store.is_local(),"slurm requires a data store on a filesystem that is shared with the clusters compute nodes");
         let base_path = data_store.as_local_path()?;
         let image_path = slurm_config.image_path.clone().or_else(|| env::var_os(IMAGE_PATH).map(PathBuf::from))
             .filter(|p| !p.as_os_str().is_empty()).map(std::path::absolute).transpose()?;
         if let Some(path) = &image_path {
             crate::ensure!(path.is_dir(), "image directory {} does not exist", path.display());
+        } else if apptainer {
+            warn!("No image directory set, set {IMAGE_PATH} if they exist locally.")
         }
         let backend = Arc::new(SlurmCommandBackend::new(storage.clone(), slurm_config));
         Ok(Self {
