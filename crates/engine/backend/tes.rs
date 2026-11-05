@@ -15,7 +15,11 @@ use crankshaft::{
             name::{GeneratorIterator, UniqueAlphanumeric},
             runner::backend::tes,
         },
-        task::{Execution, Output, Resources, output},
+        task::{
+            Execution, Input, Output, Resources,
+            input::{self, Contents},
+            output,
+        },
     },
 };
 use cwl_core::files::FileOrDirectory;
@@ -30,11 +34,14 @@ use tokio_util::sync::CancellationToken;
 use url::Url;
 use uuid::Uuid;
 
+const CONTAINER_TASK_DIR: &str = "/mnt/task";
 const CONTAINER_WORKDIR: &str = "/mnt/task/workdir";
 const CONTAINER_TMPDIR: &str = "/mnt/task/tmp";
 const CONTAINER_INPUT_DIR: &str = "/mnt/task/inputs";
 const CONTAINER_STDOUT_FILE: &str = "/mnt/task/stdout";
 const CONTAINER_STDERR_FILE: &str = "/mnt/task/stderr";
+/// Written by the scan executor below the tmpdir output, outside of the tool's results
+const EMPTY_DIRS_FILE: &str = "cwl_empty_dirs";
 
 #[derive(Debug, Clone)]
 pub struct TesBackend {
@@ -109,47 +116,36 @@ impl TaskBackend for TesBackend {
         //build crankshaft task object
         // Deliberately not wired to `Execution::stdin` as TES implementations may truncate the file
         // appended to args as trailing in backend.rs
-        #[allow(clippy::cast_precision_loss)]
-        let mut task = Task::builder()
-            .name(request.id)
-            .maybe_description(request.description)
-            .executions(nonempty![
-                Execution::builder()
-                    .work_dir(request.execution_path)
-                    .env(request.env.clone())
-                    .program(&args[0])
-                    .args(&args[1..])
-                    .images([&container])
-                    .expect("image list must not be empty")
-                    .stdout(stdout_file)
-                    .stderr(stderr_file)
-                    .build(),
-                // mark all created empty dirs with the s3 marker
-                Execution::builder()
-                    .work_dir(request.execution_path)
-                    .program("find")
-                    .args([
-                        ".".to_string(),
-                        "-type".to_string(),
-                        "d".to_string(),
-                        "-empty".to_string(),
-                        "-exec".to_string(),
-                        "touch".to_string(),
-                        format!("{{}}/{}", crate::backend::mount::EMPTY_DIR_MARKER),
-                        ";".to_string(),
-                    ])
-                    .images([DEFAULT_DOCKER_CONTAINER])
-                    .expect("image list must not be empty")
-                    .build()
-            ])
-            .resources(
-                Resources::builder()
-                    .cpu(request.runtime.cores as f64)
-                    //.disk(request.runtime.outdir_size) //we don't use this currently
-                    .ram(request.runtime.ram as f64 / 1024.0)
-                    .build(),
-            )
-            .build();
+        let executions = nonempty![
+            Execution::builder()
+                .work_dir(request.execution_path)
+                .env(request.env.clone())
+                .program(&args[0])
+                .args(&args[1..])
+                .images([&container])
+                .expect("image list must not be empty")
+                .stdout(stdout_file)
+                .stderr(stderr_file)
+                .build(),
+            // TES only uploads files, so report the directories left empty
+            Execution::builder()
+                .work_dir(request.execution_path)
+                .program("find")
+                .args([
+                    ".".to_string(),
+                    "-type".to_string(),
+                    "d".to_string(),
+                    "-empty".to_string(),
+                    "-print0".to_string(),
+                ])
+                .images([DEFAULT_DOCKER_CONTAINER])
+                .expect("image list must not be empty")
+                .stdout(format!("{CONTAINER_TMPDIR}/{EMPTY_DIRS_FILE}"))
+                .build()
+        ];
+
+        // crankshaft only takes volumes at build time, so collect the inputs on a staging task
+        let mut staging = Task::builder().executions(executions.clone()).build();
 
         //add file inputs to task
         let mut inputs = request.inputs.to_vec();
@@ -158,7 +154,7 @@ impl TaskBackend for TesBackend {
             if let Some(dest) = new_destinations.remove(&i) {
                 input.set_location(Some(dest.to_string()));
             }
-            mount_input(&mut task, input)?;
+            mount_input(&mut staging, input)?;
         }
 
         let mut set = tokio::task::JoinSet::new();
@@ -191,9 +187,29 @@ impl TaskBackend for TesBackend {
 
         while let Some(res) = set.join_next().await {
             for input in res?? {
-                task.add_input(input);
+                staging.add_input(input);
             }
         }
+
+        let (task_inputs, volumes) = self
+            .empty_dirs_to_volumes(staging.inputs().cloned().collect())
+            .await?;
+
+        #[allow(clippy::cast_precision_loss)]
+        let mut task = Task::builder()
+            .name(request.id)
+            .maybe_description(request.description)
+            .executions(executions)
+            .inputs(task_inputs)
+            .volumes(volumes)
+            .resources(
+                Resources::builder()
+                    .cpu(request.runtime.cores as f64)
+                    //.disk(request.runtime.outdir_size) //we don't use this currently
+                    .ram(request.runtime.ram as f64 / 1024.0)
+                    .build(),
+            )
+            .build();
 
         task.add_output(
             Output::builder()
@@ -257,13 +273,17 @@ impl TaskBackend for TesBackend {
         .await?;
 
         // evaluate side task exit status
-        if let Some(cleanup_status) = exit_status.get(1)
-            && !cleanup_status.success()
+        if let Some(scan_status) = exit_status.get(1)
+            && !scan_status.success()
         {
             tracing::warn!(
-                "empty-directory marker cleanup step exited with {cleanup_status}; \
+                "empty-directory scan exited with {scan_status}; \
                  empty output directories may be missing from results"
             );
+        }
+
+        if let Err(e) = self.store_empty_dirs(request).await {
+            tracing::warn!("could not store empty output directories: {e}");
         }
 
         let finished_at = Utc::now().naive_utc();
@@ -302,6 +322,70 @@ impl TaskBackend for TesBackend {
 }
 
 impl TesBackend {
+    /// Funnel only stages objects, so folder keys below a directory input never reach the task.
+    /// Those directories become volumes, and an input that is empty as a whole is dropped.
+    async fn empty_dirs_to_volumes(
+        &self,
+        inputs: Vec<Input>,
+    ) -> crate::Result<(Vec<Input>, Vec<String>)> {
+        let mut kept = Vec::with_capacity(inputs.len());
+        let mut volumes = vec![];
+
+        for input in inputs {
+            let empty_dirs = match (input.ty(), input.contents()) {
+                (input::Type::Directory, Contents::Url(url)) if url.scheme() == "s3" => {
+                    self.storage.list_empty_dirs(url).await?
+                }
+                _ => vec![],
+            };
+
+            let base = input.path().trim_end_matches('/');
+            volumes.extend(empty_dirs.iter().map(|dir| {
+                if dir.is_empty() {
+                    base.to_string()
+                } else {
+                    format!("{base}/{dir}")
+                }
+            }));
+
+            if !empty_dirs.iter().any(String::is_empty) {
+                kept.push(input);
+            }
+        }
+
+        // Funnel folds only one nested volume into a parent mount, the rest stay docker arguments
+        // that it does not quote. Listing the task root first folds them all.
+        if !volumes.is_empty() {
+            volumes.insert(0, CONTAINER_TASK_DIR.to_string());
+        }
+
+        Ok((kept, volumes))
+    }
+
+    /// Stores the directories the scan found empty, as Funnel only uploads files.
+    async fn store_empty_dirs(&self, request: &TaskExecutionRequest<'_>) -> crate::Result<()> {
+        let file = request.tmpdir.join(EMPTY_DIRS_FILE)?.as_url()?;
+        let empty_dirs = self.storage.read_file(&file).await?;
+
+        let mut set = tokio::task::JoinSet::new();
+        let sem = Arc::new(tokio::sync::Semaphore::new(32));
+        for dir in empty_dirs.split('\0').filter(|dir| !dir.is_empty()) {
+            let dest = request.outdir.join(dir)?.as_url()?;
+            let permit = sem.clone().acquire_owned().await?;
+            let storage = self.storage.clone();
+            set.spawn(async move {
+                let _permit = permit; //reference semaphore
+                storage.create_dir(&dest).await
+            });
+        }
+
+        while let Some(res) = set.join_next().await {
+            res??;
+        }
+
+        Ok(())
+    }
+
     async fn upload_files_parallel(
         &self,
         inputs: &[FileOrDirectory],

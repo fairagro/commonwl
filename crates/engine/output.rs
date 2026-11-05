@@ -137,9 +137,6 @@ fn list_remote_listing<'a>(
     async move {
         let mut entries = vec![];
         for child in storage.glob(dir_url, "*").await? {
-            if child.file_name().as_deref() == Some(crate::backend::mount::EMPTY_DIR_MARKER) {
-                continue;
-            }
             if child.is_dir() {
                 let child_url = child.as_url()?;
                 let mut dir = Directory::builder()
@@ -216,10 +213,6 @@ async fn evaluate_command_binding(
         for glob_ in get_globs(globs, context.eval_context) {
             let glob_ = relativize_glob_pattern(glob_, context.source_dir);
             for item in storage.glob(&context.source_dir.as_url()?, &glob_).await? {
-                // never surface S3-empty-directory placeholder as it were real tool output - it can end up glob-matched here directly
-                if item.file_name().as_deref() == Some(crate::backend::mount::EMPTY_DIR_MARKER) {
-                    continue;
-                }
                 let fod = if item.is_dir() {
                     let basename = item.file_name();
                     let mut dir = Directory::builder()
@@ -527,8 +520,6 @@ async fn validate_dir(
             // locations, not the paths just downloaded to - always regenerate from the real copy
             dir.path = Some(dest_path.to_string_lossy().into_owned());
             dir.load_listing(LoadListingEnum::DeepListing)?;
-
-            filter_empty_dir_markers(dir);
         }
     } else if let Some(dest_path) = &path {
         //no source path, but we still want to create the directory
@@ -553,22 +544,6 @@ async fn validate_dir(
     }
 
     Ok(())
-}
-
-/// Recursively drops any `S3_EMPTY_DIR_MARKER` placeholder entries from a directory's
-/// listing, without touching the files themselves on disk.
-fn filter_empty_dir_markers(dir: &mut Directory) {
-    if let Some(listing) = &mut dir.listing {
-        listing.retain(|item| {
-            item.basename()
-                .is_none_or(|b| b != crate::backend::mount::EMPTY_DIR_MARKER)
-        });
-        for item in listing {
-            if let FileOrDirectory::Directory(d) = item {
-                filter_empty_dir_markers(d);
-            }
-        }
-    }
 }
 
 /// creates the new output path by stripping prefixes of known folders
