@@ -176,7 +176,15 @@ impl TaskBackend for SlurmBackend {
                 .maybe_docker_file(df)
                 .mounts(extras)
                 .build();
-            args = build_container_command(args, &inputs, options, request.specificationdir)?;
+            let staged = inputs.iter().cloned().map(|mut i| {
+                if let Some(path) = i.path().cloned() {
+                    let url = Url::from_file_path(&path)
+                        .map_err(|()| anyhow::anyhow!("Unable to create URL form {:?}", path))?;
+                    i.set_location(Some(url.to_string()));
+                }
+                Ok(i)
+            }).collect::<crate::Result<Vec<_>>>()?;
+            args = build_container_command(args, &staged, options, request.specificationdir)?;
         }
         //build crankshaft task object
         #[allow(clippy::cast_precision_loss)]
