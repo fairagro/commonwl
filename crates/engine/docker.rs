@@ -12,6 +12,7 @@ use std::{
     io::BufRead,
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    str::FromStr,
 };
 
 /// builds a Docker container using the bollard Docker client
@@ -62,6 +63,19 @@ impl Display for ContainerEngine {
             ContainerEngine::Podman => write!(f, "podman"),
             ContainerEngine::Singularity => write!(f, "singularity"),
             ContainerEngine::Apptainer => write!(f, "apptainer"),
+        }
+    }
+}
+
+impl FromStr for ContainerEngine {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str(){
+            "docker" => Ok(ContainerEngine::Docker),
+            "podman" => Ok(ContainerEngine::Podman),
+            "singularity" => Ok(ContainerEngine::Singularity),
+            "apptainer" => Ok(ContainerEngine::Apptainer),
+            _ => anyhow::bail!("unkown container engine"),
         }
     }
 }

@@ -30,6 +30,9 @@ pub mod command;
 pub use self::command::{SlurmCommandBackend, SlurmConfig};
 
 pub const IMAGE_PATH: &str = "SLURM_IMAGE_PATH";
+pub const SHARED_DIR: &str = "SLURM_SHARED_DIR";
+pub const CONTAINER_ENGINE: &str = "SLURM_CONTAINER_ENGINE";
+pub const LOG_DIR: &str = "SLURM_LOG_DIR"; 
 
 #[derive(Debug)]
 pub struct SlurmBackend {
@@ -69,6 +72,21 @@ impl SlurmBackend {
             image_path,
             backend,
         })
+    }
+
+    pub fn from_env(storage: Arc<StorageBackend>) -> crate::Result<Self>{
+        let shared_dir = env::var_os(SHARED_DIR).filter(|d| !d.is_empty()).map(PathBuf::from)
+            .with_context(|| {
+                format!("{SHARED_DIR} must be a directory shared with compute nodes")
+            })?;
+        crate::ensure!(shared_dir.is_dir(), "{SHARED_DIR} {} does not exist", shared_dir.display());
+        let shared_dir = std::path::absolute(&shared_dir)?;
+        let container_engine = match env::var(CONTAINER_ENGINE){
+            Ok(engine) if !engine.is_empty() => engine.parse()?,
+            _ => ContainerEngine::Apptainer,
+        };
+        let log_dir = env::var_os(LOG_DIR).filter(|d| !d.is_empty()).map(PathBuf::from);
+        Self::new(container_engine, storage, StoragePath::from_local(&shared_dir), SlurmConfig::builder().maybe_log_dir(log_dir).build())
     }
 
     fn step_dir(&self) -> PathBuf {
