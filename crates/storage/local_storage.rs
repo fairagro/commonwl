@@ -11,6 +11,14 @@ pub struct LocalStorage;
 
 #[async_trait]
 impl Storage for LocalStorage {
+    async fn create_dir(&self, uri: &Url) -> anyhow::Result<()> {
+        ensure!(uri.scheme() == "file");
+        let path = url_to_path(uri)?;
+        tokio::fs::create_dir_all(&path)
+            .await
+            .with_context(|| format!("Could not create directory {}", path.display()))
+    }
+
     async fn upload(&self, local: &Path, dest: &Url) -> anyhow::Result<()> {
         ensure!(dest.scheme() == "file");
         let dest = dest
