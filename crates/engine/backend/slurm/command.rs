@@ -3,7 +3,7 @@ use anyhow::Context;
 use crankshaft::engine::{
     Task,
     service::runner::backend::TaskRunError,
-    task::{Execution, execution::ExecutionResult},
+    task::{Execution, execution::ExecutionResult, Input, input::{self, Contents}},
 };
 use bon::Builder;
 use crankshaft::events::Event;
@@ -45,12 +45,17 @@ impl Default for SlurmConfig {
 pub struct SlurmCommandBackend {
     storage: Arc<StorageBackend>,
     config: SlurmConfig,
+    link_inputs: bool,
 }
 
 impl SlurmCommandBackend {
     #[must_use]
     pub fn new(storage: Arc<StorageBackend>, config: SlurmConfig) -> Self {
-        Self { storage, config }
+        Self { storage, config, link_inputs: false }
+    }
+    #[must_use]
+    pub fn with_linked_inputs(&self, link_inputs: bool) -> Self {
+        Self {link_inputs, ..self.clone()}
     }
 }
 
@@ -67,9 +72,10 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
     ) -> anyhow::Result<BoxFuture<'static, Result<NonEmpty<ExecutionResult>, TaskRunError>>> {
         let storage = self.storage.clone();
         let config = self.config.clone();
+        let link_inputs = self.link_inputs;
         Ok(async move {
             let mut status_vec = Vec::new();
-            stage_inputs(storage, task.inputs())
+            stage_job_inputs(storage, task.inputs(), link_inputs)
                 .await
                 .map_err(|e| TaskRunError::Other(e.into()))?;
             for exec in task.executions() {
@@ -215,6 +221,59 @@ fn is_valid_env_name(name: &str) -> bool {
 
 fn quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', r"'\''"))
+}
+
+async fn stage_job_inputs(storage: Arc<StorageBackend>, inputs: impl Iterator<Item = &Input>, link_inputs: bool) -> crate::Result<()> {
+    if link_inputs {
+        return stage_inputs(storage, inputs).await;
+    }
+    let mut other = Vec::new();
+    for i in inputs {
+        match i.contents() {
+            Contents::Path(src) => {
+                let dest = Path::new(i.path());
+                if let Some(parent) = dest.parent() {
+                    fs::create_dir_all(parent).await.with_context(|| format!("Could not create dir: {}", parent.display()))?;
+                }
+                let result = match i.ty() {
+                    input::Type::File => copy_file(src, dest).await,
+                    input::Type::Directory => copy_dir(src, dest).await,
+                };
+                result.with_context(|| {
+                    format!("Could not copy from {} to {}", src.display(), dest.display())
+                })?;
+            }
+            _ => other.push(i),
+        }
+    }
+    stage_inputs(storage, other.into_iter()).await?;
+    Ok(())
+}
+
+async fn copy_file(src: &Path, dest: &Path) -> anyhow::Result<()> {
+    if src == dest {
+        return Ok(());
+    }
+    let _ = fs::remove_file(dest).await;
+    fs::copy(src, dest).await?;
+    Ok(())
+}
+
+fn copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::Result<()>> {
+    async move {
+        fs::create_dir_all(dest).await?;
+        let mut entries = fs::read_dir(src).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let src = entry.path();
+            let dest = dest.join(entry.file_name());
+            match entry.file_type().await?.is_dir() {
+                true => copy_dir(&src, &dest).await?,
+                false => copy_file(&src, &dest).await?,
+            }
+        }
+        Ok(())
+    }
+    .boxed()
 }
 
 #[cfg(test)]

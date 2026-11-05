@@ -183,7 +183,7 @@ pub fn build_container_command(
             .to_file_path()
             .map_err(|()| anyhow::anyhow!("Not a local path!"))?;
         let target = to_linux_path(&target);
-        let mount = format!("--mount=type=bind,source={loc},target={target}");
+        let mount = format!("--mount=type=bind,source={loc},target={target},ro");
         args.push(mount);
     }
 
