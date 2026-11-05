@@ -10,16 +10,19 @@ use crankshaft::events::Event;
 use cwl_engine_storage::StorageBackend;
 use futures_util::{FutureExt, future::BoxFuture};
 use nonempty::NonEmpty;
-use std::{fmt::Write as _, path::{Path, PathBuf}, process::{ExitStatus, Stdio}, sync::Arc};
+use std::{fmt::Write as _, path::{Path, PathBuf}, process::{ExitStatus, Stdio}, sync::Arc, time::Duration};
 use tokio::{
     fs,
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    process::Command,
+    process::{Command, Child},
     select,
     sync::broadcast,
+    time::timeout
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
+
+const CANCEL_JOB_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, Clone, Builder)]
 pub struct SlurmConfig {
@@ -78,6 +81,7 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
             stage_job_inputs(storage, task.inputs(), link_inputs)
                 .await
                 .map_err(|e| TaskRunError::Other(e.into()))?;
+            let name = job_name(&task);
             for exec in task.executions() {
                 if token.is_cancelled() {
                     return Err(TaskRunError::Canceled);
@@ -90,7 +94,7 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
                     }
                 }
                 let res = resource_args(&task);
-                let status = submit(&config, &res, &job_script(exec), &token).await?;
+                let status = submit(&config, &name, &res, &job_script(exec), &token).await?;
                 status_vec.push(ExecutionResult {
                     image: Some(exec.images().first().clone()),
                     status,
@@ -105,11 +109,12 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
     }
 }
 
-async fn submit(slurm_config: &SlurmConfig, res: &[String], script: &str, token: &CancellationToken) -> Result<ExitStatus, TaskRunError> {
+async fn submit(slurm_config: &SlurmConfig, name: &str, res: &[String], script: &str, token: &CancellationToken) -> Result<ExitStatus, TaskRunError> {
     let log = slurm_config.log_dir.as_ref().map_or_else( || "/dev/null".to_string(),
         |d| d.join("cwl-%j.out").to_string_lossy().into_owned());
     let mut cmd = Command::new(&slurm_config.sbatch);
     cmd
+        .arg(format!("--job-name={name}"))
         .args(&slurm_config.sbatch_args)
         .args(res)
         .arg("--parsable")
@@ -119,6 +124,8 @@ async fn submit(slurm_config: &SlurmConfig, res: &[String], script: &str, token:
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .kill_on_drop(true);
+    #[cfg(unix)]
+    cmd.process_group(0);
     debug!("Slurm job with command {:?} submitted", cmd);
     let mut child = cmd.spawn().with_context(|| format!("Not able to run {:?}", slurm_config.sbatch))?;
     let mut stdin = child.stdin.take().expect("stdin is piped");
@@ -139,11 +146,17 @@ async fn submit(slurm_config: &SlurmConfig, res: &[String], script: &str, token:
     if let Some(id) = &j.job_id {
         info!("A new slurm job with id {id} was submitted");
     }
+    if token.is_cancelled() {
+        return Err(cancel_job(&mut j, &mut child).await);
+    }
     let status = select! {
         biased;
         () = token.cancelled() => return Err(TaskRunError::Canceled),
         status = child.wait() => status.context("Unable to wait for sbatch")?,
     };
+    if j.job_id.is_some() && status.code().is_none() {
+        return Err(TaskRunError::Other(anyhow::anyhow!("sbatch was terminated: {status}")));
+    }
     if j.job_id.take().is_none() {
         let mut stderr = String::new();
         if let Some(mut pipe) = child.stderr.take() {
@@ -276,6 +289,37 @@ fn copy_dir<'a>(src: &'a Path, dest: &'a Path) -> BoxFuture<'a, anyhow::Result<(
     .boxed()
 }
 
+async fn cancel_job(job: &mut JobGuard, sbatch: &mut Child) -> TaskRunError {
+    let Some(id) = job.job_id.as_deref() else {
+        return TaskRunError::Canceled;
+    };
+    info!("Cancelling Slurm job with {id}");
+    match Command::new(&job.scancel).arg(id).status().await {
+        Ok(status) if !status.success() => warn!("`{} {id}` failed with {status}", job.scancel),
+        Err(e) => warn!("Could not run `{} {id}`: {e}", job.scancel),
+        Ok(_) => {}
+    }
+    if timeout(CANCEL_JOB_TIMEOUT, sbatch.wait()).await.is_ok() {
+        info!("Slurm job {id} cancelled");
+        job.job_id = None;
+    } else {
+        warn!("Slurm job {id} did not stop within {}s after cancelling it", CANCEL_JOB_TIMEOUT.as_secs());
+    }
+    TaskRunError::Canceled
+}
+
+fn job_name(task: &Task) -> String {
+    let name = task.name().unwrap_or_default().chars().map(|c| {
+        if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+            c
+        } else {
+            '_'
+        }
+    })
+    .take(64).collect::<String>();
+    format!("s4n-{}", name.trim_matches('_'))
+}
+
 #[cfg(test)]
 #[cfg(unix)]
 mod tests {
@@ -298,7 +342,7 @@ mod tests {
         std::fs::set_permissions(&sbatch, std::fs::Permissions::from_mode(0o755)).unwrap();
         let config = SlurmConfig::builder().sbatch(sbatch.to_string_lossy().into_owned())
             .sbatch_args(vec!["--partition=test".to_string()]).log_dir("/logs").build();
-        let status = submit(&config, &["--mem=1024M".to_string()], "#!/bin/sh\necho hello\n",
+        let status = submit(&config, "s4n-test", &["--mem=1024M".to_string()], "#!/bin/sh\necho hello\n",
             &CancellationToken::new()).await.unwrap();
         assert!(status.success());
         let calls = std::fs::read_to_string(dir.path().join("sbatch.calls")).unwrap();
