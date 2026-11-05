@@ -36,6 +36,8 @@ pub struct SlurmConfig {
     pub scancel: String,
     #[builder(into)]
     pub image_path: Option<PathBuf>,
+    #[builder(into)]
+    pub time_limit: Option<String>,
 }
 
 impl Default for SlurmConfig {
@@ -49,16 +51,21 @@ pub struct SlurmCommandBackend {
     storage: Arc<StorageBackend>,
     config: SlurmConfig,
     link_inputs: bool,
+    time_limit: Option<u64>,
 }
 
 impl SlurmCommandBackend {
     #[must_use]
     pub fn new(storage: Arc<StorageBackend>, config: SlurmConfig) -> Self {
-        Self { storage, config, link_inputs: false }
+        Self { storage, config, link_inputs: false, time_limit: None }
     }
     #[must_use]
     pub fn with_linked_inputs(&self, link_inputs: bool) -> Self {
         Self {link_inputs, ..self.clone()}
+    }
+    #[must_use]
+    pub fn with_time_limit(&self, seconds: Option<u64>) -> Self {
+        Self {time_limit: seconds, ..self.clone()}
     }
 }
 
@@ -76,6 +83,7 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
         let storage = self.storage.clone();
         let config = self.config.clone();
         let link_inputs = self.link_inputs;
+        let time_limit = self.time_limit;
         Ok(async move {
             let mut status_vec = Vec::new();
             stage_job_inputs(storage, task.inputs(), link_inputs)
@@ -93,8 +101,9 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
                             .with_context(|| format!("Could not create dir: {}", parent.display()))?;
                     }
                 }
-                let res = resource_args(&task);
-                let status = submit(&config, &name, &res, &job_script(exec), &token).await?;
+                let mut res = resource_args(&task);
+                res.extend(time_limit.map(time_arg));
+                let status = submit(&config, &name, &res, &job_script(exec, time_limit), &token).await?;
                 status_vec.push(ExecutionResult {
                     image: Some(exec.images().first().clone()),
                     status,
@@ -198,11 +207,16 @@ fn resource_args(task: &Task) -> Vec<String> {
     args
 }
 
-fn job_script(execution: &Execution) -> String {
+fn job_script(execution: &Execution, time_limit: Option<u64>) -> String {
     let mut script = String::from("#!/bin/sh\n");
+    let redirect = execution.stderr().map_or_else(|| ">&2".to_owned(), |stderr| format!(">> {}", quote(stderr)));
     for (key, value) in execution.env() {
         debug_assert!(is_valid_env_name(key));
         writeln!(script, "export {key}={}", quote(value)).expect("writing to a String cannot fail");
+    }
+    if let Some(secs) = time_limit {
+        let _ = writeln!(script, "( sleep {secs}; echo \"Stopping job, it exceeded the time limit of {secs}s\" {redirect}; \
+            kill -TERM $$; sleep 10; kill -KILL $$ ) &");
     }
     if let Some(dir) = execution.work_dir() {
         writeln!(script, "cd {} || exit 1", quote(dir)).expect("writing to a String cannot fail");
@@ -318,6 +332,10 @@ fn job_name(task: &Task) -> String {
     })
     .take(64).collect::<String>();
     format!("s4n-{}", name.trim_matches('_'))
+}
+
+fn time_arg(seconds: u64) -> String {
+    format!("--time={}", seconds.div_ceil(60) + 1)
 }
 
 #[cfg(test)]

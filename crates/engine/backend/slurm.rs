@@ -316,11 +316,14 @@ impl TaskBackend for SlurmBackend {
                 .ty(output::Type::Directory)
                 .build(),
         );
+        let timelimit = crate::backend::evaluate_timelimit(request.timelimit, request.eval_context)
+            .and_then(|t| u64::try_from(t).ok()).filter(|t| *t > 0);
+        let backend = self.backend.with_linked_inputs(request.docker.is_some()).with_time_limit(timelimit);
         let exit_status = crate::backend::run_with_timelimit(
-            &self.backend.with_linked_inputs(request.docker.is_some()),
+            &backend,
             task,
             token,
-            request.timelimit,
+            None,
             request.eval_context,
         )
         .await?;

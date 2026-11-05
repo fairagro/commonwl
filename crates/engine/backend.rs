@@ -199,14 +199,7 @@ pub(crate) async fn run_with_timelimit(
     timelimit: Option<&ToolTimeLimit>,
     eval_context: &EvaluationContext<'_>,
 ) -> crate::Result<NonEmpty<ExitStatus>> {
-    let timeout = timelimit.and_then(|ttl| match &ttl.timelimit {
-        IntegerOrExpression::Int(i) => Some(i64::from(*i)),
-        IntegerOrExpression::Long(i) => Some(*i),
-        IntegerOrExpression::Expression(e) => {
-            let value = do_eval(e, eval_context).ok()?;
-            value.as_i64()
-        }
-    });
+    let timeout = evaluate_timelimit(timelimit, eval_context);
 
     if let Some(timeout) = timeout
         && timeout != 0
@@ -225,6 +218,17 @@ pub(crate) async fn run_with_timelimit(
         //no time constraint
         Ok(backend.run(task, None, token)?.await?.map(|r| r.status))
     }
+}
+
+pub(crate) fn evaluate_timelimit(timelimit: Option<&ToolTimeLimit>, eval_context: &EvaluationContext<'_>) -> Option<i64> {
+    timelimit.and_then(|ttl| match &ttl.timelimit {
+        IntegerOrExpression::Int(i) => Some(i64::from(*i)),
+        IntegerOrExpression::Long(i) => Some(*i),
+        IntegerOrExpression::Expression(e) => {
+            let value = do_eval(e, eval_context).ok()?;
+            value.as_i64()
+        }
+    })
 }
 
 pub(crate) struct ResolvedDockerRequirement {
