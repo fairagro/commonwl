@@ -31,6 +31,8 @@ pub struct SlurmConfig {
     pub sbatch: String,
     #[builder(into, default = String::from("scancel"))]
     pub scancel: String,
+    #[builder(into)]
+    pub image_path: Option<PathBuf>,
 }
 
 impl Default for SlurmConfig {

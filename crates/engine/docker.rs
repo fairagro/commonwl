@@ -10,7 +10,7 @@ use indexmap::IndexMap;
 use std::{
     fmt::Display,
     io::BufRead,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
@@ -348,4 +348,28 @@ fn unixify_arg(arg: &str) -> String {
             arg.to_string()
         }
     }
+}
+
+pub(crate) fn find_image_file(img: &str, dir: &Path) -> Option<PathBuf> {
+    image_file_names(img).into_iter().map(|name| dir.join(name)).find(|path| path.is_file())
+}
+
+fn image_file_names(img: &str) -> Vec<String> {
+    let img = img.split_once("://").map_or(img, |(_, rest)| rest);
+    let name = img.rsplit('/').next().unwrap_or(img);
+    let mut refs = vec![img.to_string()];
+    if !name.contains(':') && !name.contains('@') {
+        refs.push(format!("{img}:latest"));
+    }
+    let mut names = Vec::new();
+    for r in &refs {
+        let name = r.rsplit('/').next().unwrap_or(r);
+        for candidate in [format!("{}.sif", r.replace(['/', ':', '@'], "_")), format!("{}.sif", r.replace('/', "_")),
+            format!("{}.sif", name.replace([':', '@'], "_")), format!("{name}.sif"), name.to_string()] {
+            if !names.contains(&candidate) {
+                names.push(candidate);
+            }
+        }
+    }
+    names
 }

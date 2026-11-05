@@ -3,7 +3,7 @@ use crate::{
         DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
     },
-    docker::{ContainerBuildOptions, ContainerEngine, build_container_command},
+    docker::{ContainerBuildOptions, ContainerEngine, build_container_command, find_image_file},
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -19,7 +19,7 @@ use crankshaft::engine::{
 use cwl_core::{files::FileOrDirectory, requirements::StringOrInclude};
 use cwl_engine_storage::{StorageBackend, StoragePath};
 use nonempty::nonempty;
-use std::{fs, path::PathBuf, sync::Arc};
+use std::{env, fs, path::PathBuf, sync::Arc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 use url::Url;
@@ -29,6 +29,8 @@ pub mod command;
 
 pub use self::command::{SlurmCommandBackend, SlurmConfig};
 
+pub const IMAGE_PATH: &str = "SLURM_IMAGE_PATH";
+
 #[derive(Debug)]
 pub struct SlurmBackend {
     uuid: String,
@@ -36,6 +38,7 @@ pub struct SlurmBackend {
     storage: Arc<StorageBackend>,
     data_store: StoragePath,
     base_path: PathBuf,
+    image_path: Option<PathBuf>,
     backend: Arc<SlurmCommandBackend>,
 }
 
@@ -48,6 +51,11 @@ impl SlurmBackend {
     ) -> crate::Result<Self> {
         crate::ensure!(data_store.is_local(),"slurm requires a data store on a filesystem that is shared with the clusters compute nodes");
         let base_path = data_store.as_local_path()?;
+        let image_path = slurm_config.image_path.clone().or_else(|| env::var_os(IMAGE_PATH).map(PathBuf::from))
+            .filter(|p| !p.as_os_str().is_empty()).map(std::path::absolute).transpose()?;
+        if let Some(path) = &image_path {
+            crate::ensure!(path.is_dir(), "image directory {} does not exist", path.display());
+        }
         let backend = Arc::new(SlurmCommandBackend::new(storage.clone(), slurm_config));
         Ok(Self {
             uuid: Uuid::new_v4().to_string()[..8].to_string(),
@@ -55,12 +63,29 @@ impl SlurmBackend {
             storage,
             data_store,
             base_path,
+            image_path,
             backend,
         })
     }
 
     fn step_dir(&self) -> PathBuf {
         self.base_path.join(&self.uuid)
+    }
+    
+    fn resolve_image(&self, img: String) -> crate::Result<String> {
+        let apptainer =  self.container_engine == ContainerEngine::Apptainer || self.container_engine == ContainerEngine::Singularity;
+        let Some(dir) = &self.image_path else {
+            return Ok(img);
+        };
+        if !apptainer || fs::exists(&img).unwrap_or_default(){
+            return Ok(img);
+        }
+        let Some(path) = find_image_file(&img, dir) else {
+            crate::bail!("No prebuilt image for {img} in {} ({IMAGE_PATH}) use `{} pull {}/<name>.sif docker://{img}`", dir.display(),
+                self.container_engine, dir.display());
+        };
+        debug!("Using {} for {img}", path.display());
+        Ok(path.to_string_lossy().into_owned())
     }
 }
 
@@ -135,9 +160,13 @@ impl TaskBackend for SlurmBackend {
                 }
                 None => None,
             };
-
+            let img = if df.is_none(){
+                self.resolve_image(resolved.image_id)?
+            } else {
+                resolved.image_id
+            };
             let options = ContainerBuildOptions::builder()
-                .docker_image_id(resolved.image_id)
+                .docker_image_id(img)
                 .network(request.network)
                 .engine(self.container_engine)
                 .env(request.env.clone())
@@ -282,6 +311,7 @@ impl TaskBackend for SlurmBackend {
             storage: self.storage(),
             data_store: self.data_store.clone(),
             base_path: self.base_path.clone(),
+            image_path: self.image_path.clone(),
             backend: self.backend.clone(),
         }) as Arc<dyn TaskBackend>
     }
