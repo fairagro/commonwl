@@ -16,11 +16,6 @@ use cwl_engine_storage::{Storage, StorageBackend};
 use std::{fs, path::PathBuf, sync::Arc};
 use url::Url;
 
-/// Marker object name uploaded under an otherwise-empty S3 "directory" prefix so a TES
-/// server has at least one object to materialize into a real directory. Stripped back out
-/// wherever a downloaded remote directory's listing gets generated (see `output.rs`).
-pub(crate) const EMPTY_DIR_MARKER: &str = ".cwl_empty_dir";
-
 pub(crate) fn mount_input(task: &mut Task, input: &FileOrDirectory) -> crate::Result<()> {
     let ty = match input {
         FileOrDirectory::File(_) => input::Type::File,
@@ -263,15 +258,7 @@ async fn mount_workdir_item_remote(
         }
         (MountType::Directory, Source::Contents(_)) => {
             let dest = base_url.join(&format!("{rel}/"))?;
-            if dest.scheme() == "s3" {
-                //upload placeholder object
-                backend
-                    .upload_bytes(&[], &dest.join(EMPTY_DIR_MARKER)?)
-                    .await?;
-            } else {
-                let tmp = tempfile::tempdir()?;
-                backend.upload(tmp.path(), &dest).await?;
-            }
+            backend.create_dir(&dest).await?;
             inputs.push(
                 Input::builder()
                     .path(&guest_path)

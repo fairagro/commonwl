@@ -26,3 +26,4 @@ dircpy.workspace = true
 tempfile.workspace = true
 uuid.workspace = true
 tracing.workspace = true
+urlencoding.workspace = true

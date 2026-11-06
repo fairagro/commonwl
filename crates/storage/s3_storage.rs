@@ -103,6 +103,12 @@ impl S3Storage {
         let key = uri.path().trim_start_matches('/');
         Ok((bucket.to_string(), key.to_string()))
     }
+
+    /// Like `parse_uri`, but for keys holding the name a TES worker sees: `a b`, not `a%20b`.
+    fn parse_raw_uri(uri: &Url) -> anyhow::Result<(String, String)> {
+        let (bucket, key) = Self::parse_uri(uri)?;
+        Ok((bucket, urlencoding::decode(&key)?.into_owned()))
+    }
 }
 
 impl Default for S3Storage {
@@ -120,7 +126,9 @@ impl Storage for S3Storage {
         } else {
             let mut set = tokio::task::JoinSet::new();
             let sem = Arc::new(tokio::sync::Semaphore::new(32));
+            let mut is_empty = true;
             for item in local.read_dir()? {
+                is_empty = false;
                 let dir_dest = if dest.path().ends_with('/') {
                     dest.clone()
                 } else {
@@ -140,6 +148,9 @@ impl Storage for S3Storage {
                     });
                 }
             }
+            if is_empty {
+                self.create_dir(dest).await?;
+            }
             while let Some(res) = set.join_next().await {
                 res??;
             }
@@ -153,20 +164,7 @@ impl Storage for S3Storage {
         match file_type {
             S3PathType::File => self.download_file(&bucket, &key, local).await?,
             S3PathType::Directory => {
-                let objects = self
-                    .client()
-                    .await?
-                    .list_objects_v2()
-                    .bucket(&bucket)
-                    .prefix(&key)
-                    .send()
-                    .await?;
-
-                let keys: Vec<String> = objects
-                    .contents()
-                    .iter()
-                    .filter_map(|obj| obj.key().map(str::to_owned))
-                    .collect();
+                let keys = self.list_keys(&bucket, &key).await?;
                 let mut set = tokio::task::JoinSet::new();
                 let sem = Arc::new(tokio::sync::Semaphore::new(32));
                 for obj_key in keys {
@@ -175,6 +173,14 @@ impl Storage for S3Storage {
                         .unwrap_or(&obj_key)
                         .trim_start_matches('/');
                     let local_path = local.join(relative);
+                    if obj_key.ends_with('/') {
+                        tokio::fs::create_dir_all(&local_path)
+                            .await
+                            .with_context(|| {
+                                format!("Could not create directory {}", local_path.display())
+                            })?;
+                        continue;
+                    }
                     if let Some(parent) = local_path.parent() {
                         tokio::fs::create_dir_all(parent).await.with_context(|| {
                             format!("Could not create directory {}", parent.display())
@@ -323,14 +329,7 @@ impl Storage for S3Storage {
             format!("{key_prefix}/")
         };
 
-        let res = self
-            .client()
-            .await?
-            .list_objects_v2()
-            .bucket(&bucket)
-            .prefix(&key_prefix)
-            .send()
-            .await?;
+        let keys = self.list_keys(&bucket, &key_prefix).await?;
 
         let mut file_urls = vec![];
         // S3 has no real directories, only object keys
@@ -345,10 +344,12 @@ impl Storage for S3Storage {
             ..glob::MatchOptions::new()
         };
 
-        for key in res.contents().iter().filter_map(|obj| obj.key()) {
+        for key in &keys {
             let relative = key.strip_prefix(&strip_prefix).unwrap_or(key);
 
-            if pattern.matches_with(relative, match_options)
+            // a folder key is only a directory, the segment walk below picks it up
+            if !key.ends_with('/')
+                && pattern.matches_with(relative, match_options)
                 && let Ok(url) = Url::parse(&format!("s3://{bucket}/{key}"))
             {
                 file_urls.push(StoragePath::Remote(url));
@@ -371,9 +372,61 @@ impl Storage for S3Storage {
 
         Ok(Box::new(file_urls.into_iter().chain(dir_urls)))
     }
+
+    async fn create_dir(&self, uri: &Url) -> anyhow::Result<()> {
+        let (bucket, key) = S3Storage::parse_raw_uri(uri)?;
+        let key = dir_prefix(&key);
+        anyhow::ensure!(!key.is_empty(), "Can not create bucket root {uri}");
+
+        self.client()
+            .await?
+            .put_object()
+            .bucket(bucket)
+            .key(key)
+            .body(ByteStream::from_static(b""))
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    async fn list_empty_dirs(&self, base: &Url) -> anyhow::Result<Vec<String>> {
+        let (bucket, key) = S3Storage::parse_raw_uri(base)?;
+        let prefix = dir_prefix(&key);
+        let keys = self.list_keys(&bucket, &prefix).await?;
+        Ok(empty_dirs(&keys, &prefix))
+    }
 }
 
 impl S3Storage {
+    /// Lists every key below `prefix`, across as many pages as the store returns.
+    async fn list_keys(&self, bucket: &str, prefix: &str) -> anyhow::Result<Vec<String>> {
+        let mut keys = vec![];
+        let mut continuation_token = None;
+
+        loop {
+            let page = self
+                .client()
+                .await?
+                .list_objects_v2()
+                .bucket(bucket)
+                .prefix(prefix)
+                .set_continuation_token(continuation_token)
+                .send()
+                .await?;
+
+            keys.extend(
+                page.contents()
+                    .iter()
+                    .filter_map(|obj| obj.key().map(str::to_owned)),
+            );
+
+            continuation_token = page.next_continuation_token().map(str::to_string);
+            if !page.is_truncated().unwrap_or(false) || continuation_token.is_none() {
+                return Ok(keys);
+            }
+        }
+    }
+
     async fn download_file(&self, bucket: &str, key: &str, local: &Path) -> anyhow::Result<()> {
         let resp = self
             .client()
@@ -410,15 +463,17 @@ impl S3Storage {
     }
 
     async fn s3_file_type(&self, bucket: &str, key: &str) -> anyhow::Result<S3PathType> {
-        if self
-            .client()
-            .await?
-            .head_object()
-            .bucket(bucket)
-            .key(key)
-            .send()
-            .await
-            .is_ok()
+        // a folder key answers HEAD like an object
+        if !key.ends_with('/')
+            && self
+                .client()
+                .await?
+                .head_object()
+                .bucket(bucket)
+                .key(key)
+                .send()
+                .await
+                .is_ok()
         {
             return Ok(S3PathType::File);
         }
@@ -446,4 +501,92 @@ enum S3PathType {
     File,
     Directory,
     NotFound,
+}
+
+/// Normalizes a key to its directory form, leaving the bucket root (`""`) untouched.
+fn dir_prefix(key: &str) -> String {
+    match key.trim_end_matches('/') {
+        "" => String::new(),
+        key => format!("{key}/"),
+    }
+}
+
+/// Picks the folder keys with nothing below them, relative to `prefix`.
+fn empty_dirs(keys: &[String], prefix: &str) -> Vec<String> {
+    let mut sorted: Vec<&str> = keys.iter().map(String::as_str).collect();
+    sorted.sort_unstable();
+
+    // sorting puts everything below a folder key directly after it
+    sorted
+        .iter()
+        .enumerate()
+        .filter(|(i, key)| {
+            key.ends_with('/')
+                && !sorted
+                    .get(i + 1)
+                    .is_some_and(|next| next.starts_with(**key))
+        })
+        .filter_map(|(_, key)| key.strip_prefix(prefix))
+        .map(|relative| relative.trim_end_matches('/').to_string())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn keys(keys: &[&str]) -> Vec<String> {
+        keys.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn parse_raw_uri_decodes_the_key() {
+        let url = Url::parse("s3://bucket/run/sp%20ace/a%23b").unwrap();
+        let (bucket, key) = S3Storage::parse_raw_uri(&url).unwrap();
+        assert_eq!(bucket, "bucket");
+        assert_eq!(key, "run/sp ace/a#b");
+    }
+
+    #[test]
+    fn dir_prefix_normalizes_trailing_slash() {
+        assert_eq!(dir_prefix("run/dir"), "run/dir/");
+        assert_eq!(dir_prefix("run/dir/"), "run/dir/");
+        assert_eq!(dir_prefix(""), "");
+    }
+
+    #[test]
+    fn empty_dirs_reports_the_directory_itself() {
+        assert_eq!(empty_dirs(&keys(&["run/dir/"]), "run/dir/"), vec![""]);
+    }
+
+    #[test]
+    fn empty_dirs_reports_nested_paths() {
+        let found = empty_dirs(
+            &keys(&["run/a.txt", "run/sub/deep/", "run/sp ace/"]),
+            "run/",
+        );
+        assert_eq!(found, vec!["sp ace", "sub/deep"]);
+    }
+
+    #[test]
+    fn empty_dirs_skips_folder_keys_with_content() {
+        // a tool can write into a directory staged as empty
+        let found = empty_dirs(&keys(&["run/dir/", "run/dir/file"]), "run/");
+        assert_eq!(found, Vec::<String>::new());
+    }
+
+    #[test]
+    fn empty_dirs_does_not_confuse_sibling_names() {
+        let found = empty_dirs(&keys(&["run/a/", "run/a.txt", "run/ab/f"]), "run/");
+        assert_eq!(found, vec!["a"]);
+    }
+
+    #[test]
+    fn empty_dirs_handles_a_listing_without_folder_keys() {
+        assert_eq!(
+            empty_dirs(&keys(&["run/a.txt"]), "run/"),
+            Vec::<String>::new()
+        );
+        assert_eq!(empty_dirs(&[], "run/"), Vec::<String>::new());
+    }
 }
