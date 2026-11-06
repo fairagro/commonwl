@@ -37,7 +37,7 @@ use cwl_core::{
         DockerRequirement, EnvVarRequirement, InitialWorkDirRequirement,
         InlineJavascriptRequirement, InplaceUpdateRequirement, LoadListingRequirement,
         MultipleInputFeatureRequirement, NetworkAccess, ResourceRequirement,
-        ScatterFeatureRequirement, StringOrInclude, ToolTimeLimit,
+        ScatterFeatureRequirement, StringOrInclude, ToolTimeLimit, CUDARequirement,
     },
 };
 use cwl_engine_storage::{RemoteTempDir, Storage, StorageBackend, StoragePath};
@@ -167,6 +167,8 @@ pub struct TaskExecutionRequest<'a> {
     pub network: bool,
     pub use_container: bool,
     pub resources: Option<&'a ResourceRequirement>,
+    pub gpus: Option<u64>,
+    pub gpus_from_hint: bool,
 
     pub stdin_file: Option<&'a String>,
     pub stdout_file: Option<&'a String>,
@@ -762,6 +764,8 @@ pub async fn execute_commandline_tool(
     let llr = request.get_requirement_or_hint::<LoadListingRequirement>();
     let iur = request.get_requirement_or_hint::<InplaceUpdateRequirement>();
     let na = request.get_requirement_or_hint::<NetworkAccess>();
+    let cuda = request.get_requirement_or_hint::<CUDARequirement>();
+    let gpus_from_hint = cuda.is_some() && !request.has_requirement::<CUDARequirement>();
 
     let outdir = RemoteTempDir::new_under(backend.data_store(), backend.storage()).await?;
     let tmpdir = RemoteTempDir::new_under(backend.data_store(), backend.storage()).await?;
@@ -906,6 +910,7 @@ pub async fn execute_commandline_tool(
             false
         };
         debug!("Network Access is set to {network_access}");
+        let gpus = cuda.map(|cuda| resolve_gpu_count(cuda, eval_context)).transpose()?.flatten();
 
         let doc = tool.doc.as_ref().map(|d| docstring(d.clone()));
         let id = tool.id.clone().unwrap_or("Unnamed".to_owned())
@@ -934,6 +939,8 @@ pub async fn execute_commandline_tool(
                     network: network_access,
                     use_container: tool.has_requirement::<DockerRequirement>(), //hints no sufficient
                     resources: rr,
+                    gpus,
+                    gpus_from_hint,
 
                     stdin_file: stdin.as_ref(),
                     stdout_file: stdout_name.as_ref(),
@@ -1078,6 +1085,31 @@ pub fn evaluate_exitcodes(exit_codes: &NonEmpty<ExitStatus>, doc: &CWLDocument) 
         EngineStatus::Failure(code)
     } else {
         EngineStatus::Success(code)
+    }
+}
+
+fn resolve_gpu_count(cuda: &CUDARequirement, eval_context: &EvaluationContext<'_>) -> crate::Result<Option<u64>> {
+    let eval = |value: &IntegerOrExpression| -> crate::Result<i64> {
+        match value {
+            IntegerOrExpression::Int(i) => Ok(i64::from(*i)),
+            IntegerOrExpression::Long(i) => Ok(*i),
+            IntegerOrExpression::Expression(exp) => Ok(
+                do_eval(exp, eval_context)?
+                    .as_i64()
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("CUDA device count {exp} is not an integer")
+                    })?,
+            ),
+        }
+    };
+    let min = cuda.cuda_min_device_count.as_ref().map(&eval).transpose()?.unwrap_or(1);
+    let max = cuda.cuda_max_device_count.as_ref().map(&eval).transpose()?.unwrap_or(min);
+    crate::ensure!(min >= 0, "Number of cuda devices should be positive");
+    crate::ensure!(max >= min, "Maximum number of cuda devices should be greater than or equal to minimum number");
+    if min == 0 {
+        Ok(None)
+    } else {
+        Ok(Some(min.try_into()?))
     }
 }
 

@@ -285,9 +285,9 @@ pub(crate) fn collect_hints(
     hints
 }
 
-pub(crate) fn merge<T: Clone>(dst: &mut Vec<T>, src: &[T]) {
+pub(crate) fn merge<T: Clone + Same>(dst: &mut Vec<T>, src: &[T]) {
     for req in src {
-        if let Some(r) = dst.iter_mut().find(|r| same_variant::<T>(r, req)) {
+        if let Some(r) = dst.iter_mut().find(|r| r.same(req)) {
             *r = req.clone();
         } else {
             dst.push(req.clone());
@@ -297,6 +297,28 @@ pub(crate) fn merge<T: Clone>(dst: &mut Vec<T>, src: &[T]) {
 
 fn same_variant<T>(a: &T, b: &T) -> bool {
     std::mem::discriminant(a) == std::mem::discriminant(b)
+}
+
+pub(crate) trait Same {
+    fn same(&self, other: &Self) -> bool;
+}
+
+impl Same for ProcessRequirements {
+    fn same(&self, other: &Self) -> bool {
+        same_variant(self, other)
+    }
+}
+
+impl Same for ProcessHints {
+    fn same(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Requirement(a), Self::Requirement(b)) => a.same(b),
+            (Self::Any(a), Self::Any(b)) => {
+                matches!((a.get("class"), b.get("class")), (Some(a), Some(b)) if a == b)
+            }
+            _ => false,
+        }
+    }
 }
 
 #[cfg(test)]

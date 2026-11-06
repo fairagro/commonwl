@@ -203,6 +203,9 @@ fn resource_args(task: &Task) -> Vec<String> {
             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             args.push(format!("--mem={}M", (ram * 1024.0).ceil().max(1.0) as u64));
         }
+        if let Some(gpu) = resources.gpu(){
+            args.push(format!("--gres=gpu:{gpu}"));
+        }
     }
     args
 }
