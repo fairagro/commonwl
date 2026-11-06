@@ -2,9 +2,9 @@ use crate::{
     backend::{
         DEFAULT_DOCKER_CONTAINER, TaskBackend, TaskExecutionRequest, TaskExecutionResult,
         mount::{MountStrategy, mount_input, mount_workdir_item},
-    },
+    }, 
     docker::{ContainerBuildOptions, ContainerEngine, build_container_command, find_image_file},
-    environment::runtime::Runtime,
+    environment::runtime::Runtime, Jobstore, jobstore::create_private_dir
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -36,6 +36,9 @@ pub const CONTAINER_ENGINE: &str = "SLURM_CONTAINER_ENGINE";
 pub const LOG_DIR: &str = "SLURM_LOG_DIR"; 
 const DEFAULT_CORES: u64 = 1; 
 const DEFAULT_RAM: u64 = 256;
+pub const RESTART_ENV: &str = "SLURM_RESTART";
+pub const JOB_STORE_ENV: &str = "SLURM_JOB_STORE"; 
+
 #[derive(Debug)]
 pub struct SlurmBackend {
     uuid: String,
@@ -45,6 +48,7 @@ pub struct SlurmBackend {
     base_path: PathBuf,
     image_path: Option<PathBuf>,
     backend: Arc<SlurmCommandBackend>,
+    jobstore: Option<Arc<Jobstore>>,
 }
 
 impl SlurmBackend {
@@ -57,12 +61,17 @@ impl SlurmBackend {
         let apptainer = container_engine == ContainerEngine::Apptainer || container_engine == ContainerEngine::Singularity;
         crate::ensure!(data_store.is_local(),"slurm requires a data store on a filesystem that is shared with the clusters compute nodes");
         let base_path = data_store.as_local_path()?;
+        create_private_dir(&base_path).with_context(|| format!("Could not create {}", base_path.display()))?;
         let image_path = slurm_config.image_path.clone().or_else(|| env::var_os(IMAGE_PATH).map(PathBuf::from))
             .filter(|p| !p.as_os_str().is_empty()).map(std::path::absolute).transpose()?;
         if let Some(path) = &image_path {
             crate::ensure!(path.is_dir(), "image directory {} does not exist", path.display());
         } else if apptainer {
             warn!("No image directory set, set {IMAGE_PATH} if they exist locally.")
+        }
+        let jobstore = slurm_config.jobstore.as_ref().map(|d| Jobstore::new(d, slurm_config.restart)).transpose()?.map(Arc::new);
+        if slurm_config.restart && jobstore.is_none() {
+            crate::bail!("restarting a workflow requires a job store ({JOB_STORE_ENV})");
         }
         let backend = Arc::new(SlurmCommandBackend::new(storage.clone(), slurm_config));
         Ok(Self {
@@ -73,10 +82,11 @@ impl SlurmBackend {
             base_path,
             image_path,
             backend,
+            jobstore
         })
     }
 
-    pub fn from_env(storage: Arc<StorageBackend>) -> crate::Result<Self>{
+    pub fn from_env(storage: Arc<StorageBackend>, jobstore: Option<PathBuf>, restart: bool) -> crate::Result<Self>{
         let shared_dir = env::var_os(SHARED_DIR).filter(|d| !d.is_empty()).map(PathBuf::from)
             .with_context(|| {
                 format!("{SHARED_DIR} must be a directory shared with compute nodes")
@@ -88,7 +98,10 @@ impl SlurmBackend {
             _ => ContainerEngine::Apptainer,
         };
         let log_dir = env::var_os(LOG_DIR).filter(|d| !d.is_empty()).map(PathBuf::from);
-        Self::new(container_engine, storage, StoragePath::from_local(&shared_dir), SlurmConfig::builder().maybe_log_dir(log_dir).build())
+        let jobstore = jobstore.or_else(|| env::var_os(JOB_STORE_ENV).filter(|d| !d.is_empty()).map(PathBuf::from));
+        let restart = restart || env::var(RESTART_ENV).is_ok_and(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
+        Self::new(container_engine, storage, StoragePath::from_local(&shared_dir), 
+        SlurmConfig::builder().maybe_log_dir(log_dir).maybe_jobstore(jobstore).restart(restart).build())
     }
 
     fn step_dir(&self) -> PathBuf {
@@ -347,6 +360,7 @@ impl TaskBackend for SlurmBackend {
             base_path: self.base_path.clone(),
             image_path: self.image_path.clone(),
             backend: self.backend.clone(),
+            jobstore: self.jobstore.clone(),
         }) as Arc<dyn TaskBackend>
     }
 
@@ -366,6 +380,9 @@ impl TaskBackend for SlurmBackend {
 
     fn data_store(&self) -> &StoragePath {
         &self.data_store
+    }
+    fn get_jobstore(&self) -> Option<Arc<Jobstore>> {
+        self.jobstore.clone()
     }
 }
 

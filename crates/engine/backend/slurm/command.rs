@@ -40,6 +40,8 @@ pub struct SlurmConfig {
     pub time_limit: Option<String>,
     #[builder(into)]
     pub jobstore: Option<PathBuf>,
+    #[builder(default = false)]
+    pub restart: bool,
 }
 
 impl Default for SlurmConfig {
