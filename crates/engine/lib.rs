@@ -19,6 +19,7 @@ pub(crate) mod scatter;
 pub(crate) mod schema;
 pub(crate) mod tree;
 pub(crate) mod workflow;
+pub(crate) mod jobstore;
 
 pub use error::{Result, RunnerError};
 pub use expression::evaluate_expression_with_inputs;
@@ -56,6 +57,7 @@ pub use request::{
     create_execution_request_from_document, create_execution_request_with_inputs,
     load_input_file_from_file,
 };
+pub use jobstore::Jobstore;
 
 pub(crate) fn string_url_to_file_path(url: &str) -> crate::Result<PathBuf> {
     let url = Url::parse(url)?;

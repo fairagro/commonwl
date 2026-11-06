@@ -38,6 +38,8 @@ pub struct SlurmConfig {
     pub image_path: Option<PathBuf>,
     #[builder(into)]
     pub time_limit: Option<String>,
+    #[builder(into)]
+    pub jobstore: Option<PathBuf>,
 }
 
 impl Default for SlurmConfig {

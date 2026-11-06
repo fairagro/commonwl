@@ -22,6 +22,7 @@ use crate::{
     schema::format_validation::get_format_validator,
     tree::build_execution_tree,
     workflow::{collect_raw_inputs, eval_inputs},
+    jobstore::Jobstore
 };
 use anyhow::Context;
 use async_trait::async_trait;
@@ -94,6 +95,9 @@ pub trait TaskBackend: Send + Sync + 'static {
     fn data_store(&self) -> &StoragePath;
 
     fn shared_dir(&self) -> Option<PathBuf>{
+        None
+    }
+    fn get_jobstore(&self) -> Option<Arc<Jobstore>>{
         None
     }
 }
@@ -527,6 +531,7 @@ pub async fn execute_workflow(
                         backend_clone.clone(),
                         &working_dir_clone,
                         Some(&job_outdir),
+                        Some(job_index),
                         step_inputs,
                         token_clone.clone(),
                         request,
@@ -581,6 +586,7 @@ pub async fn execute_workflow(
                     backend_clone,
                     &working_dir_clone,
                     Some(&step_outdir),
+                    None,
                     step_inputs,
                     token_clone,
                     request,
@@ -656,16 +662,38 @@ pub async fn execute_workflow(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_step(
     step: &WorkflowStep,
     backend: Arc<dyn TaskBackend>,
     working_dir: &Path,
     outdir: Option<&Path>,
+    job_idx: Option<usize>,
     inputs: InputObject,
     token: CancellationToken,
     request: &ExecutionRequest,
 ) -> crate::Result<JoinHandle<crate::Result<(String, ExecutionResult)>>> {
     let step_id_clone = step.id.clone().unwrap();
+    let job = backend.get_jobstore().map(|s| -> crate::Result<_> {
+        let key = s.job_key(&request.out_dir, &step_id_clone, job_idx, 
+            &step.run, working_dir, &inputs.inputs)?;
+        Ok((s, key))
+    }).transpose()?;
+    if let Some((s, key)) = &job {
+        if let Some(outputs) = s.finished(key, &inputs.inputs) {
+            info!("Step {step_id_clone} already finished in a previous run, skipping it");
+            if let Some(tx) = &request.progress {
+                let _ = tx.send(StepEvent::Finished {step_id: step_id_clone.clone(), finished_at: Utc::now().naive_utc()});
+            }
+            let span = tracing::Span::current();
+            return Ok(tokio::spawn(
+                async move { Ok((step_id_clone, ExecutionResult { outputs, ..Default::default() })) }.instrument(span)
+            ));
+        }
+        s.reset(key)?;
+    }
+    let job_outdir = job.as_ref().map(|(store, key)| store.job_out_dir(key));
+    let outdir = job_outdir.as_deref().or(outdir);
     match &step.run {
         StringOrDocument::String(s) => {
             let specification_path = working_dir.join(s);
@@ -697,7 +725,12 @@ fn execute_step(
                                 finished_at: Utc::now().naive_utc(),
                             });
                         }
-                        Ok((step_id_clone, result?))
+                        let result = result?; 
+                        if let Some((s, key)) = &job && let EngineStatus::Success(_) 
+                            = evaluate_exitcodes(&result.exit_status, &request.specification){
+                            s.finish(key, &result.outputs)?;
+                        }
+                        Ok((step_id_clone, result))
                     }
                     .instrument(span),
                 );
@@ -732,7 +765,12 @@ fn execute_step(
                                 finished_at: Utc::now().naive_utc(),
                             });
                         }
-                        Ok((step_id_clone, result?))
+                        let result = result?; 
+                        if let Some((s, key)) = &job && let EngineStatus::Success(_) 
+                            = evaluate_exitcodes(&result.exit_status, &request.specification){
+                            s.finish(key, &result.outputs)?;
+                        }
+                        Ok((step_id_clone, result))
                     }
                     .instrument(span),
                 );
