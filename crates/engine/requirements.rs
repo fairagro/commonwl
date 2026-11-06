@@ -9,6 +9,7 @@ use cwl_core::{
         ScatterFeatureRequirement, SchemaDefRequirement, ShellCommandRequirement,
         SoftwareRequirement, StepInputExpressionRequirement, SubworkflowFeatureRequirement,
         ToolHints, ToolRequirements, ToolTimeLimit, WorkReuse, WorkflowHints, WorkflowRequirements,
+        CUDARequirement,
     },
 };
 use serde::Deserialize;
@@ -57,6 +58,7 @@ impl_conversion_methods!(ProcessRequirements, ToolTimeLimit);
 impl_conversion_methods!(ProcessRequirements, SubworkflowFeatureRequirement);
 impl_conversion_methods!(ProcessRequirements, ScatterFeatureRequirement);
 impl_conversion_methods!(ProcessRequirements, StepInputExpressionRequirement);
+impl_conversion_methods!(ProcessRequirements, CUDARequirement);
 
 // CWL does care about the distinction between tool requirements and workflow requirements,
 // but we don't care about that distinction here.
@@ -80,6 +82,8 @@ pub enum ProcessRequirements {
     ScatterFeatureRequirement(ScatterFeatureRequirement),
     MultipleInputFeatureRequirement(MultipleInputFeatureRequirement),
     StepInputExpressionRequirement(StepInputExpressionRequirement),
+    #[serde(rename = "cwltool:CUDARequirement", alias="http://commonwl.org/cwltool#CUDARequirement")]
+    CUDARequirement(CUDARequirement),
 }
 
 impl From<ToolRequirements> for ProcessRequirements {
@@ -110,6 +114,7 @@ impl From<ToolRequirements> for ProcessRequirements {
                 ProcessRequirements::InplaceUpdateRequirement(r)
             }
             ToolRequirements::ToolTimeLimit(r) => ProcessRequirements::ToolTimeLimit(r),
+            ToolRequirements::CUDARequirement(r) => ProcessRequirements::CUDARequirement(r),
         }
     }
 }
@@ -158,6 +163,7 @@ impl From<WorkflowRequirements> for ProcessRequirements {
                 ProcessRequirements::StepInputExpressionRequirement(r)
             }
             WorkflowRequirements::WorkReuse(r) => ProcessRequirements::WorkReuse(r),
+            WorkflowRequirements::CUDARequirement(r) => ProcessRequirements::CUDARequirement(r)
         }
     }
 }

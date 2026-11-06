@@ -54,6 +54,8 @@ pub enum ToolRequirements {
     NetworkAccess(NetworkAccess),
     InplaceUpdateRequirement(InplaceUpdateRequirement),
     ToolTimeLimit(ToolTimeLimit),
+    #[serde(rename = "cwltool:CUDARequirement", alias = "http://commonwl.org/cwltool#CUDARequirement")]
+    CUDARequirement(CUDARequirement),
 }
 
 impl FromShortHand for ToolRequirements {}
@@ -70,6 +72,7 @@ impl_conversion_methods!(ToolRequirements, WorkReuse);
 impl_conversion_methods!(ToolRequirements, NetworkAccess);
 impl_conversion_methods!(ToolRequirements, InplaceUpdateRequirement);
 impl_conversion_methods!(ToolRequirements, ToolTimeLimit);
+impl_conversion_methods!(ToolRequirements, CUDARequirement);
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(tag = "class")]
@@ -91,6 +94,8 @@ pub enum WorkflowRequirements {
     MultipleInputFeatureRequirement(MultipleInputFeatureRequirement),
     StepInputExpressionRequirement(StepInputExpressionRequirement),
     WorkReuse(WorkReuse),
+    #[serde(rename = "cwltool:CUDARequirement", alias = "http://commonwl.org/cwltool#CUDARequirement")]
+    CUDARequirement(CUDARequirement),
 }
 
 impl FromShortHand for WorkflowRequirements {}
@@ -394,6 +399,22 @@ pub struct MultipleInputFeatureRequirement;
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Clone)]
 /// - Reference: <https://www.commonwl.org/v1.2/Workflow.html#StepInputExpressionRequirement>
 pub struct StepInputExpressionRequirement;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Builder)]
+#[serde(rename_all = "camelCase")]
+pub struct CUDARequirement {
+    #[serde(rename = "cudaVersionMin")]
+    #[builder(into)]
+    pub cuda_min_version: String, 
+    #[builder(into)]
+    pub cuda_compute_capability: String, 
+    #[serde(rename = "cudaDeviceCountMin", skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub cuda_min_device_count: Option<IntegerOrExpression>,
+    #[serde(rename = "cudaDeviceCountMax", skip_serializing_if = "Option::is_none")]
+    #[builder(into)]
+    pub cuda_max_device_count: Option<IntegerOrExpression>,
+}
 
 #[cfg(test)]
 mod tests {
