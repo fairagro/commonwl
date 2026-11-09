@@ -1,4 +1,15 @@
 # Changelog
+## Unreleased
+### Changed
+- The TES backend no longer uses `.cwl_empty_dir` marker files. Empty directories are stored as
+  zero-byte `path/` keys in S3, created in the task through TES `volumes`, and reported back by
+  a scan executor.
+### Fixed
+- Tools on the TES backend no longer see a `.cwl_empty_dir` file in empty input directories.
+- TES runs no longer leave `.cwl_empty_dir` files in the output directory.
+- Empty subdirectories of local input directories are no longer lost when uploaded to S3.
+- S3 directories with more than 1000 objects are no longer cut off by `download` and `glob`.
+
 ## 0.15.1
 - Expose a function from expression module
 

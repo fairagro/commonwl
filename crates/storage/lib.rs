@@ -29,6 +29,17 @@ pub trait Storage: Send + Sync + std::fmt::Debug {
         base: &Url,
         pattern: &str,
     ) -> anyhow::Result<Box<dyn Iterator<Item = StoragePath> + Send>>;
+
+    /// Creates an empty directory. Object stores use a zero-byte `path/` key for this.
+    async fn create_dir(&self, uri: &Url) -> anyhow::Result<()> {
+        anyhow::bail!("Storage does not support creating directories ({uri})")
+    }
+
+    /// Lists the directories below `base` that hold nothing, relative to `base`.
+    /// An empty string means `base` itself is empty.
+    async fn list_empty_dirs(&self, _base: &Url) -> anyhow::Result<Vec<String>> {
+        Ok(vec![])
+    }
 }
 
 #[derive(Debug)]
@@ -133,6 +144,22 @@ impl Storage for StorageBackend {
             .get(base.scheme())
             .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
             .glob(base, pattern)
+            .await
+    }
+
+    async fn create_dir(&self, uri: &Url) -> anyhow::Result<()> {
+        self.inner
+            .get(uri.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .create_dir(uri)
+            .await
+    }
+
+    async fn list_empty_dirs(&self, base: &Url) -> anyhow::Result<Vec<String>> {
+        self.inner
+            .get(base.scheme())
+            .ok_or(anyhow::anyhow!("Could not find matching storage backend"))?
+            .list_empty_dirs(base)
             .await
     }
 }

@@ -8,7 +8,7 @@ use crate::{
     expression::{EvaluationContext, do_eval},
 };
 
-// Used when no ResourceRequirement sets a value, same as Sprocket.
+// Used when no ResourceRequirement sets a value
 const DEFAULT_CORES: u64 = 1;
 // In mebibytes
 const DEFAULT_RAM: u64 = 2 * 1024;
