@@ -34,8 +34,6 @@ pub const IMAGE_PATH: &str = "SLURM_IMAGE_PATH";
 pub const SHARED_DIR: &str = "SLURM_SHARED_DIR";
 pub const CONTAINER_ENGINE: &str = "SLURM_CONTAINER_ENGINE";
 pub const LOG_DIR: &str = "SLURM_LOG_DIR"; 
-const DEFAULT_CORES: u64 = 1; 
-const DEFAULT_RAM: u64 = 256;
 pub const RESTART_ENV: &str = "SLURM_RESTART";
 pub const JOB_STORE_ENV: &str = "SLURM_JOB_STORE"; 
 
@@ -243,9 +241,9 @@ impl TaskBackend for SlurmBackend {
             ])
             .resources(
                 Resources::builder()
-                    .cpu(cores as f64)
+                    .maybe_cpu(cores.map(|c| c as f64))
                     .disk(request.runtime.outdir_size as f64)
-                    .ram(ram as f64 / 1024.0)
+                    .maybe_ram(ram.map(|r| r as f64 / 1024.0))
                     .build(),
             )
             .build();
@@ -403,17 +401,9 @@ impl Drop for SlurmBackend {
     }
 }
 
-fn get_resources(rr: Option<&ResourceRequirement>, rt: &Runtime) -> (u64, u64){
-    let cores = if rr.is_some_and(|rr| rr.cores_min.is_some() || rr.cores_max.is_some()) {
-        rt.cores
-    } else {
-        DEFAULT_CORES
-    };
-    let ram = if rr.is_some_and(|rr| rr.ram_min.is_some() || rr.ram_max.is_some()){
-        rt.ram
-    } else{
-        DEFAULT_RAM
-    };
+fn get_resources(rr: Option<&ResourceRequirement>, rt: &Runtime) -> (Option<u64>, Option<u64>){
+    let cores = rr.is_some_and(|rr| rr.cores_min.is_some() || rr.cores_max.is_some()).then_some(rt.cores);
+    let ram  = rr.is_some_and(|rr| rr.ram_min.is_some() || rr.ram_max.is_some()).then_some(rt.ram);
     (cores, ram)
 }
 
