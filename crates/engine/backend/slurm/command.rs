@@ -94,6 +94,7 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
                 .await
                 .map_err(|e| TaskRunError::Other(e.into()))?;
             let name = job_name(&task);
+            let disk_limit = disk_limit(&task);
             for exec in task.executions() {
                 if token.is_cancelled() {
                     return Err(TaskRunError::Canceled);
@@ -107,7 +108,7 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
                 }
                 let mut res = resource_args(&task);
                 res.extend(time_limit.map(time_arg));
-                let status = submit(&config, &name, &res, &job_script(exec, time_limit), &token).await?;
+                let status = submit(&config, &name, &res, &job_script(exec, time_limit, disk_limit.as_ref()), &token).await?;
                 status_vec.push(ExecutionResult {
                     image: Some(exec.images().first().clone()),
                     status,
@@ -214,7 +215,7 @@ fn resource_args(task: &Task) -> Vec<String> {
     args
 }
 
-fn job_script(execution: &Execution, time_limit: Option<u64>) -> String {
+fn job_script(execution: &Execution, time_limit: Option<u64>, disk_limit: Option<&DiskSpace>) -> String {
     let mut script = String::from("#!/bin/sh\n");
     let redirect = execution.stderr().map_or_else(|| ">&2".to_owned(), |stderr| format!(">> {}", quote(stderr)));
     for (key, value) in execution.env() {
@@ -224,6 +225,12 @@ fn job_script(execution: &Execution, time_limit: Option<u64>) -> String {
     if let Some(secs) = time_limit {
         let _ = writeln!(script, "( sleep {secs}; echo \"Stopping job, it exceeded the time limit of {secs}s\" {redirect}; \
             kill -TERM $$; sleep 10; kill -KILL $$ ) &");
+    }
+    if let Some(limit) = disk_limit {
+        let dirs = limit.dirs.iter().map(|d| quote(d)).collect::<Vec<_>>().join(" ");
+        let _ = writeln!(script, "( while sleep {secs}; do used=$(du -skH {dirs} 2>/dev/null | awk '{{s+=$1}} END {{print s+0}}'); \
+            if [ \"$used\" -gt {kib} ]; then echo \"Stopping job, it uses $used KiB of disk, more than the requested {kib} KiB\" {redirect}; \
+            kill -TERM $$; sleep {secs}; kill -KILL $$; exit; fi; done ) &", secs = Duration::from_secs(30).as_secs(), kib = limit.kib);
     }
     if let Some(dir) = execution.work_dir() {
         writeln!(script, "cd {} || exit 1", quote(dir)).expect("writing to a String cannot fail");
@@ -344,6 +351,28 @@ fn job_name(task: &Task) -> String {
 fn time_arg(seconds: u64) -> String {
     format!("--time={}", seconds.div_ceil(60) + 1)
 }
+
+#[derive(Debug)]
+struct DiskSpace {
+    dirs: Vec<String>,
+    kib: u64,
+}
+
+fn disk_limit(task: &Task) -> Option<DiskSpace> {
+    let gib = task.resources()?.disk()?;
+    let mut dirs: Vec<_> = task.inputs().filter(|input| !input.read_only()).map(|input| input.path().to_owned()).collect();
+    dirs.sort();
+    dirs.dedup_by(|dir, parent| {
+        Path::new(dir).starts_with(Path::new(parent))
+    });
+    if dirs.is_empty() {
+        return None;
+    }
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let kib = (gib * 1024.0 * 1024.0).ceil() as u64;
+    Some(DiskSpace { dirs, kib })
+}
+
 
 #[cfg(test)]
 #[cfg(unix)]
