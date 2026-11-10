@@ -371,7 +371,8 @@ struct DiskSpace {
 
 fn disk_limit(task: &Task) -> Option<DiskSpace> {
     let gib = task.resources()?.disk()?;
-    let mut dirs: Vec<_> = task.inputs().filter(|input| !input.read_only()).map(|input| input.path().to_owned()).collect();
+    let mut dirs: Vec<_> = task.inputs().filter(|input| !input.read_only() && 
+        input.name().is_some_and(|n| n == "outdir")).map(|input| input.path().to_owned()).collect();
     dirs.sort();
     dirs.dedup_by(|dir, parent| {
         Path::new(dir).starts_with(Path::new(parent))

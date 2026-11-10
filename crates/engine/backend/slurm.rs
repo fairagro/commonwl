@@ -242,7 +242,7 @@ impl TaskBackend for SlurmBackend {
             .resources(
                 Resources::builder()
                     .maybe_cpu(cores.map(|c| c as f64))
-                    .disk(request.runtime.outdir_size as f64)
+                    .maybe_disk(outdir_limit_in_gib(request.resources, request.runtime))
                     .maybe_ram(ram.map(|r| r as f64 / 1024.0))
                     .build(),
             )
@@ -405,6 +405,11 @@ fn get_resources(rr: Option<&ResourceRequirement>, rt: &Runtime) -> (Option<u64>
     let cores = rr.is_some_and(|rr| rr.cores_min.is_some() || rr.cores_max.is_some()).then_some(rt.cores);
     let ram  = rr.is_some_and(|rr| rr.ram_min.is_some() || rr.ram_max.is_some()).then_some(rt.ram);
     (cores, ram)
+}
+
+fn outdir_limit_in_gib(rr: Option<&ResourceRequirement>, rt: &Runtime) -> Option<f64> {
+    #[allow(clippy::cast_precision_loss)]
+    rr.is_some_and(|rr| rr.outdir_min.is_some() || rr.outdir_max.is_some()).then(|| rt.outdir_size as f64 / 1024.0)
 }
 
 #[cfg(test)]
