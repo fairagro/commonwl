@@ -208,7 +208,7 @@ pub fn build_container_command(
 
     if !options.network {
         if apptainer {
-            args.push("--net=none".to_string());
+            args.push("--net".to_string());
             args.push("--network=none".to_string());
         }
         else {
