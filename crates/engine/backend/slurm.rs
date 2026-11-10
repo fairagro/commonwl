@@ -36,6 +36,8 @@ pub const CONTAINER_ENGINE: &str = "SLURM_CONTAINER_ENGINE";
 pub const LOG_DIR: &str = "SLURM_LOG_DIR"; 
 pub const RESTART_ENV: &str = "SLURM_RESTART";
 pub const JOB_STORE_ENV: &str = "SLURM_JOB_STORE"; 
+pub const SBATCH_ARGS: &str = "SLURM_SBATCH_ARGS";
+pub const MAX_JOBS: &str = "SLURM_MAX_JOBS";
 
 #[derive(Debug)]
 pub struct SlurmBackend {
@@ -47,6 +49,30 @@ pub struct SlurmBackend {
     image_path: Option<PathBuf>,
     backend: Arc<SlurmCommandBackend>,
     jobstore: Option<Arc<Jobstore>>,
+}
+
+impl SlurmConfig {
+    pub fn from_env() -> crate::Result<Self> {
+        let path = |name: &str| {
+            env::var_os(name).filter(|value| !value.is_empty()).map(PathBuf::from)
+        };
+        let max_jobs = match env::var(MAX_JOBS).ok().filter(|v| !v.is_empty()) {
+            Some(value) => {
+                let n = value.parse::<usize>().ok().filter(|n| *n > 0).with_context(|| {
+                    format!("{MAX_JOBS} must be a positive number, got '{value}'")
+                })?;
+                Some(n)
+            }
+            None => None,
+        };
+        let sbatch_args = env::var(SBATCH_ARGS).map(|args| args.split_whitespace()
+            .map(str::to_owned).collect()).unwrap_or_default();
+        let restart = env::var(RESTART_ENV).is_ok_and(|value| {
+            matches!(value.to_ascii_lowercase().as_str(), "1" | "true" | "yes")
+        });
+        Ok(Self::builder().sbatch_args(sbatch_args).maybe_log_dir(path(LOG_DIR)).maybe_image_path(path(IMAGE_PATH))
+            .maybe_max_jobs(max_jobs).maybe_jobstore(path(JOB_STORE_ENV)).restart(restart).build())
+    }
 }
 
 impl SlurmBackend {
@@ -95,11 +121,10 @@ impl SlurmBackend {
             Ok(engine) if !engine.is_empty() => engine.parse()?,
             _ => ContainerEngine::Apptainer,
         };
-        let log_dir = env::var_os(LOG_DIR).filter(|d| !d.is_empty()).map(PathBuf::from);
-        let jobstore = jobstore.or_else(|| env::var_os(JOB_STORE_ENV).filter(|d| !d.is_empty()).map(PathBuf::from));
-        let restart = restart || env::var(RESTART_ENV).is_ok_and(|v| matches!(v.to_ascii_lowercase().as_str(), "1" | "true" | "yes"));
-        Self::new(container_engine, storage, StoragePath::from_local(&shared_dir), 
-        SlurmConfig::builder().maybe_log_dir(log_dir).maybe_jobstore(jobstore).restart(restart).build())
+        let mut config = SlurmConfig::from_env()?;
+        config.jobstore = jobstore.or_else(|| env::var_os(JOB_STORE_ENV).filter(|d| !d.is_empty()).map(PathBuf::from));
+        config.restart |= restart;
+        Self::new(container_engine, storage, StoragePath::from_local(&shared_dir), config)
     }
 
     fn step_dir(&self) -> PathBuf {
