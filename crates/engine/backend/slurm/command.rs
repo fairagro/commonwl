@@ -16,13 +16,14 @@ use tokio::{
     io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     process::{Command, Child},
     select,
-    sync::broadcast,
+    sync::{Semaphore, broadcast},
     time::timeout
 };
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
 const CANCEL_JOB_TIMEOUT: Duration = Duration::from_secs(60);
+pub const DEFAULT_MAX_JOBS: usize = 32;
 
 #[derive(Debug, Clone, Builder)]
 pub struct SlurmConfig {
@@ -42,6 +43,8 @@ pub struct SlurmConfig {
     pub jobstore: Option<PathBuf>,
     #[builder(default = false)]
     pub restart: bool,
+    #[builder(default = DEFAULT_MAX_JOBS)]
+    pub max_jobs: usize,
 }
 
 impl Default for SlurmConfig {
@@ -56,12 +59,14 @@ pub struct SlurmCommandBackend {
     config: SlurmConfig,
     link_inputs: bool,
     time_limit: Option<u64>,
+    jobs: Arc<Semaphore>,
 }
 
 impl SlurmCommandBackend {
     #[must_use]
     pub fn new(storage: Arc<StorageBackend>, config: SlurmConfig) -> Self {
-        Self { storage, config, link_inputs: false, time_limit: None }
+        let jobs = Arc::new(Semaphore::new(config.max_jobs.max(1)));
+        Self { storage, config, link_inputs: false, time_limit: None, jobs }
     }
     #[must_use]
     pub fn with_linked_inputs(&self, link_inputs: bool) -> Self {
@@ -88,7 +93,13 @@ impl crankshaft::engine::service::runner::backend::Backend for SlurmCommandBacke
         let config = self.config.clone();
         let link_inputs = self.link_inputs;
         let time_limit = self.time_limit;
+        let jobs = self.jobs.clone();
         Ok(async move {
+            let _jobs = select! {
+                biased;
+                () = token.cancelled() => return Err(TaskRunError::Canceled),
+                jobs = jobs.acquire_owned() => jobs.map_err(|e| TaskRunError::Other(e.into()))?,
+            };
             let mut status_vec = Vec::new();
             stage_job_inputs(storage, task.inputs(), link_inputs)
                 .await
